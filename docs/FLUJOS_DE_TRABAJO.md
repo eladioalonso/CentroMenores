@@ -93,25 +93,31 @@ Registrar a un menor sin duplicar su identidad y abrir un nuevo periodo de estan
 
 ### Objetivo
 
-Registrar observaciones y acontecimientos cotidianos de forma ordenada y atribuible.
+Disponer de un registro cronológico general y único de la actividad cotidiana del centro. No habrá un diario independiente por menor: las anotaciones se consultarán en una cronología común y podrán relacionarse con uno o varios menores cuando corresponda.
 
 ### Recorrido propuesto
 
 1. El educador entra en Diario profesional.
-2. Selecciona al menor o menores relacionados.
-3. La aplicación propone la estancia activa, si existe, y permite comprobarla.
-4. Selecciona una categoría o tipo de anotación de un catálogo configurable.
-5. Introduce el contenido y los datos complementarios definidos por el centro.
-6. Guarda la anotación.
-7. La aplicación registra autor, fecha y hora, y la relaciona con el menor y la estancia cuando corresponda.
-8. La anotación aparece en las consultas e historiales autorizados.
+2. La aplicación muestra la cronología general, ordenada por fecha y hora, con los registros que el usuario esté autorizado a consultar.
+3. Para crear una anotación, el profesional selecciona si se trata de un registro general del centro o si está relacionado con uno o varios menores.
+4. Si selecciona menores, la aplicación permite vincular todos los implicados en una única anotación y propone comprobar la estancia correspondiente de cada uno cuando proceda.
+5. Selecciona una categoría o tipo de anotación de un catálogo configurable.
+6. Introduce el contenido y los datos complementarios definidos por el centro.
+7. Guarda la anotación.
+8. La aplicación registra automáticamente el autor, la fecha y la hora de creación, y conserva la relación con los menores y las estancias que correspondan.
+9. La anotación aparece una sola vez en la cronología general y también en las consultas o historiales autorizados de cada menor relacionado.
 
 ### Reglas
 
+- El diario es un registro cronológico general del centro, no una colección de diarios individuales.
+- Una anotación puede no estar relacionada con ningún menor, o estar relacionada con uno o varios.
+- Si un mismo acontecimiento afecta a varios menores, se creará una única anotación con varias relaciones; no se duplicará el texto por cada menor.
+- La fecha y hora del acontecimiento, si difieren de la fecha y hora de registro, deberán poder distinguirse.
+- Las consultas podrán filtrarse, como mínimo, por intervalo de fechas, menor relacionado, profesional autor y categoría, siempre respetando los permisos.
 - Una anotación no debe confundirse automáticamente con una incidencia.
-- Si el contenido requiere abrir una incidencia formal, la aplicación podrá ofrecer iniciar ese flujo sin duplicar innecesariamente la información.
-- Las anotaciones guardadas no se modificarán de forma silenciosa.
-- Se definirán permisos para consultar, crear, rectificar y exportar anotaciones.
+- Si el contenido requiere abrir una incidencia formal, la aplicación podrá ofrecer iniciar ese flujo y mantener la relación entre ambos registros, evitando duplicar innecesariamente la información.
+- Las anotaciones guardadas no se modificarán de forma silenciosa. Las rectificaciones conservarán trazabilidad de autoría, fecha, motivo y contenido anterior conforme a la política que apruebe el centro.
+- Se definirán permisos diferenciados para consultar, crear, rectificar y exportar anotaciones.
 
 ## 7. Registro y seguimiento de una incidencia
 
