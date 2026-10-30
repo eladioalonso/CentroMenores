@@ -52,12 +52,12 @@ La autorización se comprobará en los servicios de aplicación antes de ejecuta
 El diario profesional será visible para todos los educadores autorizados, pero la autoría de cada anotación debe quedar protegida.
 
 - **Consulta:** todos los educadores pueden consultar las anotaciones del diario, respetando las restricciones de acceso que se definan para información especialmente sensible.
-- **Anotación propia:** el autor podrá corregir sus propias anotaciones únicamente mientras permanezca abierto el turno completo al que pertenecen. El turno completo tiene una duración máxima de 48 horas; al finalizar ese turno, todas las anotaciones atribuidas a él quedarán bloqueadas para su modificación por el autor, sin excepción por la hora concreta en que se creó cada anotación. Las correcciones realizadas antes del cierre serán trazables y nunca sobrescribirán silenciosamente el contenido original.
+- **Anotación propia:** el autor podrá corregir sus propias anotaciones únicamente mientras permanezca abierto el turno completo al que pertenecen. El turno ordinario descrito por el centro comprende una tarde (15:00–22:00), la mañana siguiente (08:00–15:00) y la noche siguiente (22:00–08:00 del día posterior). Para permitir prolongaciones excepcionales por falta de sustitución, el cierre podrá realizarse manualmente al terminar realmente el servicio o, si no se realiza, se ejecutará automáticamente al cumplirse 48 horas desde el inicio del turno. Ese plazo es un límite absoluto. Las correcciones realizadas antes del cierre serán trazables y nunca sobrescribirán silenciosamente el contenido original.
 - **Anotación ajena:** otro educador no podrá editar ni sustituir el texto original.
 - **Matización:** cualquier educador autorizado podrá añadir una matización o comentario vinculado a una anotación ajena. La matización será un registro independiente, con su propio autor, fecha y hora; el texto original permanecerá intacto.
 - **Rectificación posterior al cierre o de una anotación ajena:** si se detecta un error una vez finalizado el turno de 48 horas, el autor tampoco podrá modificar la anotación original. Deberá añadir una rectificación vinculada, indicando quién la realiza, cuándo y el motivo. La rectificación no borrará el texto original.
 - **Historial:** la consulta de una anotación permitirá distinguir el texto original, sus correcciones por el autor y las matizaciones o rectificaciones añadidas por otros profesionales.
-- **Trazabilidad:** todas las operaciones conservarán identidad del usuario, fecha/hora y relación con la anotación afectada. El sistema deberá asociar cada anotación al turno en que se creó y aplicar el bloqueo al cierre de ese turno, con una duración máxima de 48 horas.
+- **Trazabilidad:** todas las operaciones conservarán identidad del usuario, fecha/hora y relación con la anotación afectada. El sistema deberá asociar cada anotación al turno completo correspondiente. El turno podrá cerrarse mediante una acción expresa del educador responsable o de un administrador autorizado cuando el servicio haya terminado realmente; si nadie lo cierra, el sistema lo cerrará automáticamente al cumplirse 48 horas desde su inicio. El cierre manual podrá adelantar el bloqueo, pero nunca ampliar el límite absoluto.
 
 La aplicación deberá distinguir claramente una matización (información complementaria) de una rectificación (señalar o corregir un dato erróneo). Los permisos para exportar o imprimir el diario se definirán por separado.
 
@@ -113,8 +113,7 @@ Antes de implementar el sistema se deberá confirmar:
 1. Si existen otros perfiles profesionales que deban tener acceso a la aplicación, además de educadores y administrador del sistema.
 2. Qué autorizaciones concretas tendrá cada educador sobre los distintos módulos y registros.
 3. Qué personas estarán autorizadas para acceder al área sanitaria y con qué alcance.
-7. Cómo se configuran y determinan los límites de cada turno completo de 48 horas para bloquear automáticamente las anotaciones propias al finalizarlo.
 4. Si el administrador del sistema podrá consultar información operativa o si sus permisos se limitarán a la administración técnica, salvo que también actúe como educador.
-5. Quién puede consultar, modificar, exportar y cerrar cada tipo de registro.
+5. Quién puede consultar, modificar, exportar y cerrar cada tipo de registro, incluida la autorización para cerrar manualmente un turno.
 6. Qué eventos se auditan y durante cuánto tiempo se conservan.
 7. Cómo se gestionan las ausencias, sustituciones y bajas de usuarios.
