@@ -47,7 +47,21 @@ Aunque todos los educadores compartan el mismo perfil, los permisos se definirá
 
 La autorización se comprobará en los servicios de aplicación antes de ejecutar la operación y acceder a los datos protegidos. Las restricciones legales o de confidencialidad se aplicarán con independencia de que los educadores compartan perfil.
 
-## 4. Protección reforzada del área sanitaria
+## 4. Diario profesional: autoría, consulta y rectificaciones
+
+El diario profesional será visible para todos los educadores autorizados, pero la autoría de cada anotación debe quedar protegida.
+
+- **Consulta:** todos los educadores pueden consultar las anotaciones del diario, respetando las restricciones de acceso que se definan para información especialmente sensible.
+- **Anotación propia:** el autor podrá corregir sus propias anotaciones mediante un procedimiento trazable. No se sobrescribirá silenciosamente el contenido ya registrado.
+- **Anotación ajena:** otro educador no podrá editar ni sustituir el texto original.
+- **Matización:** cualquier educador autorizado podrá añadir una matización o comentario vinculado a una anotación ajena. La matización será un registro independiente, con su propio autor, fecha y hora; el texto original permanecerá intacto.
+- **Rectificación de una anotación ajena:** si se detecta un error, se añadirá una rectificación vinculada a la anotación original, indicando quién la realiza, cuándo y el motivo. La rectificación no borrará el texto original.
+- **Historial:** la consulta de una anotación permitirá distinguir el texto original, sus correcciones por el autor y las matizaciones o rectificaciones añadidas por otros profesionales.
+- **Trazabilidad:** todas las operaciones conservarán identidad del usuario, fecha/hora y relación con la anotación afectada.
+
+La aplicación deberá distinguir claramente una matización (información complementaria) de una rectificación (señalar o corregir un dato erróneo). Los permisos para exportar o imprimir el diario se definirán por separado.
+
+## 5. Protección reforzada del área sanitaria
 
 - El acceso estará limitado a usuarios expresamente autorizados.
 - Consultar, modificar, adjuntar, exportar e imprimir información sanitaria podrán ser permisos distintos.
@@ -58,7 +72,7 @@ La autorización se comprobará en los servicios de aplicación antes de ejecuta
 
 La asignación concreta de autorizaciones sanitarias queda pendiente de validación por el centro.
 
-## 5. Identificación y sesión
+## 6. Identificación y sesión
 
 - Cada profesional tendrá una cuenta individual.
 - Las contraseñas se almacenarán mediante hash seguro, nunca en texto claro.
@@ -68,7 +82,7 @@ La asignación concreta de autorizaciones sanitarias queda pendiente de validaci
 - La aplicación ofrecerá un cambio de usuario que cierre la sesión anterior antes de iniciar otra.
 - Los errores de autenticación no revelarán información innecesaria sobre las cuentas.
 
-## 6. Auditoría
+## 7. Auditoría
 
 Se registrarán, según la política que se defina:
 
@@ -82,7 +96,7 @@ Cada evento incluirá como mínimo usuario, fecha/hora, tipo de operación y ref
 
 La auditoría no deberá poder alterarse desde las pantallas ordinarias de trabajo. Se definirán permisos y plazos de conservación para estos registros.
 
-## 7. Principios de administración
+## 8. Principios de administración
 
 - Aplicar el principio de mínimo privilegio.
 - Registrar los cambios de roles y permisos.
@@ -92,7 +106,7 @@ La auditoría no deberá poder alterarse desde las pantallas ordinarias de traba
 - No permitir que un educador ordinario se otorgue privilegios administrativos.
 - Mantener separadas, en la medida técnicamente viable, las funciones de administración del sistema y el acceso a información especialmente sensible.
 
-## 8. Decisiones pendientes
+## 9. Decisiones pendientes
 
 Antes de implementar el sistema se deberá confirmar:
 
