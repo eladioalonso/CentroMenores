@@ -35,6 +35,7 @@ Estas tecnologías constituyen la propuesta inicial y podrán revisarse durante 
 - [Arquitectura técnica](docs/ARQUITECTURA.md)
 - [Usuarios y permisos](docs/USUARIOS_Y_PERMISOS.md)
 - [Flujos de trabajo](docs/FLUJOS_DE_TRABAJO.md)
+- [Modelo conceptual de datos](docs/MODELO_DATOS.md)
 
 ## Alcance y protección de datos
 
