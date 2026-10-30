@@ -34,6 +34,7 @@ Estas tecnologías constituyen la propuesta inicial y podrán revisarse durante 
 - [Módulos funcionales](docs/MODULOS.md)
 - [Arquitectura técnica](docs/ARQUITECTURA.md)
 - [Usuarios y permisos](docs/USUARIOS_Y_PERMISOS.md)
+- [Flujos de trabajo](docs/FLUJOS_DE_TRABAJO.md)
 
 ## Alcance y protección de datos
 
