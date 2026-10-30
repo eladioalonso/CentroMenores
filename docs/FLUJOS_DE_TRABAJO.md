@@ -116,7 +116,7 @@ Disponer de un registro cronológico general y único de la actividad cotidiana 
 - Las consultas podrán filtrarse, como mínimo, por intervalo de fechas, menor relacionado, profesional autor y categoría, siempre respetando los permisos.
 - Una anotación no debe confundirse automáticamente con una incidencia.
 - Si el contenido requiere abrir una incidencia formal, la aplicación podrá ofrecer iniciar ese flujo y mantener la relación entre ambos registros, evitando duplicar innecesariamente la información.
-- Las anotaciones guardadas no se modificarán de forma silenciosa. Las rectificaciones conservarán trazabilidad de autoría, fecha, motivo y contenido anterior conforme a la política que apruebe el centro.
+- Las anotaciones guardadas no se modificarán de forma silenciosa. El autor solo podrá corregir sus propias anotaciones mientras siga abierto el turno completo al que pertenecen, con una duración máxima de 48 horas. Al finalizar ese turno, todas sus anotaciones quedarán bloqueadas para modificación por el autor, incluidas las creadas poco antes del cierre. El sistema asociará cada anotación al turno correspondiente y aplicará el bloqueo automáticamente al finalizarlo. Después del bloqueo, cualquier corrección deberá registrarse como rectificación independiente vinculada al original, con autor, fecha/hora y motivo; el contenido original permanecerá intacto.
 - Se definirán permisos diferenciados para consultar, crear, rectificar y exportar anotaciones.
 
 ## 7. Registro y seguimiento de una incidencia
@@ -341,8 +341,11 @@ La restauración deberá probarse periódicamente; una copia no se considerará 
 4. Cierra su sesión.
 5. La aplicación vuelve a la pantalla de acceso.
 6. Si otro educador utiliza el equipo, inicia sesión con sus propias credenciales.
+7. Al finalizar el turno completo, la aplicación bloquea automáticamente para su modificación por el autor todas las anotaciones del diario asociadas a ese turno.
 
-El cierre de sesión no debe cerrar ni finalizar automáticamente tareas, incidencias o salidas.
+**Regla de cierre del diario:** el turno completo tiene una duración máxima de 48 horas. El plazo de edición no se calcula individualmente desde la creación de cada anotación: depende del inicio y final del turno al que se asocia. Al finalizar el turno, el autor ya no podrá modificar ninguna de sus anotaciones. Si detecta posteriormente un error u omisión, deberá añadir una rectificación vinculada al registro original, conservando el original y dejando constancia de autor, fecha/hora y motivo. El bloqueo no impide añadir matizaciones o rectificaciones independientes conforme a los permisos establecidos.
+
+El cierre de sesión no debe cerrar ni finalizar automáticamente tareas, incidencias o salidas. Tampoco debe confundirse el cierre de sesión con el cierre del turno: el bloqueo de las anotaciones se produce al finalizar el turno completo registrado por la aplicación.
 
 ## 19. Estados y catálogos configurables
 
