@@ -61,6 +61,11 @@ class EducationDialog(StaySelectorDialog):
         self.goals.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.goals.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.body.addWidget(self.goals)
+        self.updates = QTableWidget(0, 5)
+        self.updates.setHorizontalHeaderLabels(["Fecha", "Área", "Observación", "Actuación", "Respuesta / seguimiento"])
+        self.updates.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.updates.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.body.addWidget(self.updates)
         actions = QHBoxLayout()
         for label, callback in [("Añadir seguimiento", self.add_update),
                                 ("Cambiar estado", self.change_status),
@@ -76,6 +81,9 @@ class EducationDialog(StaySelectorDialog):
             rows = session.scalars(select(EducationGoal).where(EducationGoal.stay_id == stay_id)
                 .order_by(EducationGoal.created_at.desc())).all() if stay_id else []
             data = [(g.id, g.title, g.status, g.target_date.isoformat() if g.target_date else "—") for g in rows]
+            updates = [(u.created_at, u.category, u.objective_description, u.actions_taken,
+                u.response_observed + (" · Seguimiento: " + u.follow_up if u.follow_up else ""))
+                for g in rows for u in g.updates]
         self.goals.setRowCount(len(data))
         for i, values in enumerate(data):
             item_id, *display = values
@@ -83,6 +91,11 @@ class EducationDialog(StaySelectorDialog):
                 cell = QTableWidgetItem(value)
                 if col == 0: cell.setData(Qt.ItemDataRole.UserRole, item_id)
                 self.goals.setItem(i, col, cell)
+        updates.sort(key=lambda row: row[0], reverse=True)
+        self.updates.setRowCount(len(updates))
+        for i, (created, category, observation, actions, response) in enumerate(updates):
+            values = [created.astimezone().strftime("%d/%m/%Y %H:%M"), category, observation, actions, response]
+            for col, value in enumerate(values): self.updates.setItem(i, col, QTableWidgetItem(value))
 
     def create_goal(self):
         if not self.stay.currentData(): return
