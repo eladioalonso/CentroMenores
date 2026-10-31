@@ -530,6 +530,8 @@ class DocumentsDialog(QDialog):
             self.category.addItem(label, key)
         self.title = QLineEdit()
         self.title.setMaxLength(180)
+        self.supersedes = QComboBox()
+        self.supersedes.addItem("Documento nuevo (versión 1)", None)
         self.expiry = QDateEdit(QDate.currentDate().addYears(1))
         self.expiry.setCalendarPopup(True)
         self.no_expiry = QCheckBox("Sin caducidad")
@@ -542,6 +544,7 @@ class DocumentsDialog(QDialog):
         form.addRow("Estancia activa", self.stay)
         form.addRow("Categoría", self.category)
         form.addRow("Título", self.title)
+        form.addRow("Sustituye a (nueva versión)", self.supersedes)
         form.addRow("Caduca el", self.expiry)
         form.addRow("", self.no_expiry)
         form.addRow("Notas", self.notes)
@@ -563,7 +566,29 @@ class DocumentsDialog(QDialog):
         layout.addLayout(actions)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.stay.currentIndexChanged.connect(self.refresh)
+        self.category.currentIndexChanged.connect(self.refresh_supersedes)
         self.refresh()
+
+    def refresh_supersedes(self):
+        selected = self.supersedes.currentData()
+        self.supersedes.blockSignals(True)
+        self.supersedes.clear()
+        self.supersedes.addItem("Documento nuevo (versión 1)", None)
+        stay_id = self.stay.currentData()
+        if stay_id:
+            with session_scope(self.factory) as session:
+                docs = session.scalars(select(PersonalDocument).where(
+                    PersonalDocument.stay_id == stay_id,
+                    PersonalDocument.category == self.category.currentData()
+                ).order_by(PersonalDocument.created_at.desc())).all()
+                for doc in docs:
+                    self.supersedes.addItem(
+                        f"{doc.title} · v{doc.version} · {doc.original_filename}",
+                        doc.id
+                    )
+        index = self.supersedes.findData(selected)
+        self.supersedes.setCurrentIndex(index if index >= 0 else 0)
+        self.supersedes.blockSignals(False)
 
     def choose_file(self):
         filename, _ = QFileDialog.getOpenFileName(self, "Seleccionar documento")
@@ -575,7 +600,9 @@ class DocumentsDialog(QDialog):
         stay_id = self.stay.currentData()
         if not stay_id:
             self.table.setRowCount(0)
+            self.refresh_supersedes()
             return
+        self.refresh_supersedes()
         with session_scope(self.factory) as session:
             docs = list_documents(session, actor_account_id=self.actor_id, stay_id=stay_id)
             rows = [(d.id, d.title, d.category, d.original_filename, str(d.version),
@@ -651,7 +678,7 @@ class DocumentsDialog(QDialog):
                     original_filename=source.name, relative_path=relative_path,
                     mime_type=mime_type, size_bytes=target.stat().st_size,
                     sha256=digest, expires_on=None if self.no_expiry.isChecked() else self.expiry.date().toPython(),
-                    notes=self.notes.toPlainText(),
+                    notes=self.notes.toPlainText(), supersedes_id=self.supersedes.currentData(),
                 )
             self.title.clear()
             self.notes.clear()
