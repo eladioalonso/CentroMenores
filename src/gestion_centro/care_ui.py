@@ -279,6 +279,7 @@ class HealthDialog(StaySelectorDialog):
                 record_medication_administration(session, actor_account_id=self.actor_id,
                     plan_id=cell.data(Qt.ItemDataRole.UserRole), scheduled_at=datetime.now(timezone.utc),
                     status=status, note=note)
+            self.refresh()
             QMessageBox.information(self, "Administración", "Registro añadido.")
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo registrar", str(exc))
