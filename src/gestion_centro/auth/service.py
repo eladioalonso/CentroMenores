@@ -111,3 +111,49 @@ def set_account_active(session: Session, account_id: str, active: bool) -> None:
         account_id=account.id, username_snapshot=account.username,
         event="account_reactivated" if active else "account_deactivated",
     ))
+
+
+def admin_reset_password(
+    session: Session, *, actor_account_id: str, target_account_id: str, new_password: str
+) -> None:
+    """Permite al administrador restablecer, pero nunca consultar, una contraseña."""
+    actor = session.get(UserAccount, actor_account_id)
+    target = session.get(UserAccount, target_account_id)
+    if actor is None or not actor.active or actor.role != Role.ADMIN.value:
+        raise PermissionError("Se requiere una cuenta administradora activa")
+    if target is None:
+        raise ValueError("La cuenta indicada no existe")
+    target.password_hash = hash_password(new_password)
+    target.failed_attempts = 0
+    target.updated_at = datetime.now(timezone.utc)
+    session.add(AccessAudit(
+        account_id=actor.id, username_snapshot=actor.username,
+        event="admin_password_reset", details=f"Cuenta restablecida: {target.id}",
+    ))
+
+
+def admin_set_account_active(
+    session: Session, *, actor_account_id: str, target_account_id: str, active: bool
+) -> None:
+    """Activa o desactiva cuentas con control de permisos y protección del último admin."""
+    actor = session.get(UserAccount, actor_account_id)
+    target = session.get(UserAccount, target_account_id)
+    if actor is None or not actor.active or actor.role != Role.ADMIN.value:
+        raise PermissionError("Se requiere una cuenta administradora activa")
+    if target is None:
+        raise ValueError("La cuenta indicada no existe")
+    if not active and target.role == Role.ADMIN.value and target.active:
+        active_admins = session.scalar(
+            select(func.count()).select_from(UserAccount).where(
+                UserAccount.role == Role.ADMIN.value, UserAccount.active.is_(True)
+            )
+        )
+        if active_admins <= 1:
+            raise ValueError("No se puede desactivar al último administrador activo")
+    target.active = active
+    target.updated_at = datetime.now(timezone.utc)
+    session.add(AccessAudit(
+        account_id=actor.id, username_snapshot=actor.username,
+        event="admin_account_activated" if active else "admin_account_deactivated",
+        details=f"Cuenta afectada: {target.id}",
+    ))
