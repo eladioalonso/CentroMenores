@@ -1,51 +1,45 @@
 # Gestión del Centro
 
-Aplicación de escritorio para la gestión interna de un centro de menores.
+Aplicación de escritorio local para la gestión interna de un centro de menores.
 
-## Objetivo
+## Enfoque
 
-Centralizar la actividad cotidiana del centro en una aplicación Windows de uso local, con fichas únicas de menores, estancias e historial, seguimiento educativo, diario profesional, incidencias, salidas, actividades, documentación, tareas e informes.
+- Windows, funcionamiento local y distribución portable.
+- Un único ordenador de trabajo por turnos, con cuentas individuales.
+- Python, PySide6, SQLite, SQLAlchemy y Alembic.
+- Datos persistentes dentro de la carpeta portable.
+- Desarrollo y pruebas exclusivamente con datos ficticios.
 
-La aplicación está concebida para que varios educadores utilicen **el mismo ordenador por turnos**, cada uno con su propia cuenta y permisos.
+## Preparar el entorno de desarrollo
 
-## Enfoque de despliegue
+Requiere Python 3.11 o superior.
 
-- Aplicación de escritorio para Windows.
-- Funcionamiento local, sin necesidad de conexión a Internet.
-- Distribución portable: el programa y sus datos estarán contenidos en una carpeta.
-- No será necesario instalar Python ni bibliotecas en los equipos de los educadores.
-- La carpeta podrá copiarse a otro ordenador Windows compatible, con la aplicación cerrada.
-- La eliminación de la carpeta eliminará también los datos que estén dentro de ella. Las copias externas de seguridad deberán gestionarse por separado.
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -e ".[dev]"
+```
 
-## Tecnologías propuestas
+## Ejecutar y probar
 
-- Python: lenguaje principal.
-- PySide6: interfaz gráfica.
-- SQLite: base de datos local.
-- SQLAlchemy: acceso y mapeo de datos.
-- Alembic: migraciones del esquema.
-- PyInstaller, modo onedir: empaquetado de la aplicación para Windows.
+```powershell
+gestion-centro
+pytest
+```
 
-Estas tecnologías constituyen la propuesta inicial y podrán revisarse durante el diseño técnico antes de comenzar la implementación.
+En desarrollo, la carpeta de datos se puede indicar con `CENTRO_DATOS_DIR`; por defecto se utiliza `.centro_datos/`, excluida de Git. En la distribución portable, los datos se ubicarán junto al ejecutable.
 
 ## Documentación
 
-- [Planteamiento del proyecto](docs/PLANTEAMIENTO.md)
-- [Módulos funcionales](docs/MODULOS.md)
-- [Arquitectura técnica](docs/ARQUITECTURA.md)
+- [Planteamiento](docs/PLANTEAMIENTO.md)
+- [Módulos](docs/MODULOS.md)
+- [Arquitectura](docs/ARQUITECTURA.md)
 - [Usuarios y permisos](docs/USUARIOS_Y_PERMISOS.md)
 - [Flujos de trabajo](docs/FLUJOS_DE_TRABAJO.md)
 - [Modelo conceptual de datos](docs/MODELO_DATOS.md)
-- [Decisiones consolidadas del diseño](docs/DECISIONES_CONSOLIDADAS.md)
+- [Decisiones consolidadas](docs/DECISIONES_CONSOLIDADAS.md)
 
-## Alcance y protección de datos
+## Estado
 
-La aplicación gestionará exclusivamente la actividad interna del centro. No pretende sustituir ni gestionar los procedimientos administrativos externos de protección de menores.
-
-Durante el desarrollo se utilizarán datos ficticios. No se deben incorporar al repositorio datos personales reales, expedientes, informes sanitarios, documentos identificativos, credenciales ni copias de bases de datos reales.
-
-La aplicación deberá diseñarse conforme a los principios de protección de datos, minimización, control de acceso, trazabilidad y conservación segura.
-
-## Estado del diseño
-
-La especificación funcional vigente y las decisiones aprobadas se recogen en [Decisiones consolidadas del diseño](docs/DECISIONES_CONSOLIDADAS.md). La programación no comenzará hasta recibir aprobación expresa.
+Esta rama incorpora el núcleo técnico inicial. Todavía no implementa autenticación, expedientes ni operaciones con datos de menores. No utilizar con datos reales.
