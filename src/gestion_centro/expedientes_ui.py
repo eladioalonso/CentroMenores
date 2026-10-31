@@ -85,13 +85,13 @@ class ExpedientesDialog(QDialog):
         if not ok or not given.strip(): return
         family, ok = QInputDialog.getText(self, "Nuevo expediente", "Apellidos:")
         if not ok or not family.strip(): return
+        open_now = QMessageBox.question(self, "Primer ingreso",
+            "¿Registrar también una estancia activa desde hoy?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         try:
             with session_scope(self.factory) as session:
                 minor = create_minor(session, actor_account_id=self.actor_id,
                     internal_code=code, given_names=given, family_names=family)
-                open_now = QMessageBox.question(self, "Primer ingreso",
-                    "¿Registrar también una estancia activa desde hoy?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
                 if open_now == QMessageBox.StandardButton.Yes:
                     open_stay(session, actor_account_id=self.actor_id, minor_id=minor.id, started_on=date.today())
             self.refresh()
