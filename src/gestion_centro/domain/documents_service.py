@@ -40,8 +40,8 @@ def register_document(session: Session, *, actor_account_id: str, stay_id: str, 
                       supersedes_id: str | None = None):
     actor = _actor(session, actor_account_id)
     stay = session.get(Stay, stay_id)
-    if stay is None:
-        raise ValueError("La estancia no existe")
+    if stay is None or stay.status != "active":
+        raise ValueError("La estancia no existe o está cerrada")
     if category not in DOCUMENT_CATEGORIES or not title.strip():
         raise ValueError("Categoría o título documental no válido")
     if not original_filename.strip() or not mime_type.strip() or size_bytes <= 0 or size_bytes > 25 * 1024 * 1024:
@@ -91,8 +91,9 @@ def record_authorization(session: Session, *, actor_account_id: str, stay_id: st
                          valid_from: date, valid_until: date | None = None,
                          conditions: str | None = None, document_id: str | None = None):
     actor = _actor(session, actor_account_id)
-    if session.get(Stay, stay_id) is None:
-        raise ValueError("La estancia no existe")
+    stay = session.get(Stay, stay_id)
+    if stay is None or stay.status != "active":
+        raise ValueError("La estancia no existe o está cerrada")
     if authorization_type not in AUTHORIZATION_TYPES or not scope.strip() or not issuer.strip():
         raise ValueError("Tipo, alcance y emisor son obligatorios")
     if valid_until and valid_until < valid_from:
@@ -130,8 +131,8 @@ def set_authorization_status(session: Session, *, actor_account_id: str, authori
     authorization = session.get(Authorization, authorization_id)
     if authorization is None or status not in {"valid", "revoked", "expired"}:
         raise ValueError("Autorización o estado no válido")
-    if status == "revoked" and not reason.strip():
-        raise ValueError("La revocación requiere un motivo")
+    if not reason.strip():
+        raise ValueError("Todo cambio de estado requiere un motivo")
     authorization.status = status
     _audit(session, actor, "authorization_status_changed",
            f"{authorization.id}:{status}:{reason.strip()}")
