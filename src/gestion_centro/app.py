@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 
-from PySide6.QtCore import QEvent, QObject, QTimer, Qt
+from PySide6.QtCore import QEvent, QObject, QTimer, Qt, QLockFile
 from PySide6.QtWidgets import (
     QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QVBoxLayout, QWidget, QHBoxLayout, QPushButton,
@@ -249,6 +249,11 @@ def main() -> int:
     app.setApplicationName("Gestión del Centro")
     paths = data_paths()
     ensure_data_directories(paths)
+    instance_lock = QLockFile(str(paths.root / ".gestion_centro.lock"))
+    instance_lock.setStaleLockTime(0)
+    if not instance_lock.tryLock(100):
+        QMessageBox.warning(None, "Aplicación ya abierta", "Ya hay otra instancia de Gestión del Centro utilizando esta carpeta de datos.")
+        return 1
     engine = build_engine(paths.database)
     try:
         upgrade_database(engine)
@@ -267,6 +272,7 @@ def main() -> int:
         dialog = CredentialsDialog(first_admin=first_admin)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             engine.dispose()
+            instance_lock.unlock()
             return 0
         name, username, password = dialog.values()
         try:
@@ -286,6 +292,7 @@ def main() -> int:
             if result.status is AuthStatus.RETRY_FLOW_CLOSED or login_failures >= 5:
                 QMessageBox.warning(None, "Acceso cerrado", "Cinco intentos fallidos. El proceso de acceso se cerrará.")
                 engine.dispose()
+                instance_lock.unlock()
                 return 1
             elif result.status is not AuthStatus.SUCCESS:
                 QMessageBox.warning(None, "Acceso no válido", "Usuario o contraseña incorrectos, o cuenta inactiva.")
@@ -333,4 +340,5 @@ def main() -> int:
         from gestion_centro.auth.models import AccessAudit
         session.add(AccessAudit(account_id=authenticated.account_id, username_snapshot=username, event="logout"))
     engine.dispose()
+    instance_lock.unlock()
     return result
