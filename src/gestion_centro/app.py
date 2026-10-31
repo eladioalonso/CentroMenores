@@ -568,7 +568,7 @@ class MainWindow(QMainWindow):
             manage.clicked.connect(lambda: AccountManagementDialog(factory, account_id).exec())
             layout.addWidget(manage)
             backups = QPushButton("Copias de seguridad")
-            backups.clicked.connect(lambda: BackupDialog(paths).exec())
+            backups.clicked.connect(lambda: BackupDialog(paths, factory, account_id).exec())
             layout.addWidget(backups)
         if factory is not None and account_id is not None:
             agenda = QPushButton("Agenda común y tareas")
