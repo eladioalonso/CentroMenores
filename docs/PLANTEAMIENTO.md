@@ -101,3 +101,6 @@ Las fases podrán ajustarse después de revisar el programa existente y validar 
 Se aplicarán desde el diseño los principios de minimización, limitación de finalidad, confidencialidad, integridad, disponibilidad y responsabilidad proactiva. Antes de utilizar datos reales deberán revisarse las obligaciones aplicables, los perfiles de acceso, los plazos de conservación, las copias de seguridad y la necesidad de una evaluación de impacto.
 
 El desarrollo y las pruebas utilizarán exclusivamente datos ficticios. No se subirán al repositorio expedientes reales, documentos identificativos, información sanitaria, credenciales ni bases de datos del centro.
+
+
+> **Especificación vigente:** consultar [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md). Este documento reúne las decisiones aprobadas más recientes y prevalece sobre cualquier apartado anterior que las contradiga.
