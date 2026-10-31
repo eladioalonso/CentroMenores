@@ -563,7 +563,11 @@ class MainWindow(QMainWindow):
             agenda = QPushButton("Agenda común y tareas")
             agenda.clicked.connect(lambda: AgendaDialog(factory, account_id).exec())
             layout.addWidget(agenda)
-            if paths is not None:\n                documents = QPushButton("Documentación personal")\n                documents.clicked.connect(lambda: DocumentsDialog(factory, account_id, paths).exec())\n                layout.addWidget(documents)\n            communications = QPushButton("Comunicaciones internas")
+            if paths is not None:
+                documents = QPushButton("Documentación personal")
+                documents.clicked.connect(lambda: DocumentsDialog(factory, account_id, paths).exec())
+                layout.addWidget(documents)
+            communications = QPushButton("Comunicaciones internas")
             communications.clicked.connect(lambda: CommunicationsDialog(factory, account_id).exec())
             layout.addWidget(communications)
         notice = QLabel(
@@ -590,7 +594,8 @@ def main() -> int:
     try:
         upgrade_database(engine)
     except Exception as exc:
-        QMessageBox.critical(None, "Error de base de datos", f"No se pudo preparar la base de datos de forma segura:\n{exc}")
+        QMessageBox.critical(None, "Error de base de datos", f"No se pudo preparar la base de datos de forma segura:
+{exc}")
         engine.dispose()
         instance_lock.unlock()
         return 1
