@@ -26,6 +26,10 @@ from gestion_centro.domain.service import (
     close_expired_diary_days, create_agenda_item, list_agenda_items,
     set_agenda_item_status,
 )
+from gestion_centro.domain.communications_service import (
+    create_communication, add_communication_contribution, close_communication,
+    list_communications,
+)
 
 IDLE_LIMIT_MS = 15 * 60 * 1000
 
@@ -338,6 +342,92 @@ class AgendaDialog(QDialog):
             QMessageBox.warning(self, "No se pudo cambiar el estado", str(exc))
 
 
+class CommunicationsDialog(QDialog):
+    """Bandeja compartida de comunicaciones internas."""
+    def __init__(self, factory, actor_id: str) -> None:
+        super().__init__()
+        self.factory, self.actor_id = factory, actor_id
+        self.setWindowTitle("Comunicaciones internas")
+        self.resize(820, 520)
+        layout = QVBoxLayout(self)
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["Título", "Estado", "Última actualización"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        layout.addWidget(self.table)
+        actions = QHBoxLayout()
+        for label, callback in [("Nueva comunicación", self.create_item),
+            ("Añadir aportación", self.add_note), ("Cerrar con motivo", self.close_item),
+            ("Actualizar", self.refresh)]:
+            button = QPushButton(label)
+            button.clicked.connect(callback)
+            actions.addWidget(button)
+        layout.addLayout(actions)
+        self.refresh()
+
+    def refresh(self) -> None:
+        with session_scope(self.factory) as session:
+            items = list_communications(session)
+            rows = [(x.id, x.title, "Abierta" if x.status == "draft" else "Cerrada",
+                x.updated_at.astimezone().strftime("%d/%m/%Y %H:%M")) for x in items]
+        self.table.setRowCount(len(rows))
+        for row, values in enumerate(rows):
+            item_id, *display = values
+            for col, value in enumerate(display):
+                cell = QTableWidgetItem(value)
+                if col == 0:
+                    cell.setData(Qt.ItemDataRole.UserRole, item_id)
+                self.table.setItem(row, col, cell)
+
+    def selected_id(self):
+        row = self.table.currentRow()
+        cell = self.table.item(row, 0) if row >= 0 else None
+        return cell.data(Qt.ItemDataRole.UserRole) if cell else None
+
+    def create_item(self) -> None:
+        title, ok = QInputDialog.getText(self, "Nueva comunicación", "Título:")
+        if not ok or not title.strip(): return
+        content, ok = QInputDialog.getMultiLineText(self, "Nueva comunicación", "Primera aportación:")
+        if not ok or not content.strip(): return
+        try:
+            with session_scope(self.factory) as session:
+                create_communication(session, actor_account_id=self.actor_id, title=title, content=content)
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo guardar", str(exc))
+
+    def add_note(self) -> None:
+        item_id = self.selected_id()
+        if not item_id:
+            QMessageBox.information(self, "Selecciona", "Selecciona una comunicación.")
+            return
+        content, ok = QInputDialog.getMultiLineText(self, "Aportación", "Texto:")
+        if not ok or not content.strip(): return
+        try:
+            with session_scope(self.factory) as session:
+                add_communication_contribution(session, actor_account_id=self.actor_id,
+                    communication_id=item_id, content=content)
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo añadir", str(exc))
+
+    def close_item(self) -> None:
+        item_id = self.selected_id()
+        if not item_id:
+            QMessageBox.information(self, "Selecciona", "Selecciona una comunicación.")
+            return
+        reason, ok = QInputDialog.getText(self, "Cerrar comunicación", "Motivo:")
+        if not ok or not reason.strip(): return
+        try:
+            with session_scope(self.factory) as session:
+                close_communication(session, actor_account_id=self.actor_id,
+                    communication_id=item_id, reason=reason)
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo cerrar", str(exc))
+
+
 class MainWindow(QMainWindow):
     def __init__(self, display_name: str, role: Role, factory=None, account_id: str | None = None) -> None:
         super().__init__()
@@ -358,6 +448,9 @@ class MainWindow(QMainWindow):
             agenda = QPushButton("Agenda común y tareas")
             agenda.clicked.connect(lambda: AgendaDialog(factory, account_id).exec())
             layout.addWidget(agenda)
+            communications = QPushButton("Comunicaciones internas")
+            communications.clicked.connect(lambda: CommunicationsDialog(factory, account_id).exec())
+            layout.addWidget(communications)
         notice = QLabel(
             "Núcleo técnico en desarrollo. Todavía no está habilitado para introducir datos reales "
             "de menores ni para uso asistencial."
