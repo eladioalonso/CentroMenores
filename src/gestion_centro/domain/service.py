@@ -304,3 +304,106 @@ def reopen_incident(
     incident.closed_by_account_id = None
     # El motivo del cierre anterior se conserva; la reapertura queda en auditoría.
     _audit(session, actor, "incident_reopened", f"Incidencia: {incident.id}; motivo: {reason.strip()}")
+
+
+AGENDA_KINDS = {"appointment", "activity", "task", "meeting", "call", "contact", "vaccine", "birthday", "event"}
+AGENDA_STATUSES = {"pending", "in_progress", "done", "cancelled"}
+
+
+def create_agenda_item(
+    session: Session, *, actor_account_id: str, kind: str, title: str,
+    starts_at: datetime, description: str | None = None, ends_at: datetime | None = None,
+    assignment_scope: str = "team", assigned_account_id: str | None = None,
+    stay_ids: list[str] | None = None,
+):
+    """Crea una cita, evento o tarea visible para continuidad entre turnos."""
+    from gestion_centro.domain.models import AgendaItem, AgendaItemStayLink
+    actor = _active_author(session, actor_account_id)
+    if kind not in AGENDA_KINDS:
+        raise ValueError("Tipo de agenda no válido")
+    if not title.strip():
+        raise ValueError("El título es obligatorio")
+    if ends_at is not None and ends_at < starts_at:
+        raise ValueError("La fecha de finalización no puede ser anterior al inicio")
+    if assignment_scope not in {"team", "individual"}:
+        raise ValueError("El alcance de asignación no es válido")
+    if assignment_scope == "team" and assigned_account_id is not None:
+        raise ValueError("Una tarea de equipo no puede tener un responsable individual")
+    if assignment_scope == "individual" and not assigned_account_id:
+        raise ValueError("Selecciona el profesional responsable")
+    assignee = None
+    if assigned_account_id:
+        assignee = _active_author(session, assigned_account_id)
+    ids = stay_ids or []
+    if len(ids) != len(set(ids)):
+        raise ValueError("No se puede vincular dos veces la misma estancia")
+    stays = [session.get(Stay, stay_id) for stay_id in ids]
+    if any(stay is None for stay in stays):
+        raise ValueError("Una estancia vinculada no existe")
+    item = AgendaItem(
+        kind=kind, title=title.strip(), description=description.strip() if description else None,
+        starts_at=starts_at, ends_at=ends_at, status="pending",
+        assignment_scope=assignment_scope,
+        assigned_account_id=assignee.id if assignee else None,
+        created_by_account_id=actor.id,
+        created_by_name_snapshot=actor.professional.display_name,
+    )
+    session.add(item)
+    session.flush()
+    for stay in stays:
+        minor = stay.minor
+        session.add(AgendaItemStayLink(
+            agenda_item_id=item.id, stay_id=stay.id,
+            minor_code_snapshot=minor.internal_code,
+            minor_name_snapshot=f"{minor.given_names} {minor.family_names}",
+        ))
+    _audit(session, actor, "agenda_item_created", f"Elemento: {item.id}; tipo: {kind}")
+    return item
+
+
+def set_agenda_item_status(
+    session: Session, *, actor_account_id: str, item_id: str, status: str,
+    now: datetime | None = None,
+):
+    from gestion_centro.domain.models import AgendaItem
+    actor = _active_author(session, actor_account_id)
+    item = session.get(AgendaItem, item_id)
+    if item is None:
+        raise ValueError("El elemento de agenda no existe")
+    if status not in AGENDA_STATUSES:
+        raise ValueError("Estado de agenda no válido")
+    previous = item.status
+    if previous == "cancelled" and status != "pending":
+        raise ValueError("Un elemento cancelado debe reactivarse como pendiente")
+    item.status = status
+    item.updated_at = now or datetime.now(timezone.utc)
+    if status == "done":
+        item.completed_at = item.updated_at
+        item.completed_by_account_id = actor.id
+    else:
+        item.completed_at = None
+        item.completed_by_account_id = None
+    _audit(session, actor, "agenda_item_status_changed",
+        f"Elemento: {item.id}; estado: {previous} -> {status}")
+    return item
+
+
+def list_agenda_items(
+    session: Session, *, start: datetime, end: datetime,
+    status: str | None = None, kind: str | None = None,
+):
+    from gestion_centro.domain.models import AgendaItem
+    if end < start:
+        raise ValueError("El final del intervalo no puede ser anterior al inicio")
+    statement = select(AgendaItem).where(
+        AgendaItem.starts_at >= start, AgendaItem.starts_at <= end
+    ).order_by(AgendaItem.starts_at, AgendaItem.title)
+    if status is not None:
+        if status not in AGENDA_STATUSES:
+            raise ValueError("Estado de agenda no válido")
+        statement = statement.where(AgendaItem.status == status)
+    if kind is not None:
+        if kind not in AGENDA_KINDS:
+            raise ValueError("Tipo de agenda no válido")
+        statement = statement.where(AgendaItem.kind == kind)
+    return session.scalars(statement).all()
