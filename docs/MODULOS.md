@@ -187,3 +187,6 @@ La eliminación lógica o física de registros, los plazos de conservación y la
 - Un documento se almacena una vez y puede relacionarse con varios registros.
 - Una tarea puede originarse en una incidencia, un traspaso u otra necesidad.
 - El panel y los informes consultan las relaciones existentes, sin duplicar la información.
+
+
+> **Especificación vigente:** consultar [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md). Este documento reúne las decisiones aprobadas más recientes y prevalece sobre cualquier apartado anterior que las contradiga.
