@@ -23,7 +23,7 @@ def test_minor_has_unique_code_and_only_one_active_stay():
         minor = create_minor(session, actor_account_id=actor.id, internal_code="MC-2026-0001", given_names="Caso", family_names="Ficticio")
         open_stay(session, actor_account_id=actor.id, minor_id=minor.id, started_on=date(2026, 1, 1))
         with pytest.raises(ValueError, match="estancia activa"):
-            open_stay(session, minor_id=minor.id, started_on=date(2026, 2, 1))
+            open_stay(session, actor_account_id=actor.id, minor_id=minor.id, started_on=date(2026, 2, 1))
         with pytest.raises(ValueError, match="ya existe"):
             create_minor(session, actor_account_id=actor.id, internal_code="mc-2026-0001", given_names="Otro", family_names="Caso")
 
