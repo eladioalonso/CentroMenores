@@ -49,7 +49,7 @@ def register_document(session: Session, *, actor_account_id: str, stay_id: str, 
     if len(sha256) != 64 or any(ch not in "0123456789abcdef" for ch in sha256.lower()):
         raise ValueError("El hash SHA-256 no es válido")
     path = PurePosixPath(relative_path)
-    if path.is_absolute() or ".." in path.parts or "\\\\" in relative_path or ":" in relative_path or not relative_path.strip():
+    if path.is_absolute() or ".." in path.parts or "\\" in relative_path or ":" in relative_path or not relative_path.strip():
         raise ValueError("La ruta documental debe ser relativa y segura")
     if expires_on and document_date and expires_on < document_date:
         raise ValueError("La caducidad no puede preceder a la fecha del documento")
