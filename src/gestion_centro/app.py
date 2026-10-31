@@ -41,6 +41,7 @@ from gestion_centro.care_ui import EducationDialog, HealthDialog
 from gestion_centro.maintenance_ui import MaintenanceDialog
 from gestion_centro.reports_ui import ReportsDialog
 from gestion_centro.diary_ui import DiaryDialog
+from gestion_centro.calendar_ui import CalendarDialog
 from gestion_centro.domain.communications_service import (
     create_communication, add_communication_contribution, close_communication,
     list_communications,
@@ -586,6 +587,9 @@ class MainWindow(QMainWindow):
             agenda = QPushButton("Agenda común y tareas")
             agenda.clicked.connect(lambda: AgendaDialog(factory, account_id).exec())
             layout.addWidget(agenda)
+            calendar = QPushButton("Calendario día / semana / mes / año")
+            calendar.clicked.connect(lambda: CalendarDialog(factory, account_id).exec())
+            layout.addWidget(calendar)
             documents = QPushButton("Documentación personal")
             documents.clicked.connect(lambda: DocumentsDialog(factory, account_id, paths).exec())
             layout.addWidget(documents)
