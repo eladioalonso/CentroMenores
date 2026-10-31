@@ -39,6 +39,7 @@ from gestion_centro.operations_ui import AuthorizationsDialog, OutingsDialog
 from gestion_centro.backups_ui import BackupDialog
 from gestion_centro.persistence.backups import create_backup
 from gestion_centro.care_ui import EducationDialog, HealthDialog
+from gestion_centro.expedientes_ui import ExpedientesDialog
 from gestion_centro.maintenance_ui import MaintenanceDialog
 from gestion_centro.reports_ui import ReportsDialog
 from gestion_centro.diary_ui import DiaryDialog
@@ -695,6 +696,9 @@ class MainWindow(QMainWindow):
             reports.clicked.connect(lambda: ReportsDialog(factory, account_id).exec())
             layout.addWidget(reports)
         if factory is not None and account_id is not None:
+            expedientes = QPushButton("Expedientes y estancias")
+            expedientes.clicked.connect(lambda: ExpedientesDialog(factory, account_id).exec())
+            layout.addWidget(expedientes)
             diary = QPushButton("Diario e incidencias")
             diary.clicked.connect(lambda: DiaryDialog(factory, account_id).exec())
             layout.addWidget(diary)
