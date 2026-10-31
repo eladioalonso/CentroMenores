@@ -32,8 +32,7 @@ from gestion_centro.domain.service import (
     close_expired_diary_days, create_agenda_item, list_agenda_items,
     set_agenda_item_status,
 )
-from gestion_centro.domain.models import Stay, Minor
-from gestion_centro.domain.documents import PersonalDocument
+from gestion_centro.domain.models import Stay
 from gestion_centro.domain.documents_service import register_document, list_documents
 from gestion_centro.operations_ui import AuthorizationsDialog, OutingsDialog
 from gestion_centro.backups_ui import BackupDialog
