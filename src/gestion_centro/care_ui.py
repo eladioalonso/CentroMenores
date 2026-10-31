@@ -192,8 +192,19 @@ class HealthDialog(StaySelectorDialog):
                                 ("Registrar vacuna", self.add_vaccine)]:
             b = QPushButton(label); b.clicked.connect(callback); actions.addWidget(b)
         self.body.addLayout(actions)
-        self.administrations = QTableWidget(0, 5)
-        self.administrations.setHorizontalHeaderLabels(["Fecha / hora", "Medicamento", "Resultado", "Motivo / nota", "Registrado por"])
+        self.admin_day = QDateEdit(QDate.currentDate())
+        self.admin_day.setCalendarPopup(True)
+        self.admin_shift_filter = QComboBox()
+        self.admin_shift_filter.addItem("Todos los turnos", None)
+        self.admin_shift_filter.addItem("Mañana", "morning")
+        self.admin_shift_filter.addItem("Tarde", "afternoon")
+        self.admin_shift_filter.addItem("Noche", "night")
+        self.admin_day.dateChanged.connect(self.refresh)
+        self.admin_shift_filter.currentIndexChanged.connect(self.refresh)
+        self.body.addWidget(self.admin_day)
+        self.body.addWidget(self.admin_shift_filter)
+        self.administrations = QTableWidget(0, 6)
+        self.administrations.setHorizontalHeaderLabels(["Fecha / hora", "Turno", "Medicamento", "Resultado", "Motivo / nota", "Registrado por"])
         self.administrations.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.administrations.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.body.addWidget(self.administrations)
@@ -212,7 +223,9 @@ class HealthDialog(StaySelectorDialog):
             profile = read_health_profile(session, actor_account_id=self.actor_id, stay_id=stay_id)
             plans = list_medication_plans(session, actor_account_id=self.actor_id, stay_id=stay_id)
             vaccine_rows = session.scalars(select(VaccineRecord).where(VaccineRecord.stay_id == stay_id).order_by(VaccineRecord.administered_on.desc())).all()
-            administration_rows = [(a, p.medication_name) for p in plans for a in p.administrations]
+            administration_rows = [(a, p.medication_name) for p in plans for a in p.administrations
+                if a.scheduled_at.astimezone().date() == self.admin_day.date().toPython()
+                and (self.admin_shift_filter.currentData() is None or a.shift == self.admin_shift_filter.currentData())]
         self.allergies.setPlainText(profile.allergies or "" if profile else "")
         self.conditions.setPlainText(profile.relevant_conditions or "" if profile else "")
         self.emergency.setPlainText(profile.emergency_instructions or "" if profile else "")
@@ -227,7 +240,9 @@ class HealthDialog(StaySelectorDialog):
         admin_rows = sorted(administration_rows, key=lambda x: x[0].scheduled_at, reverse=True)
         self.administrations.setRowCount(len(admin_rows))
         for i, (record, medication) in enumerate(admin_rows):
-            values = [record.scheduled_at.astimezone().strftime("%d/%m/%Y %H:%M"), medication, record.status, record.note or "—", record.recorded_by_name_snapshot]
+            values = [record.scheduled_at.astimezone().strftime("%d/%m/%Y %H:%M"),
+                {"morning":"Mañana","afternoon":"Tarde","night":"Noche","unspecified":"Sin turno"}.get(record.shift, record.shift),
+                medication, record.status, record.note or "—", record.recorded_by_name_snapshot]
             for col, value in enumerate(values): self.administrations.setItem(i, col, QTableWidgetItem(value))
         self.vaccines.setRowCount(len(vaccine_rows))
         for i, record in enumerate(vaccine_rows):
@@ -270,6 +285,10 @@ class HealthDialog(StaySelectorDialog):
             ["Administrada", "Rechazada", "No disponible"], 0, False)
         if not ok: return
         status = {"Administrada":"administered","Rechazada":"refused","No disponible":"not_available"}[label]
+        shift_label, ok = QInputDialog.getItem(self, "Turno de administración", "Turno:",
+            ["Mañana", "Tarde", "Noche"], 0, False)
+        if not ok: return
+        shift = {"Mañana":"morning","Tarde":"afternoon","Noche":"night"}[shift_label]
         note = ""
         if status != "administered":
             note, ok = QInputDialog.getMultiLineText(self, "Motivo", "Motivo obligatorio:")
@@ -278,7 +297,7 @@ class HealthDialog(StaySelectorDialog):
             with session_scope(self.factory) as session:
                 record_medication_administration(session, actor_account_id=self.actor_id,
                     plan_id=cell.data(Qt.ItemDataRole.UserRole), scheduled_at=datetime.now(timezone.utc),
-                    status=status, note=note)
+                    status=status, shift=shift, note=note)
             self.refresh()
             QMessageBox.information(self, "Administración", "Registro añadido.")
         except (ValueError, PermissionError) as exc:
