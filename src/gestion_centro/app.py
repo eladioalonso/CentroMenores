@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import sys
+import hashlib
+import mimetypes
+import shutil
+from pathlib import Path
+from uuid import uuid4
 
 from PySide6.QtCore import QEvent, QObject, QTimer, Qt, QLockFile, QDateTime
 from PySide6.QtWidgets import (
     QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QVBoxLayout, QWidget, QHBoxLayout, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QInputDialog, QComboBox,
-    QDateTimeEdit, QTextEdit,
+    QDateTimeEdit, QTextEdit, QFileDialog,
 )
 from sqlalchemy import func, select
 
@@ -26,6 +31,9 @@ from gestion_centro.domain.service import (
     close_expired_diary_days, create_agenda_item, list_agenda_items,
     set_agenda_item_status,
 )
+from gestion_centro.domain.models import Stay, Minor
+from gestion_centro.domain.documents import PersonalDocument
+from gestion_centro.domain.documents_service import register_document, list_documents
 from gestion_centro.domain.communications_service import (
     create_communication, add_communication_contribution, close_communication,
     list_communications,
@@ -428,8 +436,115 @@ class CommunicationsDialog(QDialog):
             QMessageBox.warning(self, "No se pudo cerrar", str(exc))
 
 
+class DocumentsDialog(QDialog):
+    """Registro y consulta de documentos personales con almacenamiento portable."""
+    CATEGORIES = {
+        "Identificación": "identity", "Sanitaria": "health",
+        "Administrativa": "administrative", "Educativa": "education",
+        "Familiar": "family", "Otros": "other",
+    }
+
+    def __init__(self, factory, actor_id: str, paths) -> None:
+        super().__init__()
+        self.factory, self.actor_id, self.paths = factory, actor_id, paths
+        self.setWindowTitle("Documentación personal")
+        self.resize(900, 540)
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        self.stay = QComboBox()
+        with session_scope(factory) as session:
+            stays = session.scalars(select(Stay).where(Stay.status == "active").order_by(Stay.started_on.desc())).all()
+            values = [(s.id, f"{s.minor.internal_code} · {s.minor.given_names} {s.minor.family_names}") for s in stays]
+        for stay_id, label in values:
+            self.stay.addItem(label, stay_id)
+        self.category = QComboBox()
+        for label, key in self.CATEGORIES.items():
+            self.category.addItem(label, key)
+        self.title = QLineEdit()
+        self.title.setMaxLength(180)
+        self.file_label = QLabel("Ningún archivo seleccionado")
+        self.selected_file: Path | None = None
+        choose = QPushButton("Seleccionar archivo…")
+        choose.clicked.connect(self.choose_file)
+        form.addRow("Estancia activa", self.stay)
+        form.addRow("Categoría", self.category)
+        form.addRow("Título", self.title)
+        form.addRow("Archivo", choose)
+        form.addRow("Seleccionado", self.file_label)
+        layout.addLayout(form)
+        save = QPushButton("Guardar documento")
+        save.clicked.connect(self.save_document)
+        layout.addWidget(save)
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(["Título", "Categoría", "Archivo", "Versión", "Fecha"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        layout.addWidget(self.table)
+        self.stay.currentIndexChanged.connect(self.refresh)
+        self.refresh()
+
+    def choose_file(self):
+        filename, _ = QFileDialog.getOpenFileName(self, "Seleccionar documento")
+        if filename:
+            self.selected_file = Path(filename)
+            self.file_label.setText(self.selected_file.name)
+
+    def refresh(self):
+        stay_id = self.stay.currentData()
+        if not stay_id:
+            self.table.setRowCount(0)
+            return
+        with session_scope(self.factory) as session:
+            docs = list_documents(session, actor_account_id=self.actor_id, stay_id=stay_id)
+            rows = [(d.title, d.category, d.original_filename, str(d.version),
+                     d.created_at.astimezone().strftime("%d/%m/%Y %H:%M")) for d in docs]
+        self.table.setRowCount(len(rows))
+        for row, values in enumerate(rows):
+            for col, value in enumerate(values):
+                self.table.setItem(row, col, QTableWidgetItem(value))
+
+    def save_document(self):
+        stay_id = self.stay.currentData()
+        if not stay_id or self.selected_file is None or not self.selected_file.is_file():
+            QMessageBox.warning(self, "Faltan datos", "Selecciona una estancia y un archivo válido.")
+            return
+        title = self.title.text().strip()
+        if not title:
+            QMessageBox.warning(self, "Falta el título", "El título documental es obligatorio.")
+            return
+        source = self.selected_file
+        digest = hashlib.sha256(source.read_bytes()).hexdigest()
+        relative_dir = Path("documentos") / str(uuid4())
+        target_dir = self.paths.documents / relative_dir
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target = target_dir / source.name
+        try:
+            shutil.copy2(source, target)
+            relative_path = target.relative_to(self.paths.root).as_posix()
+            mime_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
+            with session_scope(self.factory) as session:
+                register_document(
+                    session, actor_account_id=self.actor_id, stay_id=stay_id,
+                    category=self.category.currentData(), title=title,
+                    original_filename=source.name, relative_path=relative_path,
+                    mime_type=mime_type, size_bytes=target.stat().st_size,
+                    sha256=digest,
+                )
+            self.title.clear()
+            self.selected_file = None
+            self.file_label.setText("Ningún archivo seleccionado")
+            self.refresh()
+        except (OSError, ValueError, PermissionError) as exc:
+            target.unlink(missing_ok=True)
+            try:
+                target_dir.rmdir()
+            except OSError:
+                pass
+            QMessageBox.warning(self, "No se pudo guardar", str(exc))
+
+
 class MainWindow(QMainWindow):
-    def __init__(self, display_name: str, role: Role, factory=None, account_id: str | None = None) -> None:
+    def __init__(self, display_name: str, role: Role, factory=None, account_id: str | None = None, paths=None) -> None:
         super().__init__()
         self.setWindowTitle("Gestión del Centro")
         self.resize(1100, 720)
@@ -448,7 +563,7 @@ class MainWindow(QMainWindow):
             agenda = QPushButton("Agenda común y tareas")
             agenda.clicked.connect(lambda: AgendaDialog(factory, account_id).exec())
             layout.addWidget(agenda)
-            communications = QPushButton("Comunicaciones internas")
+            if paths is not None:\n                documents = QPushButton("Documentación personal")\n                documents.clicked.connect(lambda: DocumentsDialog(factory, account_id, paths).exec())\n                layout.addWidget(documents)\n            communications = QPushButton("Comunicaciones internas")
             communications.clicked.connect(lambda: CommunicationsDialog(factory, account_id).exec())
             layout.addWidget(communications)
         notice = QLabel(
@@ -526,7 +641,7 @@ def main() -> int:
         username = account.username if account else ""
         role = authenticated.role or Role.EDUCATOR
 
-    window = MainWindow(display_name, role, factory, authenticated.account_id)
+    window = MainWindow(display_name, role, factory, authenticated.account_id, paths)
     monitor = None
 
     def lock_session() -> None:
