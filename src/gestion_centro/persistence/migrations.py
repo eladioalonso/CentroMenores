@@ -1,5 +1,6 @@
 """Inicialización versionada del esquema local mediante Alembic."""
 
+import sys
 from pathlib import Path
 
 from alembic import command
@@ -7,10 +8,18 @@ from alembic.config import Config
 from sqlalchemy.engine import Engine
 
 
+def migration_root() -> Path:
+    # En PyInstaller --onedir, los recursos se incluyen en _internal (sys._MEIPASS).
+    if getattr(sys, "frozen", False):
+        bundle_root = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+        return bundle_root
+    return Path(__file__).resolve().parents[3]
+
+
 def upgrade_database(engine: Engine) -> None:
-    project_root = Path(__file__).resolve().parents[3]
-    ini_path = project_root / "alembic.ini"
-    migrations_path = project_root / "migrations"
+    resource_root = migration_root()
+    ini_path = resource_root / "alembic.ini"
+    migrations_path = resource_root / "migrations"
     if not ini_path.is_file() or not migrations_path.is_dir():
         raise RuntimeError(
             "No se encuentran los archivos de migración. La distribución portable "
