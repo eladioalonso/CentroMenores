@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import csv
-from datetime import date
+from datetime import date, datetime, time
 from pathlib import Path
 
 from sqlalchemy import func, select
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from gestion_centro.auth.models import AccessAudit, UserAccount
 from gestion_centro.domain.models import (
-    Stay, DiaryEntry, DiaryDay, Incident, AgendaItem, Event,
+    Stay, DiaryEntry, Incident, AgendaItem, Event,
 )
 
 
@@ -25,8 +25,8 @@ def aggregate_statistics(session: Session, *, actor_account_id: str,
     def count(query) -> int:
         return int(session.scalar(query) or 0)
 
-    start_dt = __import__("datetime").datetime.combine(start_date, __import__("datetime").time.min)
-    end_dt = __import__("datetime").datetime.combine(end_date, __import__("datetime").time.max)
+    start_dt = datetime.combine(start_date, time.min)
+    end_dt = datetime.combine(end_date, time.max)
     result = {
         "period_start": start_date.isoformat(),
         "period_end": end_date.isoformat(),
