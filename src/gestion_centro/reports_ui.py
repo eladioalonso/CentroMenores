@@ -1,5 +1,4 @@
 """Interfaz de estadísticas agregadas."""
-from datetime import date
 from pathlib import Path
 
 from PySide6.QtWidgets import (
