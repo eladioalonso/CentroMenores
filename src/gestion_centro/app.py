@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QVBoxLayout, QWidget, QHBoxLayout, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QInputDialog, QComboBox,
-    QDateTimeEdit, QDateEdit, QTextEdit, QFileDialog, QDesktopServices,
+    QDateTimeEdit, QDateEdit, QTextEdit, QFileDialog, QDesktopServices, QCheckBox,
 )
 from sqlalchemy import func, select
 
@@ -609,8 +609,11 @@ class DocumentsDialog(QDialog):
                     actual = hashlib.file_digest(stream, "sha256").hexdigest()
                 if actual != doc.sha256:
                     raise ValueError("El hash no coincide. El archivo puede haber sido alterado.")
-                session.add(AccessAudit(account_id=self.actor_id,
-                    username_snapshot="document-user", event="personal_document_opened",
+                actor = session.get(UserAccount, self.actor_id)
+                if actor is None or not actor.active:
+                    raise PermissionError("La cuenta ya no está activa.")
+                session.add(AccessAudit(account_id=actor.id,
+                    username_snapshot=actor.username, event="personal_document_opened",
                     details=f"{doc.id}; estancia:{doc.stay_id}"))
             if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(target))):
                 raise OSError("Windows no ha podido abrir el documento.")
