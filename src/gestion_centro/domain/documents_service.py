@@ -44,8 +44,13 @@ def register_document(session: Session, *, actor_account_id: str, stay_id: str, 
         raise ValueError("La estancia no existe")
     if category not in DOCUMENT_CATEGORIES or not title.strip():
         raise ValueError("Categoría o título documental no válido")
-    if not original_filename.strip() or not mime_type.strip() or size_bytes <= 0:
-        raise ValueError("Faltan datos válidos del archivo")
+    if not original_filename.strip() or not mime_type.strip() or size_bytes <= 0 or size_bytes > 25 * 1024 * 1024:
+        raise ValueError("El archivo debe tener tamaño válido y no superar 25 MB")
+    allowed_mimes = {"application/pdf", "image/jpeg", "image/png", "image/webp", "text/plain",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+    if mime_type not in allowed_mimes:
+        raise ValueError("Tipo de archivo no permitido")
     if len(sha256) != 64 or any(ch not in "0123456789abcdef" for ch in sha256.lower()):
         raise ValueError("El hash SHA-256 no es válido")
     path = PurePosixPath(relative_path)
@@ -58,6 +63,8 @@ def register_document(session: Session, *, actor_account_id: str, stay_id: str, 
         previous = session.get(PersonalDocument, supersedes_id)
         if previous is None or previous.stay_id != stay_id or previous.category != category:
             raise ValueError("La versión anterior no corresponde a este documento")
+        if session.scalar(select(PersonalDocument.id).where(PersonalDocument.supersedes_id == previous.id)):
+            raise ValueError("La versión seleccionada ya tiene una versión posterior")
         version = previous.version + 1
     doc = PersonalDocument(stay_id=stay.id, category=category, title=title.strip(),
         original_filename=original_filename.strip(), relative_path=relative_path,
@@ -117,6 +124,20 @@ def check_authorization(session: Session, *, actor_account_id: str, stay_id: str
     return valid
 
 
+def set_authorization_status(session: Session, *, actor_account_id: str, authorization_id: str,
+                             status: str, reason: str):
+    actor = _actor(session, actor_account_id)
+    authorization = session.get(Authorization, authorization_id)
+    if authorization is None or status not in {"valid", "revoked", "expired"}:
+        raise ValueError("Autorización o estado no válido")
+    if status == "revoked" and not reason.strip():
+        raise ValueError("La revocación requiere un motivo")
+    authorization.status = status
+    _audit(session, actor, "authorization_status_changed",
+           f"{authorization.id}:{status}:{reason.strip()}")
+    return authorization
+
+
 def create_outing(session: Session, *, actor_account_id: str, kind: str, destination: str,
                   purpose: str, planned_departure: datetime, planned_return: datetime,
                   responsible_account_id: str, stay_ids: list[str],
@@ -164,6 +185,10 @@ def set_outing_status(session: Session, *, actor_account_id: str, outing_id: str
     outing = session.get(Outing, outing_id)
     if outing is None or status not in OUTING_STATUSES:
         raise ValueError("Salida o estado no válido")
+    allowed_transitions = {"planned": {"in_progress", "cancelled"},
+        "in_progress": {"returned", "cancelled"}, "returned": set(), "cancelled": set()}
+    if status != outing.status and status not in allowed_transitions[outing.status]:
+        raise ValueError("Transición de estado no permitida")
     moment = actual_at or datetime.now(timezone.utc)
     if status == "in_progress":
         outing.actual_departure = moment
