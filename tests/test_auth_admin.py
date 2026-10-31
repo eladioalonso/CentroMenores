@@ -42,3 +42,32 @@ def test_last_active_admin_cannot_be_deactivated():
         with pytest.raises(ValueError, match="último administrador"):
             admin_set_account_active(session, actor_account_id=admin.id, target_account_id=admin.id, active=False)
         assert session.get(UserAccount, admin.id).active is True
+
+
+def test_admin_can_create_account_and_change_role():
+    from gestion_centro.auth.service import admin_create_professional_account, admin_change_role
+
+    with session_for_test() as session:
+        admin = create_professional_account(session, display_name="Admin", username="admin", password="contraseña inicial segura", role=Role.ADMIN)
+        session.flush()
+        target = admin_create_professional_account(session, actor_account_id=admin.id,
+            display_name="Nuevo profesional", username="nuevo",
+            password="contraseña nueva segura", role=Role.EDUCATOR)
+        admin_change_role(session, actor_account_id=admin.id,
+            target_account_id=target.id, role=Role.ADMIN)
+        assert target.role == Role.ADMIN.value
+
+
+def test_non_admin_cannot_create_account_or_reset_password():
+    from gestion_centro.auth.service import admin_create_professional_account
+
+    with session_for_test() as session:
+        educator = create_professional_account(session, display_name="Educador", username="educador", password="contraseña educador segura", role=Role.EDUCATOR)
+        session.flush()
+        with pytest.raises(PermissionError):
+            admin_create_professional_account(session, actor_account_id=educator.id,
+                display_name="Intruso", username="intruso",
+                password="contraseña intruso segura", role=Role.ADMIN)
+        with pytest.raises(PermissionError):
+            admin_reset_password(session, actor_account_id=educator.id,
+                target_account_id=educator.id, new_password="contraseña restablecida")
