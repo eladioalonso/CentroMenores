@@ -49,7 +49,7 @@ def register_document(session: Session, *, actor_account_id: str, stay_id: str, 
     if len(sha256) != 64 or any(ch not in "0123456789abcdef" for ch in sha256.lower()):
         raise ValueError("El hash SHA-256 no es válido")
     path = PurePosixPath(relative_path)
-    if path.is_absolute() or ".." in path.parts or not relative_path.strip():
+    if path.is_absolute() or ".." in path.parts or "\\\\" in relative_path or ":" in relative_path or not relative_path.strip():
         raise ValueError("La ruta documental debe ser relativa y segura")
     if expires_on and document_date and expires_on < document_date:
         raise ValueError("La caducidad no puede preceder a la fecha del documento")
@@ -134,8 +134,18 @@ def create_outing(session: Session, *, actor_account_id: str, kind: str, destina
     if len(auth_ids) != len(set(auth_ids)):
         raise ValueError("Hay autorizaciones duplicadas")
     auths = [session.get(Authorization, item) for item in auth_ids]
-    if any(a is None or a.stay_id not in {s.id for s in stays} or a.status != "valid" for a in auths):
-        raise ValueError("Una autorización no es válida para las estancias seleccionadas")
+    stay_set = {s.id for s in stays}
+    outing_date = planned_departure.date()
+    if any(a is None or a.stay_id not in stay_set or a.status != "valid"
+           or a.valid_from > outing_date or (a.valid_until is not None and a.valid_until < outing_date)
+           for a in auths):
+        raise ValueError("Una autorización no es válida o está fuera de vigencia")
+    required_type = {"family": "family_visit", "activity": "activity", "health": "medical",
+                     "school": "general", "administrative": "general"}.get(kind)
+    if required_type:
+        authorized_stays = {a.stay_id for a in auths if a.authorization_type in {required_type, "general"}}
+        if not stay_set.issubset(authorized_stays):
+            raise ValueError("Falta autorización vigente para una o varias estancias")
     outing = Outing(kind=kind, destination=destination.strip(), purpose=purpose.strip(),
         planned_departure=planned_departure, planned_return=planned_return,
         responsible_account_id=responsible.id, status="planned",
