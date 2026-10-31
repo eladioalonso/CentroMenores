@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from gestion_centro.persistence.base import Base
 from gestion_centro.auth.models import Professional, UserAccount, AccessAudit
 from gestion_centro.domain.models import Minor, Stay
-from gestion_centro.domain import education, health, documents
 from gestion_centro.domain.reports import aggregate_statistics, export_statistics_csv
 
 
