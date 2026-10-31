@@ -162,7 +162,7 @@ def restore_backup(paths: DataPaths, archive: Path) -> Path:
     ensure_data_directories(paths)
     # La copia previa es obligatoria y queda verificada antes de tocar nada.
     pre_restore = create_backup(paths, kind="pre_operation")
-    with tempfile.TemporaryDirectory(prefix="centro-restore-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="centro-restore-", dir=paths.root) as temp_dir:
         stage = Path(temp_dir)
         with zipfile.ZipFile(archive, "r") as bundle:
             for info in bundle.infolist():
@@ -201,16 +201,6 @@ def restore_backup(paths: DataPaths, archive: Path) -> Path:
                 raise ValueError("La estructura de auditoría no es compatible")
             # Las referencias de cuenta inexistentes se convierten en NULL,
             # conservando usuario, evento, fecha y detalle originales.
-            restored.execute(
-                """INSERT OR IGNORE INTO access_audit
-                (id, account_id, username_snapshot, event, occurred_at, details)
-                SELECT a.id,
-                    CASE WHEN a.account_id IS NOT NULL AND EXISTS
-                        (SELECT 1 FROM user_accounts u WHERE u.id=a.account_id)
-                    THEN a.account_id ELSE NULL END,
-                    a.username_snapshot, a.event, a.occurred_at, a.details
-                FROM current_db.access_audit a"""
-            ) if False else None
             restored.execute("ATTACH DATABASE ? AS current_db", (str(paths.database),))
             restored.execute(
                 """INSERT OR IGNORE INTO access_audit
