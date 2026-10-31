@@ -115,7 +115,7 @@ Se propone PyInstaller en modo onedir. El resultado incluirá el ejecutable y su
 
 - El usuario final solo ejecutará el programa.
 - Se probará en instalaciones limpias de Windows compatibles.
-- Las actualizaciones no sobrescribirán ni eliminarán data/.
+- No se implementará un sistema de actualización automática ni un apartado de actualizaciones en la aplicación. Cualquier sustitución manual futura deberá seguir un procedimiento controlado y disponer de copia verificada previa.
 - Antes de actualizar se exigirá una copia de seguridad verificada.
 - Las migraciones de base de datos se ejecutarán de forma controlada y con posibilidad de recuperación.
 - La carpeta podrá trasladarse entre equipos Windows compatibles, respetando permisos, arquitectura y dependencias del sistema operativo.
@@ -151,9 +151,11 @@ La estructura es una propuesta de separación de responsabilidades; se concretar
 - Migración de esquema con copia previa.
 - Ejecución desde una carpeta con espacios y caracteres no ASCII en su ruta.
 - Portabilidad a otro ordenador Windows limpio.
-- Actualización sin pérdida de datos ni documentos.
 - Pruebas con un volumen de datos representativo.
 
 ## 12. Evolución futura
 
 Si cambian las condiciones —por ejemplo, varios ordenadores trabajando simultáneamente con los mismos datos— no se compartirá el archivo SQLite por red. Se diseñará una arquitectura cliente-servidor con base de datos central, autenticación y permisos aplicados en el servidor. Esa ampliación queda fuera del alcance actual.
+
+
+> **Especificación vigente:** consultar [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md). Este documento reúne las decisiones aprobadas más recientes y prevalece sobre cualquier apartado anterior que las contradiga.
