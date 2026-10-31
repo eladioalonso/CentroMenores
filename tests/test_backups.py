@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -71,7 +72,7 @@ def test_restore_requires_matching_schema_and_preserves_current_audit(tmp_path):
     archive = create_backup(paths, kind="manual",
         now=datetime(2026, 5, 4, tzinfo=timezone.utc))
     (paths.documents / "sample.pdf").write_bytes(b"changed after backup")
-    with sqlite3.connect(paths.database) as connection:
+    with closing(sqlite3.connect(paths.database)) as connection:
         connection.execute(
             "INSERT INTO access_audit VALUES (?, NULL, ?, ?, ?, ?)",
             ("audit-after-backup", "educador-ficticio", "test_event",
@@ -80,7 +81,7 @@ def test_restore_requires_matching_schema_and_preserves_current_audit(tmp_path):
     previous = restore_backup(paths, archive)
     assert previous.is_file()
     assert (paths.documents / "sample.pdf").read_bytes() == b"fake document bytes"
-    with sqlite3.connect(paths.database) as connection:
+    with closing(sqlite3.connect(paths.database)) as connection:
         row = connection.execute(
             "SELECT username_snapshot, event, details FROM access_audit WHERE id=?",
             ("audit-after-backup",)
@@ -92,7 +93,7 @@ def test_restore_refuses_different_schema_without_replacing_live_database(tmp_pa
     paths = prepare_paths(tmp_path / "portable")
     archive = create_backup(paths, kind="manual",
         now=datetime(2026, 5, 5, tzinfo=timezone.utc))
-    with sqlite3.connect(paths.database) as connection:
+    with closing(sqlite3.connect(paths.database)) as connection:
         connection.execute("UPDATE alembic_version SET version_num='newer-version'")
     before = (paths.documents / "sample.pdf").read_bytes()
     import pytest
