@@ -43,6 +43,7 @@ class MedicationAdministration(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     plan_id: Mapped[str] = mapped_column(ForeignKey("medication_plans.id"), nullable=False)
     scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    shift: Mapped[str] = mapped_column(String(16), nullable=False, default="unspecified")
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     note: Mapped[str | None] = mapped_column(Text)
     recorded_by_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
