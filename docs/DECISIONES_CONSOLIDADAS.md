@@ -208,3 +208,58 @@ Criterios funcionales acordados, sujetos a validación normativa:
 8. Móvil local, ayuda, demostración y validación integral.
 
 **No iniciar programación ni modificar código hasta recibir aprobación expresa del usuario después de revisar esta documentación y el plan técnico.**
+
+
+## 14. Decisiones técnicas aprobadas en la revisión
+
+Estas decisiones complementan las decisiones funcionales anteriores y quedan aprobadas para la fase de diseño técnico. No autorizan por sí solas el inicio de la programación.
+
+### SQLite y acceso concurrente
+
+- Usar SQLite inicialmente en modo de diario **DELETE**; no activar WAL en la configuración inicial.
+- Configurar `synchronous=FULL`, `foreign_keys=ON` en cada conexión y un `busy_timeout` razonable y configurable.
+- Utilizar transacciones para operaciones relacionadas. Las operaciones de escritura deben ser breves; no mantener transacciones abiertas mientras una persona rellena un formulario.
+- Mantener una única instancia de la aplicación por carpeta/base de datos y centralizar el mecanismo de escritura.
+- Detectar conflictos cuando dos usuarios intenten modificar el mismo registro y evitar sobrescrituras silenciosas.
+- No compartir la base SQLite por red ni permitir escrituras desde varios equipos.
+
+### Guardado y recuperación de formularios
+
+- Guardado automático progresivo en almacenamiento temporal, separado del registro definitivo.
+- La incorporación definitiva de información requiere que el usuario pulse Guardar o confirme expresamente la operación.
+- Los datos temporales se asocian al usuario y formulario, se pueden revisar antes de recuperar y caducan a los 7 días.
+- Un borrador o formulario recuperado nunca se convierte automáticamente en un registro oficial.
+- La aplicación comprobará al iniciar si hubo un cierre inesperado, verificará la base de datos y los adjuntos, detectará operaciones interrumpidas y ofrecerá recuperación controlada.
+- No se harán reparaciones destructivas ni se eliminarán datos dudosos silenciosamente.
+
+### Copias completas y consistentes
+
+- Las copias completas podrán ejecutarse con la aplicación abierta mediante un procedimiento coordinado y consistente, incluyendo base de datos, documentos, fotografías, auditoría y configuración necesaria.
+- Para SQLite se utilizará el mecanismo de copia consistente (SQLite Backup API o equivalente probado); nunca se copiará una base activa ignorando archivos auxiliares.
+- Cada copia se verificará antes de marcarse como válida. Los fallos quedarán registrados y no se presentarán como copias correctas.
+- La base de datos y sus archivos adjuntos deben representar un mismo estado lógico. El procedimiento deberá coordinar escrituras y adjuntos durante la copia.
+- La auditoría tendrá respaldo independiente y una restauración general no hará retroceder ni perder los eventos de auditoría más recientes.
+
+### Documentos y fotografías
+
+- Los documentos y fotografías se guardarán como archivos independientes de SQLite, dentro de la carpeta portable.
+- Se utilizarán identificadores internos únicos y rutas relativas; los nombres físicos no incluirán nombres de menores.
+- Se comprobará la integridad mediante hash.
+- La incorporación seguirá un procedimiento seguro: escritura temporal, verificación y vinculación definitiva; se detectarán restos y archivos huérfanos sin borrarlos automáticamente cuando exista duda.
+
+### Auditoría
+
+- Los eventos de auditoría registrarán, como mínimo, usuario, fecha/hora, operación, resultado y referencia al registro afectado; se añadirá motivo cuando proceda.
+- La auditoría se mantendrá separada de los datos operativos, con controles de integridad y copias propias.
+- No habrá edición ni borrado ordinario de eventos.
+- Se mantiene expresamente la limitación: sin cifrado y con control administrativo del ordenador y sus archivos, no puede garantizarse inmutabilidad absoluta.
+
+### Ubicación y despliegue
+
+- La carpeta activa se ubicará en una ruta local independiente y escribible, por ejemplo `C:\\CentroMenores`.
+- No se utilizarán como ubicación activa `Program Files`, carpetas de red ni carpetas sincronizadas por OneDrive, Dropbox u otros servicios.
+- La carpeta portable podrá trasladarse a otro ordenador con la aplicación cerrada y tras verificar la copia.
+
+### Pruebas obligatorias antes de producción
+
+Ninguna versión se considerará preparada para producción hasta superar pruebas con datos ficticios, incluyendo cierres forzados durante escrituras, apagados simulados, recuperación de formularios, restauración integral, migración a otro equipo, adjuntos ausentes/dañados/duplicados, conflictos de edición, fallos durante copias, permisos, auditoría y volúmenes representativos de información.
