@@ -35,6 +35,7 @@ from gestion_centro.domain.models import Stay, Minor
 from gestion_centro.domain.documents import PersonalDocument
 from gestion_centro.domain.documents_service import register_document, list_documents
 from gestion_centro.operations_ui import AuthorizationsDialog, OutingsDialog
+from gestion_centro.care_ui import EducationDialog, HealthDialog
 from gestion_centro.domain.communications_service import (
     create_communication, add_communication_contribution, close_communication,
     list_communications,
@@ -578,6 +579,12 @@ class MainWindow(QMainWindow):
             outings = QPushButton("Salidas")
             outings.clicked.connect(lambda: OutingsDialog(factory, account_id).exec())
             layout.addWidget(outings)
+            education = QPushButton("Seguimiento educativo y escolaridad")
+            education.clicked.connect(lambda: EducationDialog(factory, account_id).exec())
+            layout.addWidget(education)
+            health = QPushButton("Ficha sanitaria y medicación")
+            health.clicked.connect(lambda: HealthDialog(factory, account_id).exec())
+            layout.addWidget(health)
             documents = QPushButton("Documentación personal")
             documents.clicked.connect(lambda: DocumentsDialog(factory, account_id, paths).exec())
             layout.addWidget(documents)
