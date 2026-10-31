@@ -9,6 +9,7 @@ import tempfile
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
+from uuid import uuid4
 
 from gestion_centro.paths import DataPaths, ensure_data_directories
 
@@ -38,7 +39,7 @@ def verify_backup(archive: Path) -> dict:
             raise ValueError("El backup está incompleto")
         manifest = json.loads(bundle.read("manifest.json"))
         for name, expected in manifest["files"].items():
-            if name not in names or hashlib.sha256(bundle.read(name)).hexdigest() != expected:
+            if not _safe_archive_name(name) or name not in names or hashlib.sha256(bundle.read(name)).hexdigest() != expected:
                 raise ValueError(f"Integridad incorrecta en {name}")
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temp:
             temp.write(bundle.read("database/centro.db"))
@@ -64,7 +65,7 @@ def create_backup(paths: DataPaths, *, kind: str = "manual",
         raise FileNotFoundError("No existe la base de datos")
     moment = now or datetime.now(timezone.utc)
     stamp = moment.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    target = paths.backups / f"{kind}-{stamp}.zip"
+    target = paths.backups / f"{kind}-{stamp}-{uuid4().hex[:8]}.zip"
     with tempfile.TemporaryDirectory(prefix="centro-backup-") as temp_dir:
         snapshot = Path(temp_dir) / "centro.db"
         source = sqlite3.connect(paths.database)
