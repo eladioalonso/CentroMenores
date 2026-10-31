@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 
-from PySide6.QtCore import QEvent, QObject, QTimer, Qt, QLockFile
+from PySide6.QtCore import QEvent, QObject, QTimer, Qt, QLockFile, QDateTime
 from PySide6.QtWidgets import (
     QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QVBoxLayout, QWidget, QHBoxLayout, QPushButton,
@@ -256,7 +256,7 @@ class AgendaDialog(QDialog):
         self.starts = QDateTimeEdit()
         self.starts.setCalendarPopup(True)
         self.starts.setDisplayFormat("dd/MM/yyyy HH:mm")
-        self.starts.setDateTime(__import__("PySide6.QtCore", fromlist=["QDateTime"]).QDateTime.currentDateTime())
+        self.starts.setDateTime(QDateTime.currentDateTime())
         form.addRow("Tipo", self.kind)
         form.addRow("Título", self.title)
         form.addRow("Descripción", self.description)
@@ -311,7 +311,7 @@ class AgendaDialog(QDialog):
             QMessageBox.warning(self, "Falta el título", "El título es obligatorio.")
             return
         local_value = self.starts.dateTime().toPython()
-        starts_at = local_value.astimezone().replace(tzinfo=timezone.utc) if local_value.tzinfo else local_value.replace(tzinfo=timezone.utc)
+        starts_at = local_value.astimezone(timezone.utc) if local_value.tzinfo else local_value.astimezone().astimezone(timezone.utc)
         try:
             with session_scope(self.factory) as session:
                 create_agenda_item(session, actor_account_id=self.actor_id,
