@@ -35,6 +35,8 @@ from gestion_centro.domain.models import Stay, Minor
 from gestion_centro.domain.documents import PersonalDocument
 from gestion_centro.domain.documents_service import register_document, list_documents
 from gestion_centro.operations_ui import AuthorizationsDialog, OutingsDialog
+from gestion_centro.backups_ui import BackupDialog
+from gestion_centro.persistence.backups import create_backup
 from gestion_centro.care_ui import EducationDialog, HealthDialog
 from gestion_centro.domain.communications_service import (
     create_communication, add_communication_contribution, close_communication,
@@ -565,6 +567,9 @@ class MainWindow(QMainWindow):
             manage = QPushButton("Administrar cuentas")
             manage.clicked.connect(lambda: AccountManagementDialog(factory, account_id).exec())
             layout.addWidget(manage)
+            backups = QPushButton("Copias de seguridad")
+            backups.clicked.connect(lambda: BackupDialog(paths).exec())
+            layout.addWidget(backups)
         if factory is not None and account_id is not None:
             agenda = QPushButton("Agenda común y tareas")
             agenda.clicked.connect(lambda: AgendaDialog(factory, account_id).exec())
@@ -672,6 +677,16 @@ def main() -> int:
         display_name = account.professional.display_name if account else "Profesional"
         username = account.username if account else ""
         role = authenticated.role or Role.EDUCATOR
+
+    # Una copia diaria se crea al primer arranque de cada día UTC.
+    from datetime import datetime, timezone
+    day_stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    if not any(paths.backups.glob(f"daily-{day_stamp}*.zip")):
+        try:
+            create_backup(paths, kind="daily")
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(None, "Copia diaria pendiente",
+                f"No se pudo completar la copia diaria: {exc}")
 
     window = MainWindow(display_name, role, factory, authenticated.account_id, paths)
     monitor = None
