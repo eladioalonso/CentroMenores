@@ -319,13 +319,13 @@ Los informes deben indicar el periodo y los criterios utilizados. No incluirán 
 3. Crea una copia consistente de la base de datos y de los documentos asociados.
 4. Verifica que los archivos de la copia existen y que la base de datos supera las comprobaciones previstas.
 5. Registra fecha, resultado y ubicación.
-6. Ofrece exportar una copia cifrada a un dispositivo o ubicación externa autorizada.
+6. Ofrece exportar una copia completa sin cifrado a un dispositivo USB autorizado, conforme a la decisión expresa del centro. El USB será legible desde otro ordenador y deberá custodiarse físicamente.
 
 ### Restaurar una copia
 
 1. Se exige autorización específica.
 2. Se identifica la copia y se comprueba su integridad.
-3. La aplicación informa de que la restauración sustituirá el estado actual.
+3. La aplicación informa de las consecuencias de la restauración, conserva una copia preventiva del estado actual e identifica los datos posteriores que podrían verse afectados. No completa fusiones incompatibles automáticamente.
 4. Se crea una copia preventiva del estado actual cuando sea posible.
 5. Se realiza la restauración con la aplicación en estado controlado.
 6. Se comprueba la integridad de la base de datos y la disponibilidad de los documentos.
@@ -383,3 +383,6 @@ Antes de convertir estos flujos en requisitos definitivos, se necesita confirmar
 12. Qué avisos son imprescindibles en el panel de inicio.
 
 Las respuestas se incorporarán a este documento antes de cerrar el diseño funcional.
+
+
+> **Especificación vigente:** consultar [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md). Este documento reúne las decisiones aprobadas más recientes y prevalece sobre cualquier apartado anterior que las contradiga.
