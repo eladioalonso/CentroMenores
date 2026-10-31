@@ -513,7 +513,11 @@ class DocumentsDialog(QDialog):
             QMessageBox.warning(self, "Falta el título", "El título documental es obligatorio.")
             return
         source = self.selected_file
-        digest = hashlib.sha256(source.read_bytes()).hexdigest()
+        if source.stat().st_size <= 0 or source.stat().st_size > 25 * 1024 * 1024:
+            QMessageBox.warning(self, "Tamaño no permitido", "El archivo debe ocupar entre 1 byte y 25 MB.")
+            return
+        with source.open("rb") as stream:
+            digest = hashlib.file_digest(stream, "sha256").hexdigest()
         relative_dir = Path("documentos") / str(uuid4())
         target_dir = self.paths.documents / relative_dir
         target_dir.mkdir(parents=True, exist_ok=True)
