@@ -36,6 +36,7 @@ Estas tecnologías constituyen la propuesta inicial y podrán revisarse durante 
 - [Usuarios y permisos](docs/USUARIOS_Y_PERMISOS.md)
 - [Flujos de trabajo](docs/FLUJOS_DE_TRABAJO.md)
 - [Modelo conceptual de datos](docs/MODELO_DATOS.md)
+- [Decisiones consolidadas del diseño](docs/DECISIONES_CONSOLIDADAS.md)
 
 ## Alcance y protección de datos
 
@@ -44,3 +45,7 @@ La aplicación gestionará exclusivamente la actividad interna del centro. No pr
 Durante el desarrollo se utilizarán datos ficticios. No se deben incorporar al repositorio datos personales reales, expedientes, informes sanitarios, documentos identificativos, credenciales ni copias de bases de datos reales.
 
 La aplicación deberá diseñarse conforme a los principios de protección de datos, minimización, control de acceso, trazabilidad y conservación segura.
+
+## Estado del diseño
+
+La especificación funcional vigente y las decisiones aprobadas se recogen en [Decisiones consolidadas del diseño](docs/DECISIONES_CONSOLIDADAS.md). La programación no comenzará hasta recibir aprobación expresa.
