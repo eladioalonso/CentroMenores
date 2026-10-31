@@ -39,6 +39,7 @@ from gestion_centro.operations_ui import AuthorizationsDialog, OutingsDialog
 from gestion_centro.backups_ui import BackupDialog
 from gestion_centro.persistence.backups import create_backup
 from gestion_centro.care_ui import EducationDialog, HealthDialog
+from gestion_centro.maintenance_ui import MaintenanceDialog
 from gestion_centro.domain.communications_service import (
     create_communication, add_communication_contribution, close_communication,
     list_communications,
@@ -571,6 +572,9 @@ class MainWindow(QMainWindow):
             backups = QPushButton("Copias de seguridad")
             backups.clicked.connect(lambda: BackupDialog(paths, factory, account_id).exec())
             layout.addWidget(backups)
+            maintenance = QPushButton("Mantenimiento y diagnóstico")
+            maintenance.clicked.connect(lambda: MaintenanceDialog(paths, factory, account_id).exec())
+            layout.addWidget(maintenance)
         if factory is not None and account_id is not None:
             agenda = QPushButton("Agenda común y tareas")
             agenda.clicked.connect(lambda: AgendaDialog(factory, account_id).exec())
