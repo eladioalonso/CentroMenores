@@ -10,16 +10,16 @@ import shutil
 from pathlib import Path
 from uuid import uuid4
 
-from PySide6.QtCore import QEvent, QObject, QTimer, Qt, QLockFile, QDateTime
+from PySide6.QtCore import QEvent, QObject, QTimer, Qt, QLockFile, QDateTime, QDate, QUrl
 from PySide6.QtWidgets import (
     QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QVBoxLayout, QWidget, QHBoxLayout, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QInputDialog, QComboBox,
-    QDateTimeEdit, QTextEdit, QFileDialog,
+    QDateTimeEdit, QDateEdit, QTextEdit, QFileDialog, QDesktopServices,
 )
 from sqlalchemy import func, select
 
-from gestion_centro.auth.models import UserAccount
+from gestion_centro.auth.models import UserAccount, AccessAudit
 from gestion_centro.auth.service import (
     AuthStatus, Role, authenticate, create_professional_account,
     admin_create_professional_account, admin_reset_password,
@@ -33,6 +33,7 @@ from gestion_centro.domain.service import (
     set_agenda_item_status,
 )
 from gestion_centro.domain.models import Stay
+from gestion_centro.domain.documents import PersonalDocument
 from gestion_centro.domain.documents_service import register_document, list_documents
 from gestion_centro.operations_ui import AuthorizationsDialog, OutingsDialog
 from gestion_centro.backups_ui import BackupDialog
@@ -528,6 +529,11 @@ class DocumentsDialog(QDialog):
             self.category.addItem(label, key)
         self.title = QLineEdit()
         self.title.setMaxLength(180)
+        self.expiry = QDateEdit(QDate.currentDate().addYears(1))
+        self.expiry.setCalendarPopup(True)
+        self.no_expiry = QCheckBox("Sin caducidad")
+        self.notes = QTextEdit()
+        self.notes.setMaximumHeight(48)
         self.file_label = QLabel("Ningún archivo seleccionado")
         self.selected_file: Path | None = None
         choose = QPushButton("Seleccionar archivo…")
@@ -535,6 +541,9 @@ class DocumentsDialog(QDialog):
         form.addRow("Estancia activa", self.stay)
         form.addRow("Categoría", self.category)
         form.addRow("Título", self.title)
+        form.addRow("Caduca el", self.expiry)
+        form.addRow("", self.no_expiry)
+        form.addRow("Notas", self.notes)
         form.addRow("Archivo", choose)
         form.addRow("Seleccionado", self.file_label)
         layout.addLayout(form)
@@ -542,10 +551,16 @@ class DocumentsDialog(QDialog):
         save.clicked.connect(self.save_document)
         layout.addWidget(save)
         self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Título", "Categoría", "Archivo", "Versión", "Fecha"])
+        self.table.setHorizontalHeaderLabels(["Título", "Categoría", "Archivo", "Versión", "Caducidad"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.table)
+        actions = QHBoxLayout()
+        open_button = QPushButton("Abrir documento seleccionado")
+        open_button.clicked.connect(self.open_selected)
+        actions.addWidget(open_button)
+        layout.addLayout(actions)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.stay.currentIndexChanged.connect(self.refresh)
         self.refresh()
 
@@ -562,12 +577,45 @@ class DocumentsDialog(QDialog):
             return
         with session_scope(self.factory) as session:
             docs = list_documents(session, actor_account_id=self.actor_id, stay_id=stay_id)
-            rows = [(d.title, d.category, d.original_filename, str(d.version),
-                     d.created_at.astimezone().strftime("%d/%m/%Y %H:%M")) for d in docs]
+            rows = [(d.id, d.title, d.category, d.original_filename, str(d.version),
+                     d.expires_on.strftime("%d/%m/%Y") if d.expires_on else "—") for d in docs]
         self.table.setRowCount(len(rows))
         for row, values in enumerate(rows):
-            for col, value in enumerate(values):
-                self.table.setItem(row, col, QTableWidgetItem(value))
+            doc_id, *display = values
+            for col, value in enumerate(display):
+                cell = QTableWidgetItem(value)
+                if col == 0:
+                    cell.setData(Qt.ItemDataRole.UserRole, doc_id)
+                self.table.setItem(row, col, cell)
+
+    def open_selected(self):
+        row = self.table.currentRow()
+        cell = self.table.item(row, 0) if row >= 0 else None
+        if cell is None:
+            QMessageBox.information(self, "Selecciona", "Selecciona un documento.")
+            return
+        try:
+            with session_scope(self.factory) as session:
+                doc = session.get(PersonalDocument, cell.data(Qt.ItemDataRole.UserRole))
+                if doc is None:
+                    raise ValueError("El documento ya no existe.")
+                relative = Path(doc.relative_path)
+                if relative.is_absolute() or ".." in relative.parts:
+                    raise ValueError("La ruta del documento no es segura.")
+                target = (self.paths.root / relative).resolve()
+                if self.paths.root.resolve() not in target.parents or not target.is_file():
+                    raise ValueError("No se encuentra el archivo dentro de la carpeta portable.")
+                with target.open("rb") as stream:
+                    actual = hashlib.file_digest(stream, "sha256").hexdigest()
+                if actual != doc.sha256:
+                    raise ValueError("El hash no coincide. El archivo puede haber sido alterado.")
+                session.add(AccessAudit(account_id=self.actor_id,
+                    username_snapshot="document-user", event="personal_document_opened",
+                    details=f"{doc.id}; estancia:{doc.stay_id}"))
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(target))):
+                raise OSError("Windows no ha podido abrir el documento.")
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "No se pudo abrir", str(exc))
 
     def save_document(self):
         stay_id = self.stay.currentData()
@@ -598,9 +646,11 @@ class DocumentsDialog(QDialog):
                     category=self.category.currentData(), title=title,
                     original_filename=source.name, relative_path=relative_path,
                     mime_type=mime_type, size_bytes=target.stat().st_size,
-                    sha256=digest,
+                    sha256=digest, expires_on=None if self.no_expiry.isChecked() else self.expiry.date().toPython(),
+                    notes=self.notes.toPlainText(),
                 )
             self.title.clear()
+            self.notes.clear()
             self.selected_file = None
             self.file_label.setText("Ningún archivo seleccionado")
             self.refresh()
