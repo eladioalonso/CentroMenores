@@ -1,0 +1,92 @@
+"""Servicios sanitarios de registro; nunca sustituyen indicación clínica."""
+from datetime import date, datetime, timezone
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from gestion_centro.auth.models import AccessAudit, UserAccount
+from gestion_centro.domain.models import Stay
+from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationAdministration, VaccineRecord
+
+MEDICATION_RESULTS={"administered","refused","not_available"}
+
+def _actor(session: Session, account_id: str) -> UserAccount:
+    actor=session.get(UserAccount,account_id)
+    if actor is None or not actor.active or not actor.professional.active:
+        raise PermissionError("Se requiere una cuenta y un profesional activos")
+    return actor
+
+def _audit(session: Session, actor: UserAccount, event: str, details: str):
+    session.add(AccessAudit(account_id=actor.id,username_snapshot=actor.username,event=event,details=details))
+
+def _stay(session: Session, stay_id: str):
+    stay=session.get(Stay,stay_id)
+    if stay is None or stay.status!="active": raise ValueError("La estancia no existe o está cerrada")
+    return stay
+
+def read_health_profile(session: Session, *, actor_account_id: str, stay_id: str):
+    actor=_actor(session,actor_account_id); _stay(session,stay_id)
+    _audit(session,actor,"health_profile_accessed",stay_id)
+    return session.scalar(select(HealthProfile).where(HealthProfile.stay_id==stay_id))
+
+def save_health_profile(session: Session, *, actor_account_id: str, stay_id: str,
+                         allergies: str | None, relevant_conditions: str | None,
+                         emergency_instructions: str | None):
+    actor=_actor(session,actor_account_id); _stay(session,stay_id)
+    profile=session.scalar(select(HealthProfile).where(HealthProfile.stay_id==stay_id))
+    if profile is None: profile=HealthProfile(stay_id=stay_id); session.add(profile)
+    profile.allergies=allergies.strip() if allergies else None
+    profile.relevant_conditions=relevant_conditions.strip() if relevant_conditions else None
+    profile.emergency_instructions=emergency_instructions.strip() if emergency_instructions else None
+    profile.updated_by_account_id=actor.id
+    profile.updated_by_name_snapshot=actor.professional.display_name
+    profile.updated_at=datetime.now(timezone.utc)
+    _audit(session,actor,"health_profile_updated",stay_id)
+    return profile
+
+def add_medication_plan(session: Session, *, actor_account_id: str, stay_id: str,
+                        medication_name: str, prescribed_dose: str, schedule_text: str,
+                        prescriber_reference: str, starts_on: date, ends_on: date | None = None,
+                        instructions: str | None = None):
+    actor=_actor(session,actor_account_id); _stay(session,stay_id)
+    if not all(x.strip() for x in (medication_name,prescribed_dose,schedule_text,prescriber_reference)):
+        raise ValueError("Medicamento, dosis prescrita, pauta y referencia del prescriptor son obligatorios")
+    if ends_on and ends_on<starts_on: raise ValueError("La fecha final precede al inicio")
+    plan=MedicationPlan(stay_id=stay_id,medication_name=medication_name.strip(),
+        prescribed_dose=prescribed_dose.strip(),schedule_text=schedule_text.strip(),
+        prescriber_reference=prescriber_reference.strip(),starts_on=starts_on,ends_on=ends_on,
+        instructions=instructions.strip() if instructions else None,
+        recorded_by_account_id=actor.id,recorded_by_name_snapshot=actor.professional.display_name)
+    session.add(plan); session.flush()
+    _audit(session,actor,"medication_plan_recorded",plan.id)
+    return plan
+
+def record_medication_administration(session: Session, *, actor_account_id: str, plan_id: str,
+                                     scheduled_at: datetime, status: str, note: str | None = None):
+    actor=_actor(session,actor_account_id); plan=session.get(MedicationPlan,plan_id)
+    if plan is None or not plan.active: raise ValueError("La pauta no existe o está inactiva")
+    if status not in MEDICATION_RESULTS: raise ValueError("Resultado de administración no válido")
+    if status!="administered" and not (note and note.strip()):
+        raise ValueError("Indica el motivo si no se administra")
+    if scheduled_at.date()<plan.starts_on or (plan.ends_on and scheduled_at.date()>plan.ends_on):
+        raise ValueError("La fecha queda fuera de la vigencia de la pauta")
+    record=MedicationAdministration(plan_id=plan.id,scheduled_at=scheduled_at,status=status,
+        note=note.strip() if note else None,recorded_by_account_id=actor.id,
+        recorded_by_name_snapshot=actor.professional.display_name)
+    session.add(record); session.flush()
+    _audit(session,actor,"medication_administration_recorded",f"{plan.id}:{record.id}:{status}")
+    return record
+
+def add_vaccine_record(session: Session, *, actor_account_id: str, stay_id: str,
+                       vaccine_name: str, administered_on: date, dose_reference: str | None = None):
+    actor=_actor(session,actor_account_id); _stay(session,stay_id)
+    if not vaccine_name.strip(): raise ValueError("La vacuna es obligatoria")
+    record=VaccineRecord(stay_id=stay_id,vaccine_name=vaccine_name.strip(),
+        administered_on=administered_on,dose_reference=dose_reference,
+        recorded_by_account_id=actor.id,recorded_by_name_snapshot=actor.professional.display_name)
+    session.add(record); session.flush()
+    _audit(session,actor,"vaccine_recorded",record.id)
+    return record
+
+def list_medication_plans(session: Session, *, actor_account_id: str, stay_id: str):
+    actor=_actor(session,actor_account_id); _stay(session,stay_id)
+    _audit(session,actor,"medication_plans_accessed",stay_id)
+    return session.scalars(select(MedicationPlan).where(MedicationPlan.stay_id==stay_id).order_by(MedicationPlan.starts_on.desc())).all()
