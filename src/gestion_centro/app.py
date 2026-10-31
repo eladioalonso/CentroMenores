@@ -519,7 +519,7 @@ class DocumentsDialog(QDialog):
             return
         with source.open("rb") as stream:
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
-        relative_dir = Path("documentos") / str(uuid4())
+        relative_dir = Path(str(uuid4()))
         target_dir = self.paths.documents / relative_dir
         target_dir.mkdir(parents=True, exist_ok=True)
         target = target_dir / source.name
