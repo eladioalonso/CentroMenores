@@ -9,6 +9,7 @@ from PySide6.QtCore import QDate
 
 from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.reports import aggregate_statistics, export_statistics_csv
+from gestion_centro.domain.report_exports import export_pdf, export_docx
 
 
 class ReportsDialog(QDialog):
@@ -40,6 +41,12 @@ class ReportsDialog(QDialog):
         export = QPushButton("Exportar CSV…")
         export.clicked.connect(self.export)
         layout.addWidget(export)
+        pdf = QPushButton("Exportar PDF…")
+        pdf.clicked.connect(lambda: self.export_document("pdf"))
+        layout.addWidget(pdf)
+        word = QPushButton("Exportar Word…")
+        word.clicked.connect(lambda: self.export_document("docx"))
+        layout.addWidget(word)
         self.generate()
 
     def generate(self):
@@ -61,6 +68,21 @@ class ReportsDialog(QDialog):
                 self.table.setItem(i, 1, QTableWidgetItem(value))
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo generar", str(exc))
+
+    def export_document(self, kind):
+        if not self.report:
+            return
+        extension = "pdf" if kind == "pdf" else "docx"
+        filename, _ = QFileDialog.getSaveFileName(self, "Guardar informe",
+            f"memoria_agregada.{extension}", f"{extension.upper()} (*.{extension})")
+        if not filename:
+            return
+        try:
+            (export_pdf if kind == "pdf" else export_docx)(self.report, Path(filename))
+            QMessageBox.information(self, "Informe guardado",
+                "Se ha generado una memoria estadística agregada sin nombres ni identificadores.")
+        except (OSError, ValueError) as exc:
+            QMessageBox.critical(self, "Error de exportación", str(exc))
 
     def export(self):
         if not self.report:
