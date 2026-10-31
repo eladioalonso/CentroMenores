@@ -21,6 +21,7 @@ from gestion_centro.auth.service import (
 from gestion_centro.paths import data_paths, ensure_data_directories
 from gestion_centro.persistence.database import build_engine, build_session_factory, session_scope
 from gestion_centro.persistence.migrations import upgrade_database
+from gestion_centro.domain.service import close_expired_diary_days
 
 IDLE_LIMIT_MS = 15 * 60 * 1000
 
@@ -267,7 +268,10 @@ def main() -> int:
         return 1
     factory = build_session_factory(engine)
 
+    # El autocierre se ejecuta en una transacción propia al arrancar para que
+    # permanezca guardado aunque después se rechace una anotación tardía.
     with session_scope(factory) as session:
+        close_expired_diary_days(session)
         first_admin = session.scalar(select(func.count()).select_from(UserAccount)) == 0
 
     authenticated = None
