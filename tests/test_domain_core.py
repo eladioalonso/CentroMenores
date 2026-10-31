@@ -136,3 +136,18 @@ def test_invalid_diary_participant_does_not_leave_partial_entry():
                 shift="morning", category="general", content="Nota ficticia",
                 happened_at=datetime(2026, 4, 1, 10, tzinfo=timezone.utc), stay_ids=["missing"])
         assert session.scalar(select(DiaryEntry.id)) is None
+
+
+def test_startup_sweep_closes_only_diaries_past_deadline():
+    from gestion_centro.domain.models import DiaryDay
+    from gestion_centro.domain.service import close_expired_diary_days
+    with make_session() as session:
+        old_day = DiaryDay(diary_date=date(2026, 4, 1))
+        recent_day = DiaryDay(diary_date=date(2026, 4, 2))
+        session.add_all([old_day, recent_day])
+        session.flush()
+        closed = close_expired_diary_days(
+            session, now=datetime(2026, 4, 3, 12, tzinfo=timezone.utc))
+        assert closed == 1
+        assert old_day.closed_at == datetime(2026, 4, 3, 0, 0, tzinfo=timezone.utc)
+        assert recent_day.closed_at is None
