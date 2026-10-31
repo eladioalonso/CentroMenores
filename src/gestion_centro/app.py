@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import sys
 
-from PySide6.QtCore import QEvent, QObject, QTimer
+from PySide6.QtCore import QEvent, QObject, QTimer, Qt
 from PySide6.QtWidgets import (
     QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
-    QMainWindow, QMessageBox, QVBoxLayout, QWidget,
+    QMainWindow, QMessageBox, QVBoxLayout, QWidget, QHBoxLayout, QPushButton,
+    QTableWidget, QTableWidgetItem, QHeaderView, QInputDialog,
 )
 from sqlalchemy import func, select
 
 from gestion_centro.auth.models import UserAccount
 from gestion_centro.auth.service import (
     AuthStatus, Role, authenticate, create_professional_account,
+    admin_create_professional_account, admin_reset_password,
+    admin_set_account_active, admin_change_role,
 )
 from gestion_centro.paths import data_paths, ensure_data_directories
 from gestion_centro.persistence.base import Base
@@ -103,8 +106,120 @@ class IdleMonitor(QObject):
         self.app.removeEventFilter(self)
 
 
+
+class AccountManagementDialog(QDialog):
+    def __init__(self, factory, actor_id: str) -> None:
+        super().__init__()
+        self.factory, self.actor_id = factory, actor_id
+        self.setWindowTitle("Administración de cuentas")
+        self.resize(760, 420)
+        layout = QVBoxLayout(self)
+        self.table = QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(["Profesional", "Usuario", "Perfil", "Estado"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        layout.addWidget(self.table)
+        actions = QHBoxLayout()
+        for label, callback in [("Crear cuenta", self.create_account),
+            ("Restablecer contraseña", self.reset_password),
+            ("Cambiar perfil", self.change_role),
+            ("Activar / desactivar", self.toggle_active)]:
+            button = QPushButton(label)
+            button.clicked.connect(callback)
+            actions.addWidget(button)
+        layout.addLayout(actions)
+        self.refresh()
+
+    def refresh(self) -> None:
+        with session_scope(self.factory) as session:
+            accounts = session.scalars(select(UserAccount).order_by(UserAccount.username)).all()
+            rows = [(a.id, a.professional.display_name, a.username,
+                "Administrador" if a.role == Role.ADMIN.value else "Educador",
+                "Activa" if a.active and a.professional.active else "Inactiva") for a in accounts]
+        self.table.setRowCount(len(rows))
+        for row, values in enumerate(rows):
+            account_id, *display = values
+            for col, value in enumerate(display):
+                item = QTableWidgetItem(value)
+                if col == 0:
+                    item.setData(Qt.ItemDataRole.UserRole, account_id)
+                self.table.setItem(row, col, item)
+
+    def selected_account_id(self) -> str | None:
+        row = self.table.currentRow()
+        item = self.table.item(row, 0) if row >= 0 else None
+        return item.data(Qt.ItemDataRole.UserRole) if item else None
+
+    def create_account(self) -> None:
+        name, ok = QInputDialog.getText(self, "Nueva cuenta", "Nombre profesional:")
+        if not ok or not name.strip(): return
+        username, ok = QInputDialog.getText(self, "Nueva cuenta", "Usuario:")
+        if not ok or not username.strip(): return
+        password, ok = QInputDialog.getText(self, "Nueva cuenta", "Contraseña (mínimo 12 caracteres):", QLineEdit.EchoMode.Password)
+        if not ok: return
+        role_text, ok = QInputDialog.getItem(self, "Nueva cuenta", "Perfil:", ["Educador", "Administrador"], 0, False)
+        if not ok: return
+        try:
+            with session_scope(self.factory) as session:
+                admin_create_professional_account(session, actor_account_id=self.actor_id,
+                    display_name=name, username=username, password=password,
+                    role=Role.ADMIN if role_text == "Administrador" else Role.EDUCATOR)
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo crear la cuenta", str(exc))
+
+    def reset_password(self) -> None:
+        target_id = self.selected_account_id()
+        if not target_id:
+            QMessageBox.information(self, "Selecciona una cuenta", "Selecciona primero una cuenta.")
+            return
+        password, ok = QInputDialog.getText(self, "Restablecer contraseña",
+            "Nueva contraseña (mínimo 12 caracteres):", QLineEdit.EchoMode.Password)
+        if not ok: return
+        try:
+            with session_scope(self.factory) as session:
+                admin_reset_password(session, actor_account_id=self.actor_id,
+                    target_account_id=target_id, new_password=password)
+            QMessageBox.information(self, "Contraseña restablecida", "La nueva contraseña se ha guardado.")
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo restablecer", str(exc))
+
+    def change_role(self) -> None:
+        target_id = self.selected_account_id()
+        if not target_id:
+            QMessageBox.information(self, "Selecciona una cuenta", "Selecciona primero una cuenta.")
+            return
+        role_text, ok = QInputDialog.getItem(self, "Cambiar perfil", "Nuevo perfil:",
+            ["Educador", "Administrador"], 0, False)
+        if not ok: return
+        try:
+            with session_scope(self.factory) as session:
+                admin_change_role(session, actor_account_id=self.actor_id,
+                    target_account_id=target_id,
+                    role=Role.ADMIN if role_text == "Administrador" else Role.EDUCATOR)
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo cambiar el perfil", str(exc))
+
+    def toggle_active(self) -> None:
+        target_id = self.selected_account_id()
+        if not target_id:
+            QMessageBox.information(self, "Selecciona una cuenta", "Selecciona primero una cuenta.")
+            return
+        row = self.table.currentRow()
+        active = self.table.item(row, 3).text() == "Activa"
+        try:
+            with session_scope(self.factory) as session:
+                admin_set_account_active(session, actor_account_id=self.actor_id,
+                    target_account_id=target_id, active=not active)
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo cambiar el estado", str(exc))
+
+
 class MainWindow(QMainWindow):
-    def __init__(self, display_name: str, role: Role) -> None:
+    def __init__(self, display_name: str, role: Role, factory=None, account_id: str | None = None) -> None:
         super().__init__()
         self.setWindowTitle("Gestión del Centro")
         self.resize(1100, 720)
@@ -115,6 +230,10 @@ class MainWindow(QMainWindow):
         heading.setStyleSheet("font-size: 22px; font-weight: 600;")
         layout.addWidget(heading)
         layout.addWidget(QLabel(f"Sesión iniciada: {display_name} · Perfil: {'Administrador' if role is Role.ADMIN else 'Educador'}"))
+        if role is Role.ADMIN and factory is not None and account_id is not None:
+            manage = QPushButton("Administrar cuentas")
+            manage.clicked.connect(lambda: AccountManagementDialog(factory, account_id).exec())
+            layout.addWidget(manage)
         notice = QLabel(
             "Núcleo técnico en desarrollo. Todavía no está habilitado para introducir datos reales "
             "de menores ni para uso asistencial."
@@ -168,7 +287,7 @@ def main() -> int:
         username = account.username if account else ""
         role = authenticated.role or Role.EDUCATOR
 
-    window = MainWindow(display_name, role)
+    window = MainWindow(display_name, role, factory, authenticated.account_id)
     monitor = None
 
     def lock_session() -> None:
