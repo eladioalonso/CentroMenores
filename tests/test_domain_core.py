@@ -35,7 +35,7 @@ def test_reentry_creates_new_stay_and_history_is_preserved():
         minor = create_minor(session, actor_account_id=actor.id, internal_code="MC-2026-0002", given_names="Caso", family_names="Ficticio")
         first = open_stay(session, actor_account_id=actor.id, minor_id=minor.id, started_on=date(2026, 1, 1))
         close_stay(session, actor_account_id=actor.id, stay_id=first.id, ended_on=date(2026, 1, 5), reason="Fin de estancia ficticia")
-        second = open_stay(session, minor_id=minor.id, started_on=date(2026, 3, 1))
+        second = open_stay(session, actor_account_id=actor.id, minor_id=minor.id, started_on=date(2026, 3, 1))
         assert second.sequence_number == 2
         assert session.scalar(select(Stay).where(Stay.minor_id == minor.id).order_by(Stay.sequence_number)).id == first.id
 
