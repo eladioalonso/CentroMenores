@@ -6,12 +6,14 @@ from PySide6.QtWidgets import (
     QFileDialog, QHBoxLayout,
 )
 from gestion_centro.persistence.backups import create_backup, verify_backup, sync_pending_backups
+from gestion_centro.persistence.database import session_scope
+from gestion_centro.auth.models import AccessAudit, UserAccount
 
 
 class BackupDialog(QDialog):
-    def __init__(self, paths):
+    def __init__(self, paths, factory, actor_id):
         super().__init__()
-        self.paths = paths
+        self.paths, self.factory, self.actor_id = paths, factory, actor_id
         self.setWindowTitle("Copias de seguridad")
         self.resize(760, 480)
         layout = QVBoxLayout(self)
@@ -37,9 +39,19 @@ class BackupDialog(QDialog):
         for archive in archives:
             self.list.addItem(str(archive))
 
+    def audit(self, event, details):
+        with session_scope(self.factory) as session:
+            account = session.get(UserAccount, self.actor_id)
+            if account is not None:
+                session.add(AccessAudit(
+                    account_id=account.id, username_snapshot=account.username,
+                    event=event, details=details,
+                ))
+
     def create_manual(self):
         try:
             archive = create_backup(self.paths, kind="manual")
+            self.audit("backup_created", archive.name)
             QMessageBox.information(self, "Copia creada", "Copia verificada: " + archive.name)
             self.refresh()
         except (OSError, ValueError) as exc:
@@ -52,6 +64,7 @@ class BackupDialog(QDialog):
             return
         try:
             manifest = verify_backup(Path(item.text()))
+            self.audit("backup_verified", Path(item.text()).name)
             QMessageBox.information(self, "Verificación correcta",
                 "Integridad correcta. Archivos incluidos: " + str(len(manifest["files"])))
         except (OSError, ValueError, KeyError) as exc:
@@ -63,6 +76,7 @@ class BackupDialog(QDialog):
             return
         try:
             completed = sync_pending_backups(self.paths, Path(directory))
+            self.audit("backup_external_sync", str(len(completed)))
             QMessageBox.information(self, "Sincronización",
                 "Copias verificadas en el USB: " + str(len(completed)))
             self.refresh()
