@@ -107,9 +107,9 @@ Para trasladar la aplicación:
 
 No se debe copiar una base de datos SQLite en uso mediante una copia ordinaria de archivos. Las copias de seguridad se realizarán mediante un mecanismo consistente de SQLite o con la aplicación cerrada.
 
-Las copias internas se perderán si se elimina la carpeta completa. Por ello, se ofrecerá exportación de copias cifradas a una ubicación externa autorizada y se documentará cómo restaurarlas. Las copias externas deberán tener acceso restringido y una política de conservación.
+Las copias internas se perderán si se elimina la carpeta completa. Por ello, se ofrecerá exportación de copias completas sin cifrado a una unidad USB u otra ubicación externa autorizada, directamente legibles desde otro ordenador. Su custodia física y el acceso a los dispositivos deberán regularse institucionalmente. El procedimiento vigente se detalla en DECISIONES_CONSOLIDADAS.md.
 
-## 9. Empaquetado y actualizaciones
+## 9. Empaquetado y mantenimiento de versiones
 
 Se propone PyInstaller en modo onedir. El resultado incluirá el ejecutable y sus bibliotecas de ejecución en la carpeta de distribución.
 
