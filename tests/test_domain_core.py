@@ -151,3 +151,40 @@ def test_startup_sweep_closes_only_diaries_past_deadline():
         assert closed == 1
         assert old_day.closed_at == datetime(2026, 4, 3, 0, 0, tzinfo=timezone.utc)
         assert recent_day.closed_at is None
+
+
+def test_team_task_is_shared_and_can_be_completed_by_another_educator():
+    from gestion_centro.domain.models import AgendaItem
+    from gestion_centro.domain.service import create_agenda_item, set_agenda_item_status, list_agenda_items
+    with make_session() as session:
+        first = create_professional_account(session, display_name="Educador Uno",
+            username="agenda-one", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        second = create_professional_account(session, display_name="Educador Dos",
+            username="agenda-two", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        session.flush()
+        starts = datetime(2026, 5, 4, 9, tzinfo=timezone.utc)
+        item = create_agenda_item(session, actor_account_id=first.id, kind="task",
+            title="Revisar material ficticio", starts_at=starts, assignment_scope="team")
+        assert item.assigned_account_id is None
+        assert len(list_agenda_items(session, start=starts, end=starts)) == 1
+        done = set_agenda_item_status(session, actor_account_id=second.id,
+            item_id=item.id, status="done", now=datetime(2026, 5, 4, 10, tzinfo=timezone.utc))
+        assert done.status == "done"
+        assert done.completed_by_account_id == second.id
+        assert session.get(AgendaItem, item.id).completed_at == datetime(2026, 5, 4, 10, tzinfo=timezone.utc)
+
+
+def test_individual_agenda_assignment_requires_active_assignee_and_valid_interval():
+    from gestion_centro.domain.service import create_agenda_item
+    with make_session() as session:
+        actor = create_professional_account(session, display_name="Educador",
+            username="agenda-actor", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        session.flush()
+        starts = datetime(2026, 5, 4, 12, tzinfo=timezone.utc)
+        with pytest.raises(ValueError, match="responsable"):
+            create_agenda_item(session, actor_account_id=actor.id, kind="appointment",
+                title="Cita ficticia", starts_at=starts, assignment_scope="individual")
+        with pytest.raises(ValueError, match="finalización"):
+            create_agenda_item(session, actor_account_id=actor.id, kind="event",
+                title="Evento ficticio", starts_at=starts,
+                ends_at=datetime(2026, 5, 4, 11, tzinfo=timezone.utc))
