@@ -5,7 +5,7 @@ on:
 
 permissions:
   contents: read
- njobs:
+jobs:
   build-windows:
     runs-on: windows-latest
     steps:
