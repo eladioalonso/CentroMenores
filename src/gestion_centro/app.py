@@ -209,6 +209,9 @@ class AccountManagementDialog(QDialog):
             return
         row = self.table.currentRow()
         active = self.table.item(row, 3).text() == "Activa"
+        action = "desactivar" if active else "activar"
+        if QMessageBox.question(self, "Confirmar operación", f"¿Quieres {action} esta cuenta?") != QMessageBox.StandardButton.Yes:
+            return
         try:
             with session_scope(self.factory) as session:
                 admin_set_account_active(session, actor_account_id=self.actor_id,
@@ -260,6 +263,7 @@ def main() -> int:
     except Exception as exc:
         QMessageBox.critical(None, "Error de base de datos", f"No se pudo preparar la base de datos de forma segura:\\n{exc}")
         engine.dispose()
+        instance_lock.unlock()
         return 1
     factory = build_session_factory(engine)
 
