@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QPushButton, QLabel, QListWidget, QMessageBox,
     QFileDialog, QHBoxLayout,
 )
-from gestion_centro.persistence.backups import create_backup, verify_backup, sync_pending_backups
+from gestion_centro.persistence.backups import create_backup, verify_backup, sync_pending_backups, restore_backup
 from gestion_centro.persistence.database import session_scope
 from gestion_centro.auth.models import AccessAudit, UserAccount
 
@@ -25,9 +25,12 @@ class BackupDialog(QDialog):
         verify.clicked.connect(self.verify_selected)
         sync = QPushButton("Sincronizar pendientes con USB…")
         sync.clicked.connect(self.sync_usb)
+        restore = QPushButton("Restaurar copia completa…")
+        restore.clicked.connect(self.restore_selected)
         actions.addWidget(create)
         actions.addWidget(verify)
         actions.addWidget(sync)
+        actions.addWidget(restore)
         layout.addLayout(actions)
         self.list = QListWidget()
         layout.addWidget(self.list)
@@ -69,6 +72,42 @@ class BackupDialog(QDialog):
                 "Integridad correcta. Archivos incluidos: " + str(len(manifest["files"])))
         except (OSError, ValueError, KeyError) as exc:
             QMessageBox.critical(self, "Copia no válida", str(exc))
+
+    def restore_selected(self):
+        filename, _ = QFileDialog.getOpenFileName(
+            self, "Seleccionar copia completa", str(self.paths.backups), "Copias ZIP (*.zip)")
+        if not filename:
+            return
+        answer = QMessageBox.warning(
+            self, "Restauración integral",
+            "Se sustituirán la base de datos, documentos e imágenes por el contenido de la copia. "
+            "Antes se creará una copia previa automática. La auditoría actual se conservará. "
+            "La versión del esquema debe coincidir. Cierra cualquier otra instancia. ¿Continuar?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            with session_scope(self.factory) as session:
+                actor = session.get(UserAccount, self.actor_id)
+                if actor is None or not actor.active or actor.role != "admin":
+                    raise PermissionError("Se requiere una cuenta administradora activa")
+                actor_name = actor.username
+            pre_restore = restore_backup(self.paths, Path(filename))
+            with session_scope(self.factory) as session:
+                actor = session.get(UserAccount, self.actor_id)
+                session.add(AccessAudit(
+                    account_id=actor.id if actor else None,
+                    username_snapshot=actor.username if actor else actor_name,
+                    event="backup_restored",
+                    details=f"Archivo: {Path(filename).name}; copia previa: {pre_restore.name}",
+                ))
+            QMessageBox.information(self, "Restauración completada",
+                "La restauración ha finalizado. La copia previa se conserva en la carpeta de backups. "
+                "Reinicia la aplicación y comprueba los expedientes y documentos.")
+            self.refresh()
+        except (OSError, ValueError, PermissionError, KeyError) as exc:
+            QMessageBox.critical(self, "Restauración cancelada", str(exc))
 
     def sync_usb(self):
         directory = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta del USB")
