@@ -28,7 +28,7 @@ def application_root() -> Path:
         return Path(override).expanduser().resolve()
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[2] / ".centro_datos"
 
 
 def data_paths(root: Path | None = None) -> DataPaths:
