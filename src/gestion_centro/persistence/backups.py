@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import sqlite3
 import tempfile
@@ -149,3 +150,110 @@ def sync_pending_backups(paths: DataPaths, external_root: Path) -> list[Path]:
         completed.append(target)
     pending.write_text(json.dumps(remaining, ensure_ascii=False, indent=2), encoding="utf-8")
     return completed
+
+
+def restore_backup(paths: DataPaths, archive: Path) -> Path:
+    """Restaura un conjunto completo tras validar y conservar el estado actual.
+
+    Conserva los registros de auditoría actuales que no existan en la copia.
+    Rechaza copias cuyo esquema no sea compatible con la base instalada.
+    """
+    manifest = verify_backup(archive)
+    ensure_data_directories(paths)
+    # La copia previa es obligatoria y queda verificada antes de tocar nada.
+    pre_restore = create_backup(paths, kind="pre_operation")
+    with tempfile.TemporaryDirectory(prefix="centro-restore-") as temp_dir:
+        stage = Path(temp_dir)
+        with zipfile.ZipFile(archive, "r") as bundle:
+            for info in bundle.infolist():
+                if not _safe_archive_name(info.filename):
+                    raise ValueError("El archivo contiene rutas no seguras")
+                if info.is_dir():
+                    continue
+                target = stage.joinpath(*PurePosixPath(info.filename).parts)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with bundle.open(info) as source, target.open("wb") as destination:
+                    shutil.copyfileobj(source, destination)
+
+        staged_db = stage / "database" / "centro.db"
+        if not staged_db.is_file():
+            raise ValueError("La copia no contiene la base de datos")
+        with sqlite3.connect(staged_db) as restored, sqlite3.connect(paths.database) as current:
+            restored_check = restored.execute("PRAGMA integrity_check").fetchone()[0]
+            if restored_check != "ok":
+                raise ValueError("La base restaurada no supera integrity_check")
+            current_tables = {r[0] for r in current.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'")}
+            restored_tables = {r[0] for r in restored.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'")}
+            if "alembic_version" not in current_tables or "alembic_version" not in restored_tables:
+                raise ValueError("No se puede verificar la versión del esquema")
+            current_version = current.execute("SELECT version_num FROM alembic_version").fetchone()
+            restored_version = restored.execute("SELECT version_num FROM alembic_version").fetchone()
+            if not current_version or not restored_version or current_version[0] != restored_version[0]:
+                raise ValueError("La copia tiene una versión de esquema distinta. Restauración cancelada.")
+            if "access_audit" not in current_tables or "access_audit" not in restored_tables:
+                raise ValueError("No se puede garantizar la conservación de auditoría")
+            current_cols = {r[1] for r in current.execute("PRAGMA table_info(access_audit)")}
+            restored_cols = {r[1] for r in restored.execute("PRAGMA table_info(access_audit)")}
+            required = {"id", "account_id", "username_snapshot", "event", "occurred_at", "details"}
+            if not required.issubset(current_cols) or not required.issubset(restored_cols):
+                raise ValueError("La estructura de auditoría no es compatible")
+            # Las referencias de cuenta inexistentes se convierten en NULL,
+            # conservando usuario, evento, fecha y detalle originales.
+            restored.execute(
+                """INSERT OR IGNORE INTO access_audit
+                (id, account_id, username_snapshot, event, occurred_at, details)
+                SELECT a.id,
+                    CASE WHEN a.account_id IS NOT NULL AND EXISTS
+                        (SELECT 1 FROM user_accounts u WHERE u.id=a.account_id)
+                    THEN a.account_id ELSE NULL END,
+                    a.username_snapshot, a.event, a.occurred_at, a.details
+                FROM current_db.access_audit a"""
+            ) if False else None
+            restored.execute("ATTACH DATABASE ? AS current_db", (str(paths.database),))
+            restored.execute(
+                """INSERT OR IGNORE INTO access_audit
+                (id, account_id, username_snapshot, event, occurred_at, details)
+                SELECT a.id,
+                    CASE WHEN a.account_id IS NOT NULL AND EXISTS
+                        (SELECT 1 FROM user_accounts u WHERE u.id=a.account_id)
+                    THEN a.account_id ELSE NULL END,
+                    a.username_snapshot, a.event, a.occurred_at, a.details
+                FROM current_db.access_audit a"""
+            )
+            restored.commit()
+            foreign_errors = restored.execute("PRAGMA foreign_key_check").fetchall()
+            if foreign_errors:
+                raise ValueError("La base restaurada contiene relaciones inválidas")
+            restored.execute("DETACH DATABASE current_db")
+
+        # Prepara directorios completos antes de sustituirlos.
+        staged_docs = stage / "documents"
+        staged_images = stage / "images"
+        staged_docs.mkdir(exist_ok=True)
+        staged_images.mkdir(exist_ok=True)
+        backup_hold = stage / "previous"
+        backup_hold.mkdir()
+        operations = [
+            (paths.documents, backup_hold / "documents", staged_docs),
+            (paths.images, backup_hold / "images", staged_images),
+        ]
+        moved = []
+        try:
+            for live, old, new in operations:
+                if live.exists():
+                    os.replace(live, old)
+                    moved.append((live, old))
+                os.replace(new, live)
+            staged_live_db = stage / "database" / "restore.db"
+            os.replace(staged_db, staged_live_db)
+            os.replace(staged_live_db, paths.database)
+        except Exception:
+            for live, old in reversed(moved):
+                if live.exists():
+                    shutil.rmtree(live, ignore_errors=True)
+                if old.exists():
+                    os.replace(old, live)
+            raise
+    return pre_restore
