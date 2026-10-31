@@ -44,12 +44,13 @@ def verify_backup(archive: Path) -> dict:
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temp:
             temp.write(bundle.read("database/centro.db"))
             temp_path = Path(temp.name)
+        connection = sqlite3.connect(temp_path)
         try:
-            with sqlite3.connect(temp_path) as connection:
-                result = connection.execute("PRAGMA integrity_check").fetchone()[0]
-                if result != "ok":
-                    raise ValueError("La base de datos del backup no supera integrity_check")
+            result = connection.execute("PRAGMA integrity_check").fetchone()[0]
+            if result != "ok":
+                raise ValueError("La base de datos del backup no supera integrity_check")
         finally:
+            connection.close()
             temp_path.unlink(missing_ok=True)
         return manifest
 
