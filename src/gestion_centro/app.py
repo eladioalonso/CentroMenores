@@ -39,6 +39,7 @@ from gestion_centro.backups_ui import BackupDialog
 from gestion_centro.persistence.backups import create_backup
 from gestion_centro.care_ui import EducationDialog, HealthDialog
 from gestion_centro.backup_ui import BackupDialog
+from gestion_centro.persistence.backups import create_backup
 from gestion_centro.domain.communications_service import (
     create_communication, add_communication_contribution, close_communication,
     list_communications,
@@ -636,6 +637,16 @@ def main() -> int:
         instance_lock.unlock()
         return 1
     factory = build_session_factory(engine)
+
+    # Copia diaria local: una por día UTC. La sincronización externa queda pendiente
+    # hasta que el administrador conecte la unidad USB desde la interfaz.
+    daily_stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    if not any(paths.backups.glob(f"daily-{daily_stamp}T*.zip")):
+        try:
+            create_backup(paths, kind="daily")
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(None, "Copia diaria no creada",
+                f"No se pudo completar la copia diaria. Comprueba el espacio y los permisos.\n{exc}")
 
     # El autocierre se ejecuta en una transacción propia al arrancar para que
     # permanezca guardado aunque después se rechace una anotación tardía.
