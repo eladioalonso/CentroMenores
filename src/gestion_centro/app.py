@@ -19,8 +19,8 @@ from gestion_centro.auth.service import (
     admin_set_account_active, admin_change_role,
 )
 from gestion_centro.paths import data_paths, ensure_data_directories
-from gestion_centro.persistence.base import Base
 from gestion_centro.persistence.database import build_engine, build_session_factory, session_scope
+from gestion_centro.persistence.migrations import upgrade_database
 
 IDLE_LIMIT_MS = 15 * 60 * 1000
 
@@ -250,13 +250,19 @@ def main() -> int:
     paths = data_paths()
     ensure_data_directories(paths)
     engine = build_engine(paths.database)
-    Base.metadata.create_all(engine)
+    try:
+        upgrade_database(engine)
+    except Exception as exc:
+        QMessageBox.critical(None, "Error de base de datos", f"No se pudo preparar la base de datos de forma segura:\\n{exc}")
+        engine.dispose()
+        return 1
     factory = build_session_factory(engine)
 
     with session_scope(factory) as session:
         first_admin = session.scalar(select(func.count()).select_from(UserAccount)) == 0
 
     authenticated = None
+    login_failures = 0
     while authenticated is None:
         dialog = CredentialsDialog(first_admin=first_admin)
         if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -274,9 +280,14 @@ def main() -> int:
                 result = authenticate(session, username=username, password=password)
             if result.status is AuthStatus.SUCCESS:
                 authenticated = result
-            elif result.status is AuthStatus.RETRY_FLOW_CLOSED:
-                QMessageBox.warning(None, "Acceso cerrado", "Cinco intentos fallidos. Inicia de nuevo el proceso de acceso.")
+                login_failures = 0
             else:
+                login_failures += 1
+            if result.status is AuthStatus.RETRY_FLOW_CLOSED or login_failures >= 5:
+                QMessageBox.warning(None, "Acceso cerrado", "Cinco intentos fallidos. El proceso de acceso se cerrará.")
+                engine.dispose()
+                return 1
+            elif result.status is not AuthStatus.SUCCESS:
                 QMessageBox.warning(None, "Acceso no válido", "Usuario o contraseña incorrectos, o cuenta inactiva.")
         except ValueError as exc:
             QMessageBox.warning(None, "No se pudo crear la cuenta", str(exc))
@@ -318,5 +329,8 @@ def main() -> int:
     window.show()
     result = app.exec()
     monitor.stop()
+    with session_scope(factory) as session:
+        from gestion_centro.auth.models import AccessAudit
+        session.add(AccessAudit(account_id=authenticated.account_id, username_snapshot=username, event="logout"))
     engine.dispose()
     return result
