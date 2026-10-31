@@ -16,7 +16,7 @@ from gestion_centro.domain.education_service import (
     create_education_goal, add_education_update, set_education_goal_status,
     create_school_placement, add_school_record,
 )
-from gestion_centro.domain.health import HealthProfile, MedicationPlan, VaccineRecord
+from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationAdministration, VaccineRecord
 from gestion_centro.domain.health_service import (
     read_health_profile, save_health_profile, add_medication_plan,
     record_medication_administration, add_vaccine_record, list_medication_plans,
@@ -179,6 +179,16 @@ class HealthDialog(StaySelectorDialog):
                                 ("Registrar vacuna", self.add_vaccine)]:
             b = QPushButton(label); b.clicked.connect(callback); actions.addWidget(b)
         self.body.addLayout(actions)
+        self.administrations = QTableWidget(0, 5)
+        self.administrations.setHorizontalHeaderLabels(["Fecha / hora", "Medicamento", "Resultado", "Motivo / nota", "Registrado por"])
+        self.administrations.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.administrations.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.body.addWidget(self.administrations)
+        self.vaccines = QTableWidget(0, 3)
+        self.vaccines.setHorizontalHeaderLabels(["Vacuna", "Fecha", "Dosis / referencia"])
+        self.vaccines.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.vaccines.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.body.addWidget(self.vaccines)
         self.stay.currentIndexChanged.connect(self.refresh)
         self.refresh()
 
@@ -188,6 +198,8 @@ class HealthDialog(StaySelectorDialog):
         with session_scope(self.factory) as session:
             profile = read_health_profile(session, actor_account_id=self.actor_id, stay_id=stay_id)
             plans = list_medication_plans(session, actor_account_id=self.actor_id, stay_id=stay_id)
+            vaccine_rows = session.scalars(select(VaccineRecord).where(VaccineRecord.stay_id == stay_id).order_by(VaccineRecord.administered_on.desc())).all()
+            administration_rows = [(a, p.medication_name) for p in plans for a in p.administrations]
         self.allergies.setPlainText(profile.allergies or "" if profile else "")
         self.conditions.setPlainText(profile.relevant_conditions or "" if profile else "")
         self.emergency.setPlainText(profile.emergency_instructions or "" if profile else "")
@@ -199,6 +211,15 @@ class HealthDialog(StaySelectorDialog):
                 cell = QTableWidgetItem(value)
                 if col == 0: cell.setData(Qt.ItemDataRole.UserRole, p.id)
                 self.plans.setItem(i, col, cell)
+        admin_rows = sorted(administration_rows, key=lambda x: x[0].scheduled_at, reverse=True)
+        self.administrations.setRowCount(len(admin_rows))
+        for i, (record, medication) in enumerate(admin_rows):
+            values = [record.scheduled_at.astimezone().strftime("%d/%m/%Y %H:%M"), medication, record.status, record.note or "—", record.recorded_by_name_snapshot]
+            for col, value in enumerate(values): self.administrations.setItem(i, col, QTableWidgetItem(value))
+        self.vaccines.setRowCount(len(vaccine_rows))
+        for i, record in enumerate(vaccine_rows):
+            values = [record.vaccine_name, record.administered_on.strftime("%d/%m/%Y"), record.dose_reference or "—"]
+            for col, value in enumerate(values): self.vaccines.setItem(i, col, QTableWidgetItem(value))
 
     def save_profile(self):
         try:
