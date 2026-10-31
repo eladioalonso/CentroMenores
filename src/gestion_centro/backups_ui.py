@@ -1,5 +1,4 @@
 """Interfaz de copias de seguridad para administración."""
-from datetime import datetime, timezone
 from pathlib import Path
 
 from PySide6.QtWidgets import (
@@ -34,14 +33,14 @@ class BackupDialog(QDialog):
 
     def refresh(self):
         self.list.clear()
-        for archive in sorted(self.paths.backups.glob("*.zip"), key=lambda p: p.stat().st_mtime, reverse=True):
+        archives = sorted(self.paths.backups.glob("*.zip"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for archive in archives:
             self.list.addItem(str(archive))
 
     def create_manual(self):
         try:
             archive = create_backup(self.paths, kind="manual")
-            QMessageBox.information(self, "Copia creada", f"Copia verificada:
-{archive.name}")
+            QMessageBox.information(self, "Copia creada", "Copia verificada: " + archive.name)
             self.refresh()
         except (OSError, ValueError) as exc:
             QMessageBox.critical(self, "Error de copia", str(exc))
@@ -54,8 +53,7 @@ class BackupDialog(QDialog):
         try:
             manifest = verify_backup(Path(item.text()))
             QMessageBox.information(self, "Verificación correcta",
-                f"Integridad correcta.
-Archivos incluidos: {len(manifest['files'])}")
+                "Integridad correcta. Archivos incluidos: " + str(len(manifest["files"])))
         except (OSError, ValueError, KeyError) as exc:
             QMessageBox.critical(self, "Copia no válida", str(exc))
 
@@ -66,7 +64,7 @@ Archivos incluidos: {len(manifest['files'])}")
         try:
             completed = sync_pending_backups(self.paths, Path(directory))
             QMessageBox.information(self, "Sincronización",
-                f"Copias verificadas en el USB: {len(completed)}")
+                "Copias verificadas en el USB: " + str(len(completed)))
             self.refresh()
         except (OSError, ValueError) as exc:
             QMessageBox.critical(self, "Error de sincronización", str(exc))
