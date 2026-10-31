@@ -33,7 +33,7 @@ def test_reentry_creates_new_stay_and_history_is_preserved():
         actor = create_professional_account(session, display_name="Prueba", username="p2", password="contraseña de prueba segura", role=Role.EDUCATOR)
         session.flush()
         minor = create_minor(session, actor_account_id=actor.id, internal_code="MC-2026-0002", given_names="Caso", family_names="Ficticio")
-        first = open_stay(session, minor_id=minor.id, started_on=date(2026, 1, 1))
+        first = open_stay(session, actor_account_id=actor.id, minor_id=minor.id, started_on=date(2026, 1, 1))
         close_stay(session, actor_account_id=actor.id, stay_id=first.id, ended_on=date(2026, 1, 5), reason="Fin de estancia ficticia")
         second = open_stay(session, minor_id=minor.id, started_on=date(2026, 3, 1))
         assert second.sequence_number == 2
@@ -62,3 +62,44 @@ def test_event_requires_active_author_and_valid_stays():
         with pytest.raises(PermissionError):
             record_event(session, author_account_id="missing", title="x", description="y",
                 happened_at=datetime.now(timezone.utc), stay_ids=[])
+
+
+def test_diary_closure_blocks_edits_but_allows_append_only_correction():
+    from gestion_centro.domain.models import DiaryEntry
+    from gestion_centro.domain.service import close_diary_day, correct_diary_entry, record_diary_entry
+    with make_session() as session:
+        actor = create_professional_account(session, display_name="Prueba", username="diary", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        session.flush()
+        day = date(2026, 4, 1)
+        entry = record_diary_entry(session, actor_account_id=actor.id, diary_date=day,
+            shift="morning", category="general", content="Nota ficticia",
+            happened_at=datetime(2026, 4, 1, 10, tzinfo=timezone.utc))
+        close_diary_day(session, actor_account_id=actor.id, diary_date=day,
+            now=datetime(2026, 4, 2, 10, tzinfo=timezone.utc))
+        with pytest.raises(ValueError, match="cerrado"):
+            record_diary_entry(session, actor_account_id=actor.id, diary_date=day,
+                shift="morning", category="general", content="No debe entrar",
+                happened_at=datetime(2026, 4, 1, 11, tzinfo=timezone.utc))
+        correction = correct_diary_entry(session, actor_account_id=actor.id,
+            original_entry_id=entry.id, content="Texto corregido", reason="Aclaración",
+            happened_at=datetime(2026, 4, 2, 11, tzinfo=timezone.utc))
+        assert correction.correction_of_id == entry.id
+        assert session.get(DiaryEntry, entry.id).content == "Nota ficticia"
+
+
+def test_incident_participants_have_roles_and_auditable_closure_reopening():
+    from gestion_centro.domain.models import Incident
+    from gestion_centro.domain.service import close_incident, record_incident, reopen_incident
+    with make_session() as session:
+        actor = create_professional_account(session, display_name="Prueba", username="incident", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        session.flush()
+        minor = create_minor(session, actor_account_id=actor.id, internal_code="MC-2026-0099", given_names="Caso", family_names="Ficticio")
+        stay = open_stay(session, actor_account_id=actor.id, minor_id=minor.id, started_on=date(2026, 1, 1))
+        happened = datetime(2026, 4, 1, 10, tzinfo=timezone.utc)
+        incident = record_incident(session, actor_account_id=actor.id, diary_date=date(2026, 4, 1),
+            title="Incidencia ficticia", description="Descripción objetiva", incident_type="safety",
+            severity="medium", happened_at=happened, participants=[(stay.id, "witness", "Nota factual")])
+        close_incident(session, actor_account_id=actor.id, incident_id=incident.id, note="Seguimiento completado")
+        assert session.get(Incident, incident.id).status == "closed"
+        reopen_incident(session, actor_account_id=actor.id, incident_id=incident.id, reason="Nueva información")
+        assert session.get(Incident, incident.id).status == "open"
