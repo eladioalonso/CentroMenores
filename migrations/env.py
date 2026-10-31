@@ -8,6 +8,7 @@ from gestion_centro.auth import models as auth_models  # noqa: F401
 from gestion_centro.domain import models as domain_models  # noqa: F401
 from gestion_centro.domain import communications as communication_models  # noqa: F401
 from gestion_centro.domain import education as education_models  # noqa: F401
+from gestion_centro.domain import health as health_models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
