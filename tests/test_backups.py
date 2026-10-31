@@ -11,7 +11,7 @@ from gestion_centro.persistence.backups import create_backup, verify_backup, syn
 def prepare_paths(tmp_path):
     paths = data_paths(tmp_path)
     ensure_data_directories(paths)
-    with sqlite3.connect(paths.database) as connection:
+    with closing(sqlite3.connect(paths.database)) as connection:
         connection.execute("CREATE TABLE sample (value TEXT)")
         connection.execute("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)")
         connection.execute("INSERT INTO alembic_version VALUES ('test-version')")
@@ -21,6 +21,7 @@ def prepare_paths(tmp_path):
             username_snapshot TEXT NOT NULL, event TEXT NOT NULL,
             occurred_at TEXT NOT NULL, details TEXT NULL)""")
         connection.execute("INSERT INTO sample VALUES ('fictitious')")
+        connection.commit()
     (paths.documents / "sample.pdf").write_bytes(b"fake document bytes")
     (paths.images / "sample.png").write_bytes(b"fake image bytes")
     return paths
@@ -78,6 +79,7 @@ def test_restore_requires_matching_schema_and_preserves_current_audit(tmp_path):
             ("audit-after-backup", "educador-ficticio", "test_event",
              "2026-05-04T12:00:00+00:00", "registro posterior")
         )
+        connection.commit()
     previous = restore_backup(paths, archive)
     assert previous.is_file()
     assert (paths.documents / "sample.pdf").read_bytes() == b"fake document bytes"
@@ -95,6 +97,7 @@ def test_restore_refuses_different_schema_without_replacing_live_database(tmp_pa
         now=datetime(2026, 5, 5, tzinfo=timezone.utc))
     with closing(sqlite3.connect(paths.database)) as connection:
         connection.execute("UPDATE alembic_version SET version_num='newer-version'")
+        connection.commit()
     before = (paths.documents / "sample.pdf").read_bytes()
     import pytest
     with pytest.raises(ValueError, match="versión de esquema"):
