@@ -1,16 +1,17 @@
 """Interfaz básica de diario e incidencias con autoría y cierre trazable."""
 from datetime import datetime, timezone
 
-from PySide6.QtCore import QDate, QDateTime
+from PySide6.QtCore import QDate, QDateTime, Qt
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, QDateEdit, QDateTimeEdit,
     QComboBox, QLineEdit, QTextEdit, QPushButton, QTableWidget, QTableWidgetItem,
-    QHeaderView, QMessageBox, QInputDialog,
+    QHeaderView, QMessageBox, QInputDialog, QListWidget, QListWidgetItem,
+    QDialogButtonBox, QLabel,
 )
 from sqlalchemy import select
 
 from gestion_centro.persistence.database import session_scope
-from gestion_centro.domain.models import DiaryDay, DiaryEntry, Incident
+from gestion_centro.domain.models import DiaryDay, DiaryEntry, Incident, Stay
 from gestion_centro.domain.service import (
     record_diary_entry, record_incident, close_diary_day,
 )
@@ -48,11 +49,18 @@ class DiaryDialog(QDialog):
         self.happened.setDateTime(QDateTime.currentDateTime())
         self.content = QTextEdit()
         self.content.setMaximumHeight(70)
+        self.participant_hint = QLineEdit("Sin menores vinculados")
+        self.participant_hint.setReadOnly(True)
+        self.selected_stay_ids = []
         form.addRow("Fecha del diario", self.day)
         form.addRow("Turno", self.shift)
         form.addRow("Categoría", self.category)
         form.addRow("Fecha y hora del hecho", self.happened)
         form.addRow("Anotación objetiva", self.content)
+        select_stays = QPushButton("Vincular menores / estancias…")
+        select_stays.clicked.connect(self.choose_stays)
+        form.addRow("Personas vinculadas", self.participant_hint)
+        form.addRow("", select_stays)
         layout.addLayout(form)
         actions = QHBoxLayout()
         add = QPushButton("Añadir anotación")
@@ -73,6 +81,31 @@ class DiaryDialog(QDialog):
         self.day.dateChanged.connect(self.refresh)
         self.refresh()
 
+    def choose_stays(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Vincular menores y estancias activas")
+        dialog.resize(520, 420)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Marca únicamente a los menores implicados. Para un hecho general, deja la selección vacía."))
+        choices = QListWidget()
+        with session_scope(self.factory) as session:
+            stays = session.scalars(select(Stay).where(Stay.status == "active").order_by(Stay.started_on.desc())).all()
+            rows = [(s.id, f"{s.minor.internal_code} · {s.minor.given_names} {s.minor.family_names}") for s in stays]
+        for stay_id, label in rows:
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, stay_id)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked if stay_id in self.selected_stay_ids else Qt.CheckState.Unchecked)
+            choices.addItem(item)
+        layout.addWidget(choices)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.selected_stay_ids = [choices.item(i).data(Qt.ItemDataRole.UserRole) for i in range(choices.count()) if choices.item(i).checkState() == Qt.CheckState.Checked]
+            self.participant_hint.setText(f"{len(self.selected_stay_ids)} estancia(s) vinculada(s)" if self.selected_stay_ids else "Sin menores vinculados")
+
     def add_entry(self):
         try:
             local = self.happened.dateTime().toPython()
@@ -81,8 +114,10 @@ class DiaryDialog(QDialog):
                 record_diary_entry(session, actor_account_id=self.actor_id,
                     diary_date=self.day.date().toPython(), shift=self.shift.currentData(),
                     category=self.category.currentData(), content=self.content.toPlainText(),
-                    happened_at=moment)
+                    happened_at=moment, stay_ids=self.selected_stay_ids)
             self.content.clear()
+            self.selected_stay_ids = []
+            self.participant_hint.setText("Sin menores vinculados")
             self.refresh()
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo guardar", str(exc))
@@ -103,7 +138,8 @@ class DiaryDialog(QDialog):
                 record_incident(session, actor_account_id=self.actor_id,
                     diary_date=self.day.date().toPython(), title=title, description=description,
                     incident_type=self.INCIDENT_TYPES[type_label],
-                    severity=self.SEVERITIES[severity_label], happened_at=moment, participants=[])
+                    severity=self.SEVERITIES[severity_label], happened_at=moment,
+                    participants=[(stay_id, "involved", None) for stay_id in self.selected_stay_ids])
             self.refresh()
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo registrar", str(exc))
