@@ -6,6 +6,7 @@ from sqlalchemy import engine_from_config, pool
 from gestion_centro.persistence.base import Base
 from gestion_centro.auth import models as auth_models  # noqa: F401
 from gestion_centro.domain import models as domain_models  # noqa: F401
+from gestion_centro.domain import communications as communication_models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
