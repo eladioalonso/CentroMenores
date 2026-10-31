@@ -60,15 +60,16 @@ def add_medication_plan(session: Session, *, actor_account_id: str, stay_id: str
     return plan
 
 def record_medication_administration(session: Session, *, actor_account_id: str, plan_id: str,
-                                     scheduled_at: datetime, status: str, note: str | None = None):
+                                     scheduled_at: datetime, status: str, shift: str = "unspecified", note: str | None = None):
     actor=_actor(session,actor_account_id); plan=session.get(MedicationPlan,plan_id)
     if plan is None or not plan.active: raise ValueError("La pauta no existe o está inactiva")
     if status not in MEDICATION_RESULTS: raise ValueError("Resultado de administración no válido")
+    if shift not in {"morning", "afternoon", "night", "unspecified"}: raise ValueError("Turno no válido")
     if status!="administered" and not (note and note.strip()):
         raise ValueError("Indica el motivo si no se administra")
     if scheduled_at.date()<plan.starts_on or (plan.ends_on and scheduled_at.date()>plan.ends_on):
         raise ValueError("La fecha queda fuera de la vigencia de la pauta")
-    record=MedicationAdministration(plan_id=plan.id,scheduled_at=scheduled_at,status=status,
+    record=MedicationAdministration(plan_id=plan.id,scheduled_at=scheduled_at,shift=shift,status=status,
         note=note.strip() if note else None,recorded_by_account_id=actor.id,
         recorded_by_name_snapshot=actor.professional.display_name)
     session.add(record); session.flush()
