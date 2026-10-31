@@ -1,29 +1,129 @@
-"""Punto de entrada de la interfaz de escritorio."""
+"""Interfaz inicial con creación del administrador y acceso individual."""
 
 from __future__ import annotations
 
 import sys
 
-from PySide6.QtWidgets import QApplication, QLabel, QMainWindow
+from PySide6.QtWidgets import (
+    QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
+    QMainWindow, QMessageBox, QVBoxLayout, QWidget,
+)
+from sqlalchemy import func, select
+
+from gestion_centro.auth.models import UserAccount
+from gestion_centro.auth.service import AuthStatus, Role, authenticate, create_professional_account
+from gestion_centro.paths import data_paths, ensure_data_directories
+from gestion_centro.persistence.base import Base
+from gestion_centro.persistence.database import build_engine, build_session_factory, session_scope
+
+
+class CredentialsDialog(QDialog):
+    def __init__(self, *, first_admin: bool = False) -> None:
+        super().__init__()
+        self.first_admin = first_admin
+        self.setWindowTitle("Crear administrador inicial" if first_admin else "Iniciar sesión")
+        self.username = QLineEdit()
+        self.username.setMaxLength(80)
+        self.password = QLineEdit()
+        self.password.setEchoMode(QLineEdit.EchoMode.Password)
+        self.name = QLineEdit()
+        self.name.setMaxLength(160)
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        if first_admin:
+            form.addRow("Nombre profesional", self.name)
+        form.addRow("Usuario", self.username)
+        form.addRow("Contraseña", self.password)
+        layout.addLayout(form)
+        if first_admin:
+            note = QLabel("La contraseña debe tener al menos 12 caracteres. No se podrá recuperar; el administrador podrá restablecerla posteriormente.")
+            note.setWordWrap(True)
+            layout.addWidget(note)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def values(self) -> tuple[str, str, str]:
+        return self.name.text().strip(), self.username.text().strip(), self.password.text()
+
+    def accept(self) -> None:
+        name, username, password = self.values()
+        if not username or not password or (self.first_admin and not name):
+            QMessageBox.warning(self, "Datos incompletos", "Completa todos los campos.")
+            return
+        if len(password) < 12:
+            QMessageBox.warning(self, "Contraseña insuficiente", "Usa al menos 12 caracteres.")
+            return
+        super().accept()
 
 
 class MainWindow(QMainWindow):
-    def __init__(self) -> None:
+    def __init__(self, display_name: str, role: Role) -> None:
         super().__init__()
         self.setWindowTitle("Gestión del Centro")
         self.resize(1100, 720)
         self.setMinimumSize(900, 600)
-        label = QLabel(
-            "Base técnica inicial\n\n"
-            "La aplicación todavía no está preparada para gestionar datos reales."
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        heading = QLabel("Gestión del Centro")
+        heading.setStyleSheet("font-size: 22px; font-weight: 600;")
+        layout.addWidget(heading)
+        layout.addWidget(QLabel(f"Sesión iniciada: {display_name} · Perfil: {'Administrador' if role is Role.ADMIN else 'Educador'}"))
+        notice = QLabel(
+            "Núcleo técnico en desarrollo. Todavía no está habilitado para introducir datos reales "
+            "de menores ni para uso asistencial."
         )
-        label.setStyleSheet("font-size: 16px; padding: 32px;")
-        self.setCentralWidget(label)
+        notice.setWordWrap(True)
+        notice.setStyleSheet("padding: 18px;")
+        layout.addWidget(notice)
+        self.setCentralWidget(page)
 
 
 def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("Gestión del Centro")
-    window = MainWindow()
+    paths = data_paths()
+    ensure_data_directories(paths)
+    engine = build_engine(paths.database)
+    Base.metadata.create_all(engine)
+    factory = build_session_factory(engine)
+
+    with session_scope(factory) as session:
+        first_admin = session.scalar(select(func.count()).select_from(UserAccount)) == 0
+
+    while True:
+        dialog = CredentialsDialog(first_admin=first_admin)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            engine.dispose()
+            return 0
+        name, username, password = dialog.values()
+        try:
+            with session_scope(factory) as session:
+                if first_admin:
+                    create_professional_account(
+                        session, display_name=name, username=username,
+                        password=password, role=Role.ADMIN,
+                    )
+                    first_admin = False
+                    authenticated = authenticate(session, username=username, password=password)
+                else:
+                    authenticated = authenticate(session, username=username, password=password)
+            if authenticated.status is AuthStatus.SUCCESS:
+                break
+            if authenticated.status is AuthStatus.RETRY_FLOW_CLOSED:
+                QMessageBox.warning(None, "Acceso cerrado", "Se han producido cinco intentos fallidos. Vuelve a iniciar el proceso de acceso.")
+            else:
+                QMessageBox.warning(None, "Acceso no válido", "Usuario o contraseña incorrectos, o cuenta inactiva.")
+        except ValueError as exc:
+            QMessageBox.warning(None, "No se pudo crear la cuenta", str(exc))
+
+    with session_scope(factory) as session:
+        account = session.get(UserAccount, authenticated.account_id)
+        display_name = account.professional.display_name if account else "Profesional"
+        role = authenticated.role or Role.EDUCATOR
+    window = MainWindow(display_name, role)
     window.show()
-    return app.exec()
+    result = app.exec()
+    engine.dispose()
+    return result
