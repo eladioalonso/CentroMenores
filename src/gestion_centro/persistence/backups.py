@@ -8,6 +8,7 @@ import shutil
 import sqlite3
 import tempfile
 import zipfile
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from uuid import uuid4
@@ -178,7 +179,7 @@ def restore_backup(paths: DataPaths, archive: Path) -> Path:
         staged_db = stage / "database" / "centro.db"
         if not staged_db.is_file():
             raise ValueError("La copia no contiene la base de datos")
-        with sqlite3.connect(staged_db) as restored, sqlite3.connect(paths.database) as current:
+        with closing(sqlite3.connect(staged_db)) as restored, closing(sqlite3.connect(paths.database)) as current:
             restored_check = restored.execute("PRAGMA integrity_check").fetchone()[0]
             if restored_check != "ok":
                 raise ValueError("La base restaurada no supera integrity_check")
