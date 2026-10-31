@@ -8,7 +8,8 @@ from PySide6.QtCore import QEvent, QObject, QTimer, Qt, QLockFile
 from PySide6.QtWidgets import (
     QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QVBoxLayout, QWidget, QHBoxLayout, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView, QInputDialog,
+    QTableWidget, QTableWidgetItem, QHeaderView, QInputDialog, QComboBox,
+    QDateTimeEdit, QTextEdit,
 )
 from sqlalchemy import func, select
 
@@ -21,7 +22,10 @@ from gestion_centro.auth.service import (
 from gestion_centro.paths import data_paths, ensure_data_directories
 from gestion_centro.persistence.database import build_engine, build_session_factory, session_scope
 from gestion_centro.persistence.migrations import upgrade_database
-from gestion_centro.domain.service import close_expired_diary_days
+from gestion_centro.domain.service import (
+    close_expired_diary_days, create_agenda_item, list_agenda_items,
+    set_agenda_item_status,
+)
 
 IDLE_LIMIT_MS = 15 * 60 * 1000
 
@@ -222,6 +226,118 @@ class AccountManagementDialog(QDialog):
             QMessageBox.warning(self, "No se pudo cambiar el estado", str(exc))
 
 
+class AgendaDialog(QDialog):
+    """Vista inicial de agenda compartida y tareas entre turnos."""
+
+    KIND_LABELS = {
+        "task": "Tarea", "appointment": "Cita", "activity": "Actividad",
+        "meeting": "Reunión", "call": "Llamada", "contact": "Contacto",
+        "vaccine": "Vacuna", "birthday": "Cumpleaños", "event": "Evento",
+    }
+    STATUS_LABELS = {
+        "pending": "Pendiente", "in_progress": "En curso",
+        "done": "Completada", "cancelled": "Cancelada",
+    }
+
+    def __init__(self, factory, actor_id: str) -> None:
+        super().__init__()
+        self.factory, self.actor_id = factory, actor_id
+        self.setWindowTitle("Agenda común")
+        self.resize(900, 560)
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        self.kind = QComboBox()
+        for key, label in self.KIND_LABELS.items():
+            self.kind.addItem(label, key)
+        self.title = QLineEdit()
+        self.title.setMaxLength(180)
+        self.description = QTextEdit()
+        self.description.setMaximumHeight(70)
+        self.starts = QDateTimeEdit()
+        self.starts.setCalendarPopup(True)
+        self.starts.setDisplayFormat("dd/MM/yyyy HH:mm")
+        self.starts.setDateTime(__import__("PySide6.QtCore", fromlist=["QDateTime"]).QDateTime.currentDateTime())
+        form.addRow("Tipo", self.kind)
+        form.addRow("Título", self.title)
+        form.addRow("Descripción", self.description)
+        form.addRow("Fecha y hora", self.starts)
+        layout.addLayout(form)
+        create = QPushButton("Añadir al equipo")
+        create.clicked.connect(self.create_item)
+        layout.addWidget(create)
+        self.table = QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(["Fecha", "Tipo / título", "Estado", "Responsable"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        layout.addWidget(self.table)
+        actions = QHBoxLayout()
+        self.status = QComboBox()
+        for key, label in self.STATUS_LABELS.items():
+            self.status.addItem(label, key)
+        actions.addWidget(self.status)
+        update = QPushButton("Cambiar estado")
+        update.clicked.connect(self.change_status)
+        actions.addWidget(update)
+        refresh = QPushButton("Actualizar")
+        refresh.clicked.connect(self.refresh)
+        actions.addWidget(refresh)
+        layout.addLayout(actions)
+        self.refresh()
+
+    def refresh(self) -> None:
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        with session_scope(self.factory) as session:
+            items = list_agenda_items(session, start=now - timedelta(days=365),
+                end=now + timedelta(days=730))
+            rows = [(item.id, item.starts_at.strftime("%d/%m/%Y %H:%M"),
+                f"{self.KIND_LABELS.get(item.kind, item.kind)} · {item.title}",
+                self.STATUS_LABELS.get(item.status, item.status),
+                "Equipo" if item.assignment_scope == "team" else "Individual") for item in items]
+        self.table.setRowCount(len(rows))
+        for row, values in enumerate(rows):
+            item_id, *display = values
+            for col, value in enumerate(display):
+                cell = QTableWidgetItem(value)
+                if col == 0:
+                    cell.setData(Qt.ItemDataRole.UserRole, item_id)
+                self.table.setItem(row, col, cell)
+
+    def create_item(self) -> None:
+        from datetime import timezone
+        title = self.title.text().strip()
+        if not title:
+            QMessageBox.warning(self, "Falta el título", "El título es obligatorio.")
+            return
+        local_value = self.starts.dateTime().toPython()
+        starts_at = local_value.astimezone().replace(tzinfo=timezone.utc) if local_value.tzinfo else local_value.replace(tzinfo=timezone.utc)
+        try:
+            with session_scope(self.factory) as session:
+                create_agenda_item(session, actor_account_id=self.actor_id,
+                    kind=self.kind.currentData(), title=title, description=self.description.toPlainText(),
+                    starts_at=starts_at, assignment_scope="team")
+            self.title.clear()
+            self.description.clear()
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo guardar", str(exc))
+
+    def change_status(self) -> None:
+        row = self.table.currentRow()
+        cell = self.table.item(row, 0) if row >= 0 else None
+        if cell is None:
+            QMessageBox.information(self, "Selecciona un elemento", "Selecciona primero una tarea o cita.")
+            return
+        try:
+            with session_scope(self.factory) as session:
+                set_agenda_item_status(session, actor_account_id=self.actor_id,
+                    item_id=cell.data(Qt.ItemDataRole.UserRole), status=self.status.currentData())
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo cambiar el estado", str(exc))
+
+
 class MainWindow(QMainWindow):
     def __init__(self, display_name: str, role: Role, factory=None, account_id: str | None = None) -> None:
         super().__init__()
@@ -238,6 +354,10 @@ class MainWindow(QMainWindow):
             manage = QPushButton("Administrar cuentas")
             manage.clicked.connect(lambda: AccountManagementDialog(factory, account_id).exec())
             layout.addWidget(manage)
+        if factory is not None and account_id is not None:
+            agenda = QPushButton("Agenda común y tareas")
+            agenda.clicked.connect(lambda: AgendaDialog(factory, account_id).exec())
+            layout.addWidget(agenda)
         notice = QLabel(
             "Núcleo técnico en desarrollo. Todavía no está habilitado para introducir datos reales "
             "de menores ni para uso asistencial."
