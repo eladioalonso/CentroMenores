@@ -93,6 +93,10 @@ class BackupDialog(QDialog):
                 if actor is None or not actor.active or actor.role != "admin":
                     raise PermissionError("Se requiere una cuenta administradora activa")
                 actor_name = actor.username
+            # Cierra conexiones en pool antes de sustituir el fichero SQLite en Windows.
+            bind = getattr(self.factory, "kw", {}).get("bind")
+            if bind is not None:
+                bind.dispose()
             pre_restore = restore_backup(self.paths, Path(filename))
             with session_scope(self.factory) as session:
                 actor = session.get(UserAccount, self.actor_id)
