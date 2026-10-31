@@ -103,3 +103,36 @@ def test_incident_participants_have_roles_and_auditable_closure_reopening():
         assert session.get(Incident, incident.id).status == "closed"
         reopen_incident(session, actor_account_id=actor.id, incident_id=incident.id, reason="Nueva información")
         assert session.get(Incident, incident.id).status == "open"
+
+
+def test_diary_auto_closes_at_48_hour_deadline_and_rejects_late_entry():
+    from gestion_centro.domain.models import DiaryDay
+    from gestion_centro.domain.service import record_diary_entry
+    with make_session() as session:
+        actor = create_professional_account(session, display_name="Prueba", username="late-diary",
+            password="contraseña de prueba segura", role=Role.EDUCATOR)
+        session.flush()
+        day_date = date(2026, 4, 1)
+        with pytest.raises(ValueError, match="cerrado"):
+            record_diary_entry(session, actor_account_id=actor.id, diary_date=day_date,
+                shift="night", category="general", content="Anotación tardía",
+                happened_at=datetime(2026, 4, 1, 23, tzinfo=timezone.utc),
+                now=datetime(2026, 4, 3, 0, 0, tzinfo=timezone.utc))
+        day = session.scalar(select(DiaryDay).where(DiaryDay.diary_date == day_date))
+        assert day is not None
+        assert day.closed_at == datetime(2026, 4, 3, 0, 0, tzinfo=timezone.utc)
+        assert day.closed_by_account_id is None
+
+
+def test_invalid_diary_participant_does_not_leave_partial_entry():
+    from gestion_centro.domain.models import DiaryEntry
+    from gestion_centro.domain.service import record_diary_entry
+    with make_session() as session:
+        actor = create_professional_account(session, display_name="Prueba", username="atomic-diary",
+            password="contraseña de prueba segura", role=Role.EDUCATOR)
+        session.flush()
+        with pytest.raises(ValueError, match="no existe"):
+            record_diary_entry(session, actor_account_id=actor.id, diary_date=date(2026, 4, 1),
+                shift="morning", category="general", content="Nota ficticia",
+                happened_at=datetime(2026, 4, 1, 10, tzinfo=timezone.utc), stay_ids=["missing"])
+        assert session.scalar(select(DiaryEntry.id)) is None
