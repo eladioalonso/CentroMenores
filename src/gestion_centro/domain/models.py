@@ -92,3 +92,82 @@ class EventStayLink(Base):
     minor_name_snapshot: Mapped[str] = mapped_column(String(360), nullable=False)
 
     event: Mapped[Event] = relationship(back_populates="participants")
+
+
+class DiaryDay(Base):
+    __tablename__ = "diary_days"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    diary_date: Mapped[date] = mapped_column(Date, nullable=False, unique=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closed_by_account_id: Mapped[str | None] = mapped_column(ForeignKey("user_accounts.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+    entries: Mapped[list[DiaryEntry]] = relationship(back_populates="diary_day")
+
+
+class DiaryEntry(Base):
+    __tablename__ = "diary_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    diary_day_id: Mapped[str] = mapped_column(ForeignKey("diary_days.id"), nullable=False)
+    shift: Mapped[str] = mapped_column(String(12), nullable=False)
+    category: Mapped[str] = mapped_column(String(32), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    happened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    author_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
+    author_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
+    correction_of_id: Mapped[str | None] = mapped_column(ForeignKey("diary_entries.id"), nullable=True)
+
+    diary_day: Mapped[DiaryDay] = relationship(back_populates="entries")
+    participants: Mapped[list[DiaryEntryStayLink]] = relationship(back_populates="entry", cascade="all, delete-orphan")
+
+
+class DiaryEntryStayLink(Base):
+    __tablename__ = "diary_entry_stay_links"
+    __table_args__ = (UniqueConstraint("entry_id", "stay_id", name="uq_diary_entry_stay"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    entry_id: Mapped[str] = mapped_column(ForeignKey("diary_entries.id"), nullable=False)
+    stay_id: Mapped[str] = mapped_column(ForeignKey("stays.id"), nullable=False)
+    minor_code_snapshot: Mapped[str] = mapped_column(String(32), nullable=False)
+    minor_name_snapshot: Mapped[str] = mapped_column(String(360), nullable=False)
+
+    entry: Mapped[DiaryEntry] = relationship(back_populates="participants")
+
+
+class Incident(Base):
+    __tablename__ = "incidents"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    diary_day_id: Mapped[str] = mapped_column(ForeignKey("diary_days.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String(180), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    incident_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    severity: Mapped[str] = mapped_column(String(16), nullable=False)
+    happened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="open")
+    author_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
+    author_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closed_by_account_id: Mapped[str | None] = mapped_column(ForeignKey("user_accounts.id"), nullable=True)
+    closure_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    participants: Mapped[list[IncidentParticipant]] = relationship(back_populates="incident", cascade="all, delete-orphan")
+
+
+class IncidentParticipant(Base):
+    __tablename__ = "incident_participants"
+    __table_args__ = (UniqueConstraint("incident_id", "stay_id", name="uq_incident_stay"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    incident_id: Mapped[str] = mapped_column(ForeignKey("incidents.id"), nullable=False)
+    stay_id: Mapped[str] = mapped_column(ForeignKey("stays.id"), nullable=False)
+    role: Mapped[str] = mapped_column(String(32), nullable=False)
+    factual_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    minor_code_snapshot: Mapped[str] = mapped_column(String(32), nullable=False)
+    minor_name_snapshot: Mapped[str] = mapped_column(String(360), nullable=False)
+
+    incident: Mapped[Incident] = relationship(back_populates="participants")
