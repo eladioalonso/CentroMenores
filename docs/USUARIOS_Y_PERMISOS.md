@@ -117,3 +117,6 @@ Antes de implementar el sistema se deberá confirmar:
 5. Quién puede consultar, modificar, exportar y cerrar cada tipo de registro, incluida la autorización para cerrar manualmente un turno.
 6. Qué eventos se auditan y durante cuánto tiempo se conservan.
 7. Cómo se gestionan las ausencias, sustituciones y bajas de usuarios.
+
+
+> **Especificación vigente:** consultar [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md). Este documento reúne las decisiones aprobadas más recientes y prevalece sobre cualquier apartado anterior que las contradiga.
