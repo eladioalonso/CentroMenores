@@ -179,3 +179,6 @@ Las cardinalidades definitivas y las excepciones deberán concretarse durante el
 ## 6. Protección de datos durante el diseño
 
 Este modelo no autoriza por sí mismo la recogida de todos los campos mencionados. El centro deberá justificar la finalidad y necesidad de cada dato, limitar el acceso y establecer plazos de conservación. Se utilizarán exclusivamente datos ficticios en el desarrollo y las pruebas. La revisión jurídica y de protección de datos deberá realizarse antes de utilizar información real.
+
+
+> **Especificación vigente:** consultar [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md). Este documento reúne las decisiones aprobadas más recientes y prevalece sobre cualquier apartado anterior que las contradiga.
