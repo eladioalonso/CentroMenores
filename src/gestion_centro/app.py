@@ -45,8 +45,10 @@ from gestion_centro.calendar_ui import CalendarDialog
 from gestion_centro.help_ui import HelpDialog
 from gestion_centro.domain.communications_service import (
     create_communication, add_communication_contribution, close_communication,
-    list_communications,
+    list_communications, move_communication_to_trash, restore_communication,
+    reopen_communication,
 )
+from gestion_centro.domain.communications import CommunicationContribution
 
 IDLE_LIMIT_MS = 15 * 60 * 1000
 
@@ -360,23 +362,29 @@ class AgendaDialog(QDialog):
 
 
 class CommunicationsDialog(QDialog):
-    """Bandeja compartida de comunicaciones internas."""
+    """Bandeja compartida con lectura cronológica, papelera y reapertura admin."""
     def __init__(self, factory, actor_id: str) -> None:
         super().__init__()
         self.factory, self.actor_id = factory, actor_id
+        self.show_trash = False
         self.setWindowTitle("Comunicaciones internas")
-        self.resize(820, 520)
+        self.resize(900, 600)
         layout = QVBoxLayout(self)
-        self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["Título", "Estado", "Última actualización"])
+        self.table = QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(["Título", "Estado", "Última actualización", "Creada por"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.table)
         actions = QHBoxLayout()
-        for label, callback in [("Nueva comunicación", self.create_item),
-            ("Añadir aportación", self.add_note), ("Cerrar con motivo", self.close_item),
-            ("Actualizar", self.refresh)]:
+        controls = [
+            ("Nueva", self.create_item), ("Ver aportaciones", self.view_notes),
+            ("Añadir aportación", self.add_note), ("Cerrar", self.close_item),
+            ("Enviar a papelera", self.trash_item), ("Reabrir", self.reopen_item),
+            ("Papelera / bandeja", self.toggle_trash), ("Recuperar", self.restore_item),
+            ("Actualizar", self.refresh),
+        ]
+        for label, callback in controls:
             button = QPushButton(label)
             button.clicked.connect(callback)
             actions.addWidget(button)
@@ -385,9 +393,11 @@ class CommunicationsDialog(QDialog):
 
     def refresh(self) -> None:
         with session_scope(self.factory) as session:
-            items = list_communications(session)
-            rows = [(x.id, x.title, "Abierta" if x.status == "draft" else "Cerrada",
-                x.updated_at.astimezone().strftime("%d/%m/%Y %H:%M")) for x in items]
+            items = list_communications(session, include_trash=self.show_trash)
+            rows = [(x.id, x.title, "En papelera" if x.deleted_at else
+                ("Abierta" if x.status == "draft" else "Cerrada"),
+                x.updated_at.astimezone().strftime("%d/%m/%Y %H:%M"),
+                x.created_by_name_snapshot) for x in items]
         self.table.setRowCount(len(rows))
         for row, values in enumerate(rows):
             item_id, *display = values
@@ -414,6 +424,16 @@ class CommunicationsDialog(QDialog):
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo guardar", str(exc))
 
+    def view_notes(self) -> None:
+        item_id = self.selected_id()
+        if not item_id: return
+        with session_scope(self.factory) as session:
+            notes = session.scalars(select(CommunicationContribution)
+                .where(CommunicationContribution.communication_id == item_id)
+                .order_by(CommunicationContribution.created_at)).all()
+            lines = [f"{n.created_at.astimezone().strftime('%d/%m/%Y %H:%M')} · {n.author_name_snapshot}\n{n.content}" for n in notes]
+        QMessageBox.information(self, "Historial de aportaciones", "\n\n".join(lines) or "Sin aportaciones.")
+
     def add_note(self) -> None:
         item_id = self.selected_id()
         if not item_id:
@@ -431,9 +451,7 @@ class CommunicationsDialog(QDialog):
 
     def close_item(self) -> None:
         item_id = self.selected_id()
-        if not item_id:
-            QMessageBox.information(self, "Selecciona", "Selecciona una comunicación.")
-            return
+        if not item_id: return
         reason, ok = QInputDialog.getText(self, "Cerrar comunicación", "Motivo:")
         if not ok or not reason.strip(): return
         try:
@@ -443,6 +461,45 @@ class CommunicationsDialog(QDialog):
             self.refresh()
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo cerrar", str(exc))
+
+    def trash_item(self) -> None:
+        item_id = self.selected_id()
+        if not item_id: return
+        if QMessageBox.question(self, "Papelera", "¿Enviar esta comunicación a la papelera?") != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            with session_scope(self.factory) as session:
+                move_communication_to_trash(session, actor_account_id=self.actor_id, communication_id=item_id)
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo mover", str(exc))
+
+    def toggle_trash(self) -> None:
+        self.show_trash = not self.show_trash
+        self.refresh()
+
+    def restore_item(self) -> None:
+        item_id = self.selected_id()
+        if not item_id: return
+        try:
+            with session_scope(self.factory) as session:
+                restore_communication(session, actor_account_id=self.actor_id, communication_id=item_id)
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo recuperar", str(exc))
+
+    def reopen_item(self) -> None:
+        item_id = self.selected_id()
+        if not item_id: return
+        reason, ok = QInputDialog.getText(self, "Reabrir comunicación", "Motivo (solo administración):")
+        if not ok or not reason.strip(): return
+        try:
+            with session_scope(self.factory) as session:
+                reopen_communication(session, actor_account_id=self.actor_id,
+                    communication_id=item_id, reason=reason)
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo reabrir", str(exc))
 
 
 class DocumentsDialog(QDialog):
