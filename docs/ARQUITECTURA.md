@@ -62,16 +62,27 @@ Requisitos:
 - Definir restricciones de integridad y campos obligatorios.
 - Crear índices para búsquedas habituales.
 - Gestionar correctamente conexiones y cierre de la base.
-- Configurar un tiempo de espera razonable ante bloqueos.
-- Evaluar WAL y su política de checkpoint mediante pruebas; no copiar una base activa ignorando sus archivos auxiliares.
+- Configurar `journal_mode=DELETE` como modo inicial aprobado; no activar WAL en la configuración inicial.
+- Configurar `synchronous=FULL` para priorizar la durabilidad de las escrituras confirmadas.
+- Activar y verificar `foreign_keys=ON` en cada conexión.
+- Configurar un `busy_timeout` razonable y configurable ante bloqueos.
+- Mantener las transacciones breves. No abrir una transacción mientras una persona rellena un formulario.
+- Centralizar las escrituras y detectar conflictos de edición para evitar sobrescrituras silenciosas.
+- Realizar copias de bases activas mediante SQLite Backup API o un mecanismo equivalente probado; nunca copiar el archivo principal ignorando auxiliares.
 - No permitir dos instancias de la aplicación trabajando simultáneamente sobre la misma carpeta. Implementar un mecanismo de instancia única o bloqueo de ejecución.
 - Ejecutar comprobaciones de integridad y ofrecer mensajes claros ante errores.
+- Guardar automáticamente una copia temporal progresiva de los formularios, separada del registro definitivo. Guardar definitivamente requerirá confirmación expresa.
+- Asociar los temporales al usuario y formulario y conservarlos como máximo 7 días; al recuperar, permitir revisar antes de confirmar.
+- Al iniciar, detectar cierres inesperados, comprobar la base de datos, relaciones y adjuntos, e identificar operaciones interrumpidas. No reparar destructivamente ni eliminar información dudosa de forma silenciosa.
+- Las operaciones de escritura se centralizarán en un único mecanismo de acceso a datos. Si dos usuarios modifican el mismo registro, se detectará el conflicto y no se sobrescribirán cambios silenciosamente.
 
 La base de datos no se colocará en una carpeta compartida de red. Si en el futuro se necesita acceso simultáneo desde varios ordenadores, se revisará la arquitectura y se migrará a un servicio de base de datos centralizado.
 
 ## 6. Persistencia de documentos
 
-Los archivos se almacenarán en subcarpetas privadas bajo data/. La base de datos conservará sus metadatos y relaciones, además de una ruta relativa dentro del repositorio documental.
+Los archivos se almacenarán en subcarpetas privadas bajo data/, fuera de SQLite. La base de datos conservará sus metadatos y relaciones, además de una ruta relativa dentro del repositorio documental.
+
+Cada archivo tendrá un identificador interno único y un nombre físico que no incluya datos identificativos de menores. Se calculará un hash para comprobar su integridad. La incorporación se realizará primero en una ubicación temporal, se verificará y solo entonces se vinculará definitivamente; los archivos huérfanos o temporales se detectarán para revisión, sin borrado automático ante la duda.
 
 - Evitar nombres de archivo que permitan salir de la carpeta raíz mediante rutas manipuladas.
 - Generar identificadores internos únicos para los archivos.
@@ -105,7 +116,7 @@ Para trasladar la aplicación:
 4. Comprobar la copia y trasladarla a una ruta local del otro ordenador.
 5. Ejecutar el archivo principal.
 
-No se debe copiar una base de datos SQLite en uso mediante una copia ordinaria de archivos. Las copias de seguridad se realizarán mediante un mecanismo consistente de SQLite o con la aplicación cerrada.
+No se debe copiar una base de datos SQLite en uso mediante una copia ordinaria de archivos. Las copias de seguridad se realizarán mediante SQLite Backup API o un mecanismo consistente equivalente, coordinando además los adjuntos para que la base de datos y los archivos representen el mismo estado lógico. Se verificará cada copia antes de marcarla como válida.
 
 Las copias internas se perderán si se elimina la carpeta completa. Por ello, se ofrecerá exportación de copias completas sin cifrado a una unidad USB u otra ubicación externa autorizada, directamente legibles desde otro ordenador. Su custodia física y el acceso a los dispositivos deberán regularse institucionalmente. El procedimiento vigente se detalla en DECISIONES_CONSOLIDADAS.md.
 
@@ -153,7 +164,27 @@ La estructura es una propuesta de separación de responsabilidades; se concretar
 - Portabilidad a otro ordenador Windows limpio.
 - Pruebas con un volumen de datos representativo.
 
-## 12. Evolución futura
+## 12. Pruebas de robustez antes de producción
+
+Ninguna versión se considerará preparada para producción hasta superar pruebas con datos ficticios. Como mínimo:
+
+- Cierres forzados durante operaciones de escritura y simulaciones de apagado inesperado.
+- Recuperación de formularios temporales y borradores, con confirmación expresa.
+- Copias completas con la aplicación abierta, verificación y restauración integral.
+- Traslado a otro ordenador Windows compatible.
+- Adjuntos ausentes, dañados, duplicados y operaciones interrumpidas durante su incorporación.
+- Conflictos de edición entre usuarios y bloqueo por una instancia ya abierta.
+- Fallos durante la creación o traslado de copias.
+- Comprobación de permisos, auditoría e integridad de relaciones.
+- Volúmenes representativos de expedientes, documentos y fotografías.
+
+Las pruebas no utilizarán datos reales de menores.
+
+## 13. Ubicación activa
+
+La carpeta portable deberá residir en una ruta local independiente y escribible, por ejemplo `C:\\CentroMenores`. No se utilizarán como ubicación activa `Program Files`, unidades/carpetas de red ni carpetas sincronizadas por servicios como OneDrive o Dropbox. La carpeta completa podrá trasladarse con la aplicación cerrada y tras verificar la copia.
+
+## 14. Evolución futura
 
 Si cambian las condiciones —por ejemplo, varios ordenadores trabajando simultáneamente con los mismos datos— no se compartirá el archivo SQLite por red. Se diseñará una arquitectura cliente-servidor con base de datos central, autenticación y permisos aplicados en el servidor. Esa ampliación queda fuera del alcance actual.
 
