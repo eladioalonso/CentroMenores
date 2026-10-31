@@ -42,6 +42,7 @@ from gestion_centro.maintenance_ui import MaintenanceDialog
 from gestion_centro.reports_ui import ReportsDialog
 from gestion_centro.diary_ui import DiaryDialog
 from gestion_centro.calendar_ui import CalendarDialog
+from gestion_centro.help_ui import HelpDialog
 from gestion_centro.domain.communications_service import (
     create_communication, add_communication_contribution, close_communication,
     list_communications,
@@ -567,6 +568,9 @@ class MainWindow(QMainWindow):
         heading.setStyleSheet("font-size: 22px; font-weight: 600;")
         layout.addWidget(heading)
         layout.addWidget(QLabel(f"Sesión iniciada: {display_name} · Perfil: {'Administrador' if role is Role.ADMIN else 'Educador'}"))
+        help_button = QPushButton("Ayuda y preguntas frecuentes")
+        help_button.clicked.connect(lambda: HelpDialog(self).exec())
+        layout.addWidget(help_button)
         if role is Role.ADMIN and factory is not None and account_id is not None:
             manage = QPushButton("Administrar cuentas")
             manage.clicked.connect(lambda: AccountManagementDialog(factory, account_id).exec())
@@ -619,9 +623,17 @@ class MainWindow(QMainWindow):
 
 
 def main() -> int:
-    app = QApplication(sys.argv)
+    demo_mode = "--demo" in sys.argv
+    qt_args = [arg for arg in sys.argv if arg != "--demo"]
+    app = QApplication(qt_args)
     app.setApplicationName("Gestión del Centro")
-    paths = data_paths()
+    if demo_mode:
+        demo_root = (Path(sys.executable).resolve().parent / "demo_data"
+                     if getattr(sys, "frozen", False)
+                     else Path(__file__).resolve().parents[2] / ".centro_demo")
+        paths = data_paths(demo_root)
+    else:
+        paths = data_paths()
     ensure_data_directories(paths)
     instance_lock = QLockFile(str(paths.root / ".gestion_centro.lock"))
     instance_lock.setStaleLockTime(0)
@@ -694,6 +706,8 @@ def main() -> int:
         role = authenticated.role or Role.EDUCATOR
 
     window = MainWindow(display_name, role, factory, authenticated.account_id, paths)
+    if demo_mode:
+        window.setWindowTitle("Gestión del Centro · DEMOSTRACIÓN · datos separados")
     monitor = None
 
     def lock_session() -> None:
