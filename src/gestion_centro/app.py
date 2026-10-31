@@ -590,7 +590,7 @@ def main() -> int:
     try:
         upgrade_database(engine)
     except Exception as exc:
-        QMessageBox.critical(None, "Error de base de datos", f"No se pudo preparar la base de datos de forma segura:\\n{exc}")
+        QMessageBox.critical(None, "Error de base de datos", f"No se pudo preparar la base de datos de forma segura:\n{exc}")
         engine.dispose()
         instance_lock.unlock()
         return 1
