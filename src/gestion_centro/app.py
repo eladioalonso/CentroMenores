@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime, timezone
 import hashlib
 import mimetypes
 import shutil
@@ -38,8 +39,6 @@ from gestion_centro.operations_ui import AuthorizationsDialog, OutingsDialog
 from gestion_centro.backups_ui import BackupDialog
 from gestion_centro.persistence.backups import create_backup
 from gestion_centro.care_ui import EducationDialog, HealthDialog
-from gestion_centro.backup_ui import BackupDialog
-from gestion_centro.persistence.backups import create_backup
 from gestion_centro.domain.communications_service import (
     create_communication, add_communication_contribution, close_communication,
     list_communications,
@@ -570,19 +569,15 @@ class MainWindow(QMainWindow):
             manage.clicked.connect(lambda: AccountManagementDialog(factory, account_id).exec())
             layout.addWidget(manage)
             backups = QPushButton("Copias de seguridad")
-            backups.clicked.connect(lambda: BackupDialog(paths).exec())
-            layout.addWidget(backups)
-            backups = QPushButton("Copias de seguridad")
             backups.clicked.connect(lambda: BackupDialog(paths, factory, account_id).exec())
             layout.addWidget(backups)
         if factory is not None and account_id is not None:
             agenda = QPushButton("Agenda común y tareas")
             agenda.clicked.connect(lambda: AgendaDialog(factory, account_id).exec())
             layout.addWidget(agenda)
-            if paths is not None:
-                documents = QPushButton("Documentación personal")
-                documents.clicked.connect(lambda: DocumentsDialog(factory, account_id, paths).exec())
-                layout.addWidget(documents)
+            documents = QPushButton("Documentación personal")
+            documents.clicked.connect(lambda: DocumentsDialog(factory, account_id, paths).exec())
+            layout.addWidget(documents)
             authorizations = QPushButton("Autorizaciones")
             authorizations.clicked.connect(lambda: AuthorizationsDialog(factory, account_id).exec())
             layout.addWidget(authorizations)
@@ -595,15 +590,6 @@ class MainWindow(QMainWindow):
             health = QPushButton("Ficha sanitaria y medicación")
             health.clicked.connect(lambda: HealthDialog(factory, account_id).exec())
             layout.addWidget(health)
-            documents = QPushButton("Documentación personal")
-            documents.clicked.connect(lambda: DocumentsDialog(factory, account_id, paths).exec())
-            layout.addWidget(documents)
-            authorizations = QPushButton("Autorizaciones")
-            authorizations.clicked.connect(lambda: AuthorizationsDialog(factory, account_id).exec())
-            layout.addWidget(authorizations)
-            outings = QPushButton("Salidas")
-            outings.clicked.connect(lambda: OutingsDialog(factory, account_id).exec())
-            layout.addWidget(outings)
             communications = QPushButton("Comunicaciones internas")
             communications.clicked.connect(lambda: CommunicationsDialog(factory, account_id).exec())
             layout.addWidget(communications)
@@ -631,8 +617,7 @@ def main() -> int:
     try:
         upgrade_database(engine)
     except Exception as exc:
-        QMessageBox.critical(None, "Error de base de datos", f"No se pudo preparar la base de datos de forma segura:
-{exc}")
+        QMessageBox.critical(None, "Error de base de datos", f"No se pudo preparar la base de datos de forma segura:\n{exc}")
         engine.dispose()
         instance_lock.unlock()
         return 1
@@ -692,16 +677,6 @@ def main() -> int:
         display_name = account.professional.display_name if account else "Profesional"
         username = account.username if account else ""
         role = authenticated.role or Role.EDUCATOR
-
-    # Una copia diaria se crea al primer arranque de cada día UTC.
-    from datetime import datetime, timezone
-    day_stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
-    if not any(paths.backups.glob(f"daily-{day_stamp}*.zip")):
-        try:
-            create_backup(paths, kind="daily")
-        except (OSError, ValueError) as exc:
-            QMessageBox.warning(None, "Copia diaria pendiente",
-                f"No se pudo completar la copia diaria: {exc}")
 
     window = MainWindow(display_name, role, factory, authenticated.account_id, paths)
     monitor = None
