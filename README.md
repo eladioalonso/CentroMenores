@@ -40,6 +40,18 @@ En desarrollo, la carpeta de datos se puede indicar con `CENTRO_DATOS_DIR`; por 
 - [Modelo conceptual de datos](docs/MODELO_DATOS.md)
 - [Decisiones consolidadas](docs/DECISIONES_CONSOLIDADAS.md)
 
+## Funciones recientes de desarrollo
+
+- Calendario con vistas diaria, semanal, mensual y anual sobre los elementos de agenda.
+- Restauración integral con copia previa obligatoria, validación de integridad y versión del esquema, y reconciliación de la auditoría existente.
+- Exportación de estadísticas agregadas a CSV, PDF y Word.
+- Ayuda integrada con guía operativa y preguntas frecuentes.
+- Modo de demostración aislado: ejecutar `GestionCentro.exe --demo`. En desarrollo puede ejecutarse `python -m gestion_centro --demo`. Usa una carpeta `.centro_demo` independiente; no abre la carpeta de datos reales.
+
+El modo de demostración arranca con una base separada y solicita crear un administrador de prueba. No copiar datos reales a esa carpeta.
+
+El acceso móvil por Wi-Fi no está habilitado todavía. No abrir puertos ni exponer el equipo a redes externas para intentar activarlo. Requiere terminar la autenticación móvil, TLS con certificado confiable, expiración de tokens, cola de revisión y pruebas de seguridad.
+
 ## Estado de desarrollo
 
 Rama activa: `desarrollo/nucleo-aplicacion`. No fusionar ni desplegar desde `main`.
