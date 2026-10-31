@@ -99,3 +99,172 @@ def _audit(session: Session, actor: UserAccount, event: str, details: str) -> No
     session.add(AccessAudit(
         account_id=actor.id, username_snapshot=actor.username, event=event, details=details,
     ))
+
+
+VALID_SHIFTS = {"morning", "afternoon", "night"}
+VALID_CATEGORIES = {"general", "activity", "health", "observation", "positive", "negative", "maintenance", "other"}
+VALID_SEVERITIES = {"low", "medium", "high", "critical"}
+VALID_INCIDENT_TYPES = {"behavior", "health", "safety", "conflict", "escape", "damage", "other"}
+
+
+def _get_or_create_diary_day(session: Session, diary_date: date):
+    from gestion_centro.domain.models import DiaryDay
+    day = session.scalar(select(DiaryDay).where(DiaryDay.diary_date == diary_date))
+    if day is None:
+        day = DiaryDay(diary_date=diary_date)
+        session.add(day)
+        session.flush()
+    return day
+
+
+def record_diary_entry(
+    session: Session, *, actor_account_id: str, diary_date: date, shift: str,
+    category: str, content: str, happened_at: datetime, stay_ids: list[str] | None = None,
+):
+    from gestion_centro.domain.models import DiaryEntry, DiaryEntryStayLink
+    actor = _active_author(session, actor_account_id)
+    if shift not in VALID_SHIFTS or category not in VALID_CATEGORIES:
+        raise ValueError("Turno o categoría no válidos")
+    if not content.strip():
+        raise ValueError("El contenido de la anotación es obligatorio")
+    day = _get_or_create_diary_day(session, diary_date)
+    if day.closed_at is not None:
+        raise ValueError("El diario está cerrado; debe registrarse una rectificación")
+    ids = stay_ids or []
+    if len(ids) != len(set(ids)):
+        raise ValueError("Hay estancias duplicadas")
+    entry = DiaryEntry(
+        diary_day_id=day.id, shift=shift, category=category, content=content.strip(),
+        happened_at=happened_at, author_account_id=actor.id,
+        author_name_snapshot=actor.professional.display_name,
+    )
+    session.add(entry)
+    session.flush()
+    for stay_id in ids:
+        stay = session.get(Stay, stay_id)
+        if stay is None:
+            raise ValueError("Una estancia vinculada no existe")
+        minor = stay.minor
+        session.add(DiaryEntryStayLink(
+            entry_id=entry.id, stay_id=stay.id, minor_code_snapshot=minor.internal_code,
+            minor_name_snapshot=f"{minor.given_names} {minor.family_names}",
+        ))
+    _audit(session, actor, "diary_entry_recorded", f"Anotación: {entry.id}")
+    return entry
+
+
+def close_diary_day(session: Session, *, actor_account_id: str, diary_date: date, now: datetime | None = None):
+    from datetime import timedelta
+    from gestion_centro.domain.models import DiaryDay
+    actor = _active_author(session, actor_account_id)
+    day = session.scalar(select(DiaryDay).where(DiaryDay.diary_date == diary_date))
+    if day is None:
+        raise ValueError("No existe el diario de esa fecha")
+    if day.closed_at is not None:
+        raise ValueError("El diario ya está cerrado")
+    moment = now or datetime.now(timezone.utc)
+    deadline = datetime.combine(diary_date + timedelta(days=2), datetime.min.time(), tzinfo=moment.tzinfo)
+    if moment > deadline:
+        raise ValueError("El plazo de cierre de 48 horas ha vencido; requiere rectificación")
+    day.closed_at = moment
+    day.closed_by_account_id = actor.id
+    _audit(session, actor, "diary_day_closed", f"Fecha: {diary_date.isoformat()}")
+    return day
+
+
+def correct_diary_entry(
+    session: Session, *, actor_account_id: str, original_entry_id: str, content: str,
+    happened_at: datetime, reason: str,
+):
+    from gestion_centro.domain.models import DiaryEntry
+    actor = _active_author(session, actor_account_id)
+    original = session.get(DiaryEntry, original_entry_id)
+    if original is None:
+        raise ValueError("La anotación original no existe")
+    if not content.strip() or not reason.strip():
+        raise ValueError("La rectificación y su motivo son obligatorios")
+    correction = DiaryEntry(
+        diary_day_id=original.diary_day_id, shift=original.shift, category="other",
+        content=f"RECTIFICACIÓN ({reason.strip()}): {content.strip()}",
+        happened_at=happened_at, author_account_id=actor.id,
+        author_name_snapshot=actor.professional.display_name, correction_of_id=original.id,
+    )
+    session.add(correction)
+    session.flush()
+    _audit(session, actor, "diary_entry_corrected", f"Original: {original.id}; rectificación: {correction.id}")
+    return correction
+
+
+def record_incident(
+    session: Session, *, actor_account_id: str, diary_date: date, title: str,
+    description: str, incident_type: str, severity: str, happened_at: datetime,
+    participants: list[tuple[str, str, str | None]],
+):
+    from gestion_centro.domain.models import Incident, IncidentParticipant
+    actor = _active_author(session, actor_account_id)
+    if incident_type not in VALID_INCIDENT_TYPES or severity not in VALID_SEVERITIES:
+        raise ValueError("Tipo o gravedad de incidencia no válidos")
+    if not title.strip() or not description.strip():
+        raise ValueError("El título y la descripción son obligatorios")
+    day = _get_or_create_diary_day(session, diary_date)
+    if day.closed_at is not None:
+        raise ValueError("El diario está cerrado; registre la incidencia mediante rectificación")
+    incident = Incident(
+        diary_day_id=day.id, title=title.strip(), description=description.strip(),
+        incident_type=incident_type, severity=severity, happened_at=happened_at,
+        author_account_id=actor.id, author_name_snapshot=actor.professional.display_name,
+    )
+    session.add(incident)
+    session.flush()
+    seen = set()
+    for stay_id, role, factual_note in participants:
+        if stay_id in seen:
+            raise ValueError("Una estancia no puede repetirse en la incidencia")
+        seen.add(stay_id)
+        if role not in {"affected", "witness", "involved", "reporting"}:
+            raise ValueError("Rol de participación no válido")
+        stay = session.get(Stay, stay_id)
+        if stay is None:
+            raise ValueError("Una estancia vinculada no existe")
+        minor = stay.minor
+        session.add(IncidentParticipant(
+            incident_id=incident.id, stay_id=stay.id, role=role,
+            factual_note=factual_note, minor_code_snapshot=minor.internal_code,
+            minor_name_snapshot=f"{minor.given_names} {minor.family_names}",
+        ))
+    _audit(session, actor, "incident_recorded", f"Incidencia: {incident.id}")
+    return incident
+
+
+def close_incident(
+    session: Session, *, actor_account_id: str, incident_id: str, note: str, now: datetime | None = None,
+):
+    from gestion_centro.domain.models import Incident
+    actor = _active_author(session, actor_account_id)
+    incident = session.get(Incident, incident_id)
+    if incident is None or incident.status != "open":
+        raise ValueError("La incidencia no existe o no está abierta")
+    if not note.strip():
+        raise ValueError("El cierre requiere una nota")
+    incident.status = "closed"
+    incident.closed_at = now or datetime.now(timezone.utc)
+    incident.closed_by_account_id = actor.id
+    incident.closure_note = note.strip()
+    _audit(session, actor, "incident_closed", f"Incidencia: {incident.id}")
+
+
+def reopen_incident(
+    session: Session, *, actor_account_id: str, incident_id: str, reason: str,
+):
+    from gestion_centro.domain.models import Incident
+    actor = _active_author(session, actor_account_id)
+    incident = session.get(Incident, incident_id)
+    if incident is None or incident.status != "closed":
+        raise ValueError("La incidencia no existe o no está cerrada")
+    if not reason.strip():
+        raise ValueError("La reapertura requiere un motivo")
+    incident.status = "open"
+    incident.closed_at = None
+    incident.closed_by_account_id = None
+    incident.closure_note = f"Reapertura: {reason.strip()}"
+    _audit(session, actor, "incident_reopened", f"Incidencia: {incident.id}; motivo: {reason.strip()}")
