@@ -157,3 +157,46 @@ def admin_set_account_active(
         event="admin_account_activated" if active else "admin_account_deactivated",
         details=f"Cuenta afectada: {target.id}",
     ))
+
+
+def _require_admin(session: Session, actor_account_id: str) -> UserAccount:
+    actor = session.get(UserAccount, actor_account_id)
+    if actor is None or not actor.active or actor.role != Role.ADMIN.value:
+        raise PermissionError("Se requiere una cuenta administradora activa")
+    return actor
+
+
+def admin_create_professional_account(
+    session: Session, *, actor_account_id: str, display_name: str,
+    username: str, password: str, role: Role,
+) -> UserAccount:
+    actor = _require_admin(session, actor_account_id)
+    account = create_professional_account(
+        session, display_name=display_name, username=username, password=password, role=role
+    )
+    session.add(AccessAudit(
+        account_id=actor.id, username_snapshot=actor.username,
+        event="admin_account_created", details=f"Cuenta creada: {account.id}; perfil: {role.value}",
+    ))
+    return account
+
+
+def admin_change_role(
+    session: Session, *, actor_account_id: str, target_account_id: str, role: Role
+) -> None:
+    actor = _require_admin(session, actor_account_id)
+    target = session.get(UserAccount, target_account_id)
+    if target is None:
+        raise ValueError("La cuenta indicada no existe")
+    if target.role == Role.ADMIN.value and role is Role.EDUCATOR:
+        active_admins = session.scalar(select(func.count()).select_from(UserAccount).where(
+            UserAccount.role == Role.ADMIN.value, UserAccount.active.is_(True)
+        ))
+        if target.active and active_admins <= 1:
+            raise ValueError("No se puede retirar el perfil al último administrador activo")
+    target.role = role.value
+    target.updated_at = datetime.now(timezone.utc)
+    session.add(AccessAudit(
+        account_id=actor.id, username_snapshot=actor.username,
+        event="admin_role_changed", details=f"Cuenta: {target.id}; nuevo perfil: {role.value}",
+    ))
