@@ -40,6 +40,19 @@ En desarrollo, la carpeta de datos se puede indicar con `CENTRO_DATOS_DIR`; por 
 - [Modelo conceptual de datos](docs/MODELO_DATOS.md)
 - [Decisiones consolidadas](docs/DECISIONES_CONSOLIDADAS.md)
 
-## Estado
+## Estado de desarrollo
 
-Esta rama incorpora el núcleo técnico inicial. Todavía no implementa autenticación, expedientes ni operaciones con datos de menores. No utilizar con datos reales.
+Rama activa: `desarrollo/nucleo-aplicacion`. No fusionar ni desplegar desde `main`.
+
+Incluye actualmente modelos, servicios y primeras interfaces para:
+- Cuentas individuales, perfiles, bloqueo por inactividad y auditoría.
+- Menores, estancias, acontecimientos, diario e incidencias.
+- Agenda compartida y tareas.
+- Comunicaciones internas con aportaciones trazables.
+- Seguimiento educativo y escolaridad.
+- Ficha sanitaria, pautas prescritas, administración de medicación y vacunas.
+- Documentación personal con versiones y huella SHA-256.
+- Autorizaciones y salidas.
+- Copias ZIP verificables y sincronización externa pendiente.
+
+La interfaz sigue en desarrollo y no todos los flujos están completos. Las ejecuciones de CI deben comprobarse para el commit más reciente antes de considerar válida una compilación. No utilizar con datos reales: faltan validación funcional integral, restauración integral probada, revisión de seguridad y protección de datos, y aprobación de la organización responsable.
