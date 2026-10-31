@@ -8,7 +8,7 @@ from gestion_centro.domain.service import create_minor, open_stay
 from gestion_centro.domain.documents import PersonalDocument, Authorization, Outing
 from gestion_centro.domain.documents_service import (
     register_document, record_authorization, check_authorization,
-    create_outing, set_outing_status,
+    create_outing, set_outing_status, set_authorization_status,
 )
 from gestion_centro.persistence.base import Base
 
@@ -113,3 +113,21 @@ def test_authorization_expiry_and_outing_requires_valid_authority():
         set_outing_status(session, actor_account_id=actor.id, outing_id=outing.id,
                           status="returned", actual_at=datetime(2026, 5, 4, 12, tzinfo=timezone.utc))
         assert session.get(Outing, outing.id).status == "returned"
+
+def test_revocation_is_audited_and_prevents_future_use():
+    with make_session() as session:
+        actor, stay = setup_stay(session)
+        auth = record_authorization(
+            session, actor_account_id=actor.id, stay_id=stay.id,
+            authorization_type="general", scope="Salida", issuer="Representante ficticio",
+            valid_from=date(2026, 5, 1),
+        )
+        set_authorization_status(
+            session, actor_account_id=actor.id, authorization_id=auth.id,
+            status="revoked", reason="Revocación ficticia",
+        )
+        assert check_authorization(
+            session, actor_account_id=actor.id, stay_id=stay.id,
+            authorization_type="general", on_date=date(2026, 5, 4),
+        ) == []
+
