@@ -171,3 +171,42 @@ class IncidentParticipant(Base):
     minor_name_snapshot: Mapped[str] = mapped_column(String(360), nullable=False)
 
     incident: Mapped[Incident] = relationship(back_populates="participants")
+
+
+class AgendaItem(Base):
+    """Elemento de agenda o tarea compartida entre los turnos."""
+
+    __tablename__ = "agenda_items"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    title: Mapped[str] = mapped_column(String(180), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    assignment_scope: Mapped[str] = mapped_column(String(16), nullable=False, default="team")
+    assigned_account_id: Mapped[str | None] = mapped_column(ForeignKey("user_accounts.id"), nullable=True)
+    created_by_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
+    created_by_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_by_account_id: Mapped[str | None] = mapped_column(ForeignKey("user_accounts.id"), nullable=True)
+
+    participants: Mapped[list[AgendaItemStayLink]] = relationship(
+        back_populates="item", cascade="all, delete-orphan"
+    )
+
+
+class AgendaItemStayLink(Base):
+    __tablename__ = "agenda_item_stay_links"
+    __table_args__ = (UniqueConstraint("agenda_item_id", "stay_id", name="uq_agenda_item_stay"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    agenda_item_id: Mapped[str] = mapped_column(ForeignKey("agenda_items.id"), nullable=False)
+    stay_id: Mapped[str] = mapped_column(ForeignKey("stays.id"), nullable=False)
+    minor_code_snapshot: Mapped[str] = mapped_column(String(32), nullable=False)
+    minor_name_snapshot: Mapped[str] = mapped_column(String(360), nullable=False)
+
+    item: Mapped[AgendaItem] = relationship(back_populates="participants")
