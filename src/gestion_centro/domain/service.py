@@ -67,16 +67,16 @@ def record_event(
         raise ValueError("El título y la descripción son obligatorios")
     if len(stay_ids) != len(set(stay_ids)):
         raise ValueError("No se puede asociar dos veces la misma estancia")
+    stays = [session.get(Stay, stay_id) for stay_id in stay_ids]
+    if any(stay is None for stay in stays):
+        raise ValueError("Una de las estancias seleccionadas no existe")
     event = Event(
         title=title.strip(), description=description.strip(), happened_at=happened_at,
         author_account_id=author.id, author_name_snapshot=author.professional.display_name,
     )
     session.add(event)
     session.flush()
-    for stay_id in stay_ids:
-        stay = session.get(Stay, stay_id)
-        if stay is None:
-            raise ValueError("Una de las estancias seleccionadas no existe")
+    for stay in stays:
         minor = stay.minor
         session.add(EventStayLink(
             event_id=event.id, stay_id=stay.id, participation_role="participant",
@@ -107,6 +107,37 @@ VALID_SEVERITIES = {"low", "medium", "high", "critical"}
 VALID_INCIDENT_TYPES = {"behavior", "health", "safety", "conflict", "escape", "damage", "other"}
 
 
+def _diary_deadline(diary_date: date, reference: datetime) -> datetime:
+    from datetime import timedelta
+    return datetime.combine(diary_date + timedelta(days=2), datetime.min.time(), tzinfo=reference.tzinfo)
+
+
+def _ensure_diary_open(session: Session, day, actor: UserAccount, now: datetime | None = None) -> None:
+    moment = now or datetime.now(timezone.utc)
+    deadline = _diary_deadline(day.diary_date, moment)
+    if day.closed_at is None and moment >= deadline:
+        day.closed_at = deadline
+        day.closed_by_account_id = None
+        _audit(session, actor, "diary_day_auto_closed", f"Fecha: {day.diary_date.isoformat()}; cierre automático por plazo")
+    if day.closed_at is not None:
+        raise ValueError("El diario está cerrado; debe registrarse una rectificación")
+
+
+def close_expired_diary_days(session: Session, *, now: datetime | None = None) -> int:
+    """Cierra diarios vencidos; llamar al iniciar la aplicación y en tareas de mantenimiento."""
+    from gestion_centro.domain.models import DiaryDay
+    moment = now or datetime.now(timezone.utc)
+    days = session.scalars(select(DiaryDay).where(DiaryDay.closed_at.is_(None))).all()
+    closed = 0
+    for day in days:
+        deadline = _diary_deadline(day.diary_date, moment)
+        if moment >= deadline:
+            day.closed_at = deadline
+            day.closed_by_account_id = None
+            closed += 1
+    return closed
+
+
 def _get_or_create_diary_day(session: Session, diary_date: date):
     from gestion_centro.domain.models import DiaryDay
     day = session.scalar(select(DiaryDay).where(DiaryDay.diary_date == diary_date))
@@ -120,6 +151,7 @@ def _get_or_create_diary_day(session: Session, diary_date: date):
 def record_diary_entry(
     session: Session, *, actor_account_id: str, diary_date: date, shift: str,
     category: str, content: str, happened_at: datetime, stay_ids: list[str] | None = None,
+    now: datetime | None = None,
 ):
     from gestion_centro.domain.models import DiaryEntry, DiaryEntryStayLink
     actor = _active_author(session, actor_account_id)
@@ -128,11 +160,13 @@ def record_diary_entry(
     if not content.strip():
         raise ValueError("El contenido de la anotación es obligatorio")
     day = _get_or_create_diary_day(session, diary_date)
-    if day.closed_at is not None:
-        raise ValueError("El diario está cerrado; debe registrarse una rectificación")
+    _ensure_diary_open(session, day, actor, now=now)
     ids = stay_ids or []
     if len(ids) != len(set(ids)):
         raise ValueError("Hay estancias duplicadas")
+    stays = [session.get(Stay, stay_id) for stay_id in ids]
+    if any(stay is None for stay in stays):
+        raise ValueError("Una estancia vinculada no existe")
     entry = DiaryEntry(
         diary_day_id=day.id, shift=shift, category=category, content=content.strip(),
         happened_at=happened_at, author_account_id=actor.id,
@@ -140,10 +174,7 @@ def record_diary_entry(
     )
     session.add(entry)
     session.flush()
-    for stay_id in ids:
-        stay = session.get(Stay, stay_id)
-        if stay is None:
-            raise ValueError("Una estancia vinculada no existe")
+    for stay in stays:
         minor = stay.minor
         session.add(DiaryEntryStayLink(
             entry_id=entry.id, stay_id=stay.id, minor_code_snapshot=minor.internal_code,
@@ -163,9 +194,12 @@ def close_diary_day(session: Session, *, actor_account_id: str, diary_date: date
     if day.closed_at is not None:
         raise ValueError("El diario ya está cerrado")
     moment = now or datetime.now(timezone.utc)
-    deadline = datetime.combine(diary_date + timedelta(days=2), datetime.min.time(), tzinfo=moment.tzinfo)
-    if moment > deadline:
-        raise ValueError("El plazo de cierre de 48 horas ha vencido; requiere rectificación")
+    deadline = _diary_deadline(diary_date, moment)
+    if moment >= deadline:
+        day.closed_at = deadline
+        day.closed_by_account_id = None
+        _audit(session, actor, "diary_day_auto_closed", f"Fecha: {diary_date.isoformat()}; cierre automático por plazo")
+        return day
     day.closed_at = moment
     day.closed_by_account_id = actor.id
     _audit(session, actor, "diary_day_closed", f"Fecha: {diary_date.isoformat()}")
@@ -198,7 +232,7 @@ def correct_diary_entry(
 def record_incident(
     session: Session, *, actor_account_id: str, diary_date: date, title: str,
     description: str, incident_type: str, severity: str, happened_at: datetime,
-    participants: list[tuple[str, str, str | None]],
+    participants: list[tuple[str, str, str | None]], now: datetime | None = None,
 ):
     from gestion_centro.domain.models import Incident, IncidentParticipant
     actor = _active_author(session, actor_account_id)
@@ -207,16 +241,9 @@ def record_incident(
     if not title.strip() or not description.strip():
         raise ValueError("El título y la descripción son obligatorios")
     day = _get_or_create_diary_day(session, diary_date)
-    if day.closed_at is not None:
-        raise ValueError("El diario está cerrado; registre la incidencia mediante rectificación")
-    incident = Incident(
-        diary_day_id=day.id, title=title.strip(), description=description.strip(),
-        incident_type=incident_type, severity=severity, happened_at=happened_at,
-        author_account_id=actor.id, author_name_snapshot=actor.professional.display_name,
-    )
-    session.add(incident)
-    session.flush()
+    _ensure_diary_open(session, day, actor, now=now)
     seen = set()
+    stays = []
     for stay_id, role, factual_note in participants:
         if stay_id in seen:
             raise ValueError("Una estancia no puede repetirse en la incidencia")
@@ -226,6 +253,15 @@ def record_incident(
         stay = session.get(Stay, stay_id)
         if stay is None:
             raise ValueError("Una estancia vinculada no existe")
+        stays.append((stay, role, factual_note))
+    incident = Incident(
+        diary_day_id=day.id, title=title.strip(), description=description.strip(),
+        incident_type=incident_type, severity=severity, happened_at=happened_at,
+        author_account_id=actor.id, author_name_snapshot=actor.professional.display_name,
+    )
+    session.add(incident)
+    session.flush()
+    for stay, role, factual_note in stays:
         minor = stay.minor
         session.add(IncidentParticipant(
             incident_id=incident.id, stay_id=stay.id, role=role,
@@ -266,5 +302,5 @@ def reopen_incident(
     incident.status = "open"
     incident.closed_at = None
     incident.closed_by_account_id = None
-    incident.closure_note = f"Reapertura: {reason.strip()}"
+    # El motivo del cierre anterior se conserva; la reapertura queda en auditoría.
     _audit(session, actor, "incident_reopened", f"Incidencia: {incident.id}; motivo: {reason.strip()}")
