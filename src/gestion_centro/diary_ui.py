@@ -1,7 +1,7 @@
 """Interfaz básica de diario e incidencias con autoría y cierre trazable."""
 from datetime import datetime, timezone
 
-from PySide6.QtCore import Qt, QDate
+from PySide6.QtCore import QDate, QDateTime
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, QDateEdit, QDateTimeEdit,
     QComboBox, QLineEdit, QTextEdit, QPushButton, QTableWidget, QTableWidgetItem,
@@ -10,9 +10,9 @@ from PySide6.QtWidgets import (
 from sqlalchemy import select
 
 from gestion_centro.persistence.database import session_scope
-from gestion_centro.domain.models import DiaryDay, DiaryEntry, Incident, Stay
+from gestion_centro.domain.models import DiaryDay, DiaryEntry, Incident
 from gestion_centro.domain.service import (
-    record_diary_entry, record_incident, close_diary_day, close_incident,
+    record_diary_entry, record_incident, close_diary_day,
 )
 
 
@@ -45,7 +45,7 @@ class DiaryDialog(QDialog):
         for label, key in self.CATEGORIES.items(): self.category.addItem(label, key)
         self.happened = QDateTimeEdit()
         self.happened.setCalendarPopup(True)
-        self.happened.setDateTime(self.day.dateTime() if hasattr(self.day, "dateTime") else self.day.date().startOfDay())
+        self.happened.setDateTime(QDateTime.currentDateTime())
         self.content = QTextEdit()
         self.content.setMaximumHeight(70)
         form.addRow("Fecha del diario", self.day)
