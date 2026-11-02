@@ -38,3 +38,17 @@ def test_school_history_and_date_validation(edu):
  add_school_record(s,actor_account_id=actor,placement_id=placement.id,record_type="meeting",occurred_on=date(2026,9,10),description="Reunión ficticia")
  with pytest.raises(ValueError):
   add_school_record(s,actor_account_id=actor,placement_id=placement.id,record_type="attendance",occurred_on=date(2026,8,1),description="Fuera de periodo")
+
+
+def test_author_can_rectify_own_education_update_without_overwriting_original(edu):
+ s,actor,stay=edu
+ goal=create_education_goal(s,actor_account_id=actor,stay_id=stay,title="Autonomía",description="Objetivo ficticio")
+ original=add_education_update(s,actor_account_id=actor,goal_id=goal.id,category="autonomy",
+  objective_description="Observación original",actions_taken="Apoyo inicial",response_observed="Respuesta inicial")
+ from gestion_centro.domain.education_service import revise_education_update
+ other_prof=education_models.Professional(display_name="Otro") if hasattr(education_models,"Professional") else None
+ correction=revise_education_update(s,actor_account_id=actor,update_id=original.id,
+  objective_description="Observación corregida",actions_taken="Apoyo corregido",response_observed="Respuesta corregida")
+ assert original.objective_description=="Observación original"
+ assert correction.author_account_id==actor
+ assert correction.objective_description.startswith(f"RECTIFICACIÓN de la actualización {original.id}:")
