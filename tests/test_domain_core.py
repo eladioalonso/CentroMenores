@@ -221,3 +221,43 @@ def test_diary_author_can_create_a_traceable_revision_but_not_edit_another_autho
             revise_diary_entry(session, actor_account_id=author.id,
                 original_entry_id=original.id, content="Cambio tardío",
                 now=datetime(2026, 6, 4, 12, tzinfo=timezone.utc))
+
+
+def test_create_minor_persists_optional_personal_and_health_details():
+    with make_session() as session:
+        actor = create_professional_account(session, display_name="Prueba",
+            username="complete-file", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        minor = create_minor(
+            session, actor_account_id=actor.id, internal_code="MC-2026-0099",
+            given_names="Caso", family_names="Ficticio",
+            birth_country="España", locality="Lorca", nationality="Española",
+            birth_date=date(2010, 5, 20), nif_nie="X1234567A",
+            passport_number="P123456", cip="CIP-001", address="Dirección ficticia",
+            health_center="Centro de Salud de prueba", physician="Facultativo ficticio",
+            nurse="Enfermera ficticia", health_card_expires_on=date(2027, 5, 20),
+            clinical_history="Historial de prueba", email="caso@example.test",
+        )
+        assert minor.birth_country == "España"
+        assert minor.locality == "Lorca"
+        assert minor.nationality == "Española"
+        assert minor.birth_date == date(2010, 5, 20)
+        assert minor.nif_nie == "X1234567A"
+        assert minor.passport_number == "P123456"
+        assert minor.cip == "CIP-001"
+        assert minor.health_card_expires_on == date(2027, 5, 20)
+        assert minor.clinical_history == "Historial de prueba"
+        assert minor.email == "caso@example.test"
+        assert minor.age == date.today().year - 2010 - ((date.today().month, date.today().day) < (5, 20))
+
+
+def test_minor_rejects_future_birth_date_and_invalid_email():
+    with make_session() as session:
+        actor = create_professional_account(session, display_name="Prueba",
+            username="invalid-file", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        with pytest.raises(ValueError, match="nacimiento"):
+            create_minor(session, actor_account_id=actor.id, internal_code="MC-2026-0100",
+                given_names="Caso", family_names="Ficticio",
+                birth_date=date.today().replace(year=date.today().year + 1))
+        with pytest.raises(ValueError, match="correo"):
+            create_minor(session, actor_account_id=actor.id, internal_code="MC-2026-0101",
+                given_names="Caso", family_names="Ficticio", email="correo-invalido")
