@@ -384,19 +384,19 @@ class HealthDialog(StaySelectorDialog):
             QMessageBox.warning(self, "No se pudo registrar", str(exc))
 
     def administer(self):
-        row = self.plans.currentRow()
-        cell = self.plans.item(row, 0) if row >= 0 else None
+        row = self.administrations.currentRow()
+        cell = self.administrations.item(row, 0) if row >= 0 else None
         if not cell:
-            QMessageBox.information(self, "Selecciona pauta", "Selecciona una pauta.")
+            QMessageBox.information(self, "Selecciona dosis", "Selecciona una dosis prevista del cuadrante.")
+            return
+        plan_id, planned_iso, shift, existing_record_id = cell.data(Qt.ItemDataRole.UserRole)
+        if existing_record_id:
+            QMessageBox.information(self, "Ya registrada", "Esta dosis ya tiene un registro.")
             return
         label, ok = QInputDialog.getItem(self, "Administración", "Resultado:",
             ["Administrada", "Rechazada", "No disponible"], 0, False)
         if not ok: return
         status = {"Administrada":"administered","Rechazada":"refused","No disponible":"not_available"}[label]
-        shift_label, ok = QInputDialog.getItem(self, "Turno de administración", "Turno:",
-            ["Mañana", "Tarde", "Noche"], 0, False)
-        if not ok: return
-        shift = {"Mañana":"morning","Tarde":"afternoon","Noche":"night"}[shift_label]
         note = ""
         if status != "administered":
             note, ok = QInputDialog.getMultiLineText(self, "Motivo", "Motivo obligatorio:")
@@ -404,7 +404,7 @@ class HealthDialog(StaySelectorDialog):
         try:
             with session_scope(self.factory) as session:
                 record_medication_administration(session, actor_account_id=self.actor_id,
-                    plan_id=cell.data(Qt.ItemDataRole.UserRole), scheduled_at=datetime.now(timezone.utc),
+                    plan_id=plan_id, scheduled_at=datetime.fromisoformat(planned_iso),
                     status=status, shift=shift, note=note)
             self.refresh()
             QMessageBox.information(self, "Administración", "Registro añadido.")
