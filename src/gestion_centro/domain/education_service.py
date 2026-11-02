@@ -109,3 +109,32 @@ def list_education_goals(session: Session, *, stay_id: str):
 
 def list_school_placements(session: Session, *, stay_id: str):
     return session.scalars(select(SchoolPlacement).where(SchoolPlacement.stay_id==stay_id).order_by(SchoolPlacement.started_on.desc())).all()
+
+
+def revise_education_update(session: Session, *, actor_account_id: str, update_id: str,
+                            objective_description: str, actions_taken: str,
+                            response_observed: str, follow_up: str | None = None):
+    """Registra una rectificación propia como nueva actualización, sin alterar el original."""
+    actor = _actor(session, actor_account_id)
+    original = session.get(EducationUpdate, update_id)
+    if original is None:
+        raise ValueError("La actualización educativa original no existe")
+    if original.author_account_id != actor.id:
+        raise PermissionError("Solo puedes rectificar tus propias actualizaciones")
+    goal = session.get(EducationGoal, original.goal_id)
+    if goal is None or goal.status == "closed":
+        raise ValueError("El seguimiento está cerrado y no admite rectificaciones ordinarias")
+    if not all(value.strip() for value in (objective_description, actions_taken, response_observed)):
+        raise ValueError("Completa observación, actuación y respuesta")
+    correction = EducationUpdate(
+        goal_id=original.goal_id, category=original.category,
+        objective_description=f"RECTIFICACIÓN de la actualización {original.id}: {objective_description.strip()}",
+        actions_taken=actions_taken.strip(), response_observed=response_observed.strip(),
+        follow_up=follow_up.strip() if follow_up else None,
+        author_account_id=actor.id, author_name_snapshot=actor.professional.display_name,
+    )
+    session.add(correction)
+    session.flush()
+    _audit(session, actor, "education_update_revised",
+           f"Original:{original.id}; rectificación:{correction.id}")
+    return correction
