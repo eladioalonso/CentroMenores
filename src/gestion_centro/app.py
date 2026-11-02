@@ -11,7 +11,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from PySide6.QtCore import QEvent, QObject, QTimer, Qt, QLockFile, QDateTime, QDate, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QFont
 from PySide6.QtWidgets import (
     QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QVBoxLayout, QWidget, QHBoxLayout, QPushButton,
@@ -818,6 +818,7 @@ def main() -> int:
     qt_args = [arg for arg in sys.argv if arg != "--demo"]
     app = QApplication(qt_args)
     app.setApplicationName("Gestión del Centro")
+    app.setFont(QFont("Segoe UI", 11))
     if demo_mode:
         demo_root = (Path(sys.executable).resolve().parent / "demo_data"
                      if getattr(sys, "frozen", False)
