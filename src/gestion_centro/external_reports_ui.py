@@ -1,7 +1,7 @@
 """Interfaz de informes externos con selección explícita y doble revisión."""
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QComboBox, QLineEdit, QTextEdit,
+    QDialog, QVBoxLayout, QFormLayout, QComboBox, QLineEdit, QTextEdit, QLabel,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
     QCheckBox, QHBoxLayout, QInputDialog,
 )
