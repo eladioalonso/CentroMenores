@@ -1,6 +1,6 @@
 """Pruebas de humo de la navegación principal de escritorio."""
 
-from PySide6.QtWidgets import QApplication, QPushButton
+from PySide6.QtWidgets import QApplication, QPushButton, QTabWidget
 
 from gestion_centro.app import MainWindow
 from gestion_centro.auth.service import Role
@@ -36,7 +36,7 @@ def test_educator_sees_all_ordinary_modules():
             "Expedientes y estancias",
             "Diario e incidencias",
             "Agenda común y tareas",
-            "Calendario día / semana / mes / año",
+            "Calendario",
             "Documentación personal",
             "Autorizaciones",
             "Salidas",
@@ -79,3 +79,30 @@ def test_administrator_sees_ordinary_and_administration_modules():
         assert expected <= labels
     finally:
         window.close()
+
+
+def test_navigation_is_grouped_by_daily_work_and_secondary_functions():
+    window = _window(Role.EDUCATOR)
+    try:
+        tabs = window.findChild(QTabWidget)
+        assert tabs is not None
+        assert [tabs.tabText(i) for i in range(tabs.count())] == [
+            "Día a día", "Gestión y consultas"
+        ]
+        assert tabs.widget(0).findChildren(QPushButton)
+        assert len(tabs.widget(0).findChildren(QPushButton)) == 4
+        assert len(tabs.widget(1).findChildren(QPushButton)) == 7
+    finally:
+        window.close()
+
+
+def test_administration_is_separate_tab_only_for_admin():
+    educator = _window(Role.EDUCATOR)
+    admin = _window(Role.ADMIN)
+    try:
+        assert educator.findChild(QTabWidget).count() == 2
+        assert admin.findChild(QTabWidget).tabText(2) == "Administración"
+        assert len(admin.findChild(QTabWidget).widget(2).findChildren(QPushButton)) == 4
+    finally:
+        educator.close()
+        admin.close()
