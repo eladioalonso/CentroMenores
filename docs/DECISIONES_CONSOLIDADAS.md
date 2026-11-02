@@ -155,6 +155,15 @@ La aplicación incluye:
 No se incluye módulo de Servicios Generales/mantenimiento del edificio. El libro de mantenimiento del centro queda fuera de la aplicación.
 
 ### Reglas transversales
+### Autoría, edición y rectificación de registros
+- Como regla general, el profesional que crea un registro podrá corregir y modificar sus propios registros directamente, sin necesitar la intervención del administrador, mientras el registro permanezca editable y no exista una restricción específica.
+- La autoría no se transfiere por el hecho de que otro profesional consulte el registro. Otro educador no podrá sobrescribir el contenido original de un registro ajeno; podrá añadir una aportación, matización o rectificación vinculada cuando el módulo lo permita.
+- Toda modificación conservará trazabilidad: usuario que la realiza, fecha y hora, registro afectado y diferencias o versión anterior suficiente para reconstruir qué se modificó. Nunca se sobrescribirá silenciosamente información ya registrada.
+- Cuando un registro esté cerrado, validado, firmado, enviado oficialmente o sujeto a una regla específica de inalterabilidad, no se reabrirá para editarlo ordinariamente. Se añadirá una rectificación vinculada, con motivo obligatorio cuando corresponda, conservando íntegro el original.
+- El administrador no será intermediario obligatorio para las correcciones ordinarias de los autores. Sus facultades de supervisión y administración no sustituyen la autoría ni eliminan la trazabilidad.
+- Cada módulo deberá definir sus estados editables, los límites temporales y los procedimientos de rectificación. Se mantienen las reglas especiales ya acordadas para el diario profesional (autoría propia y ventana de corrección limitada al cierre del turno, con máximo absoluto de 48 horas).
+- Antes de habilitar la edición de un tipo de registro se comprobarán conflictos de edición, permisos, historial de versiones, auditoría y recuperación ante fallos.
+
 - Ficha única por menor; cada reingreso crea nueva estancia.
 - No duplicar información: el módulo de origen es el registro principal; otros módulos enlazan o muestran resúmenes.
 - Diferenciar fecha/hora del hecho y fecha/hora de registro.
