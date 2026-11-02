@@ -47,6 +47,16 @@ class Minor(Base):
 
     stays: Mapped[list[Stay]] = relationship(back_populates="minor")
 
+    @property
+    def age(self) -> int | None:
+        """Edad cumplida calculada; nunca se persiste como dato independiente."""
+        if self.birth_date is None:
+            return None
+        today = date.today()
+        return today.year - self.birth_date.year - (
+            (today.month, today.day) < (self.birth_date.month, self.birth_date.day)
+        )
+
 
 class Stay(Base):
     __tablename__ = "stays"
