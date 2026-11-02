@@ -73,6 +73,22 @@ def create_school_placement(session: Session, *, actor_account_id: str, stay_id:
     _audit(session,actor,"school_placement_created",placement.id)
     return placement
 
+def end_school_placement(session: Session, *, actor_account_id: str,
+                         placement_id: str, ended_on: date):
+    actor = _actor(session, actor_account_id)
+    placement = session.get(SchoolPlacement, placement_id)
+    if placement is None:
+        raise ValueError("La escolarización no existe")
+    if placement.ended_on is not None:
+        raise ValueError("La escolarización ya tiene fecha de finalización")
+    if ended_on < placement.started_on:
+        raise ValueError("La fecha de finalización no puede preceder al inicio")
+    placement.ended_on = ended_on
+    session.flush()
+    _audit(session, actor, "school_placement_ended", f"{placement.id}:{ended_on.isoformat()}")
+    return placement
+
+
 def add_school_record(session: Session, *, actor_account_id: str, placement_id: str,
                       record_type: str, occurred_on: date, description: str):
     actor=_actor(session,actor_account_id); placement=session.get(SchoolPlacement,placement_id)
