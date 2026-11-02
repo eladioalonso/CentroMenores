@@ -13,7 +13,7 @@ from sqlalchemy import select
 from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import DiaryDay, DiaryEntry, Incident, Stay
 from gestion_centro.domain.service import (
-    record_diary_entry, record_incident, close_diary_day,
+    record_diary_entry, record_incident, close_diary_day, revise_diary_entry,
 )
 
 
@@ -69,9 +69,11 @@ class DiaryDialog(QDialog):
         incident.clicked.connect(self.add_incident)
         close = QPushButton("Cerrar diario del día")
         close.clicked.connect(self.close_day)
+        revise = QPushButton("Corregir mi anotación")
+        revise.clicked.connect(self.revise_entry)
         refresh = QPushButton("Actualizar")
         refresh.clicked.connect(self.refresh)
-        for b in (add, incident, close, refresh): actions.addWidget(b)
+        for b in (add, incident, close, revise, refresh): actions.addWidget(b)
         layout.addLayout(actions)
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(["Hora", "Turno", "Tipo", "Contenido / incidencia", "Autor"])
@@ -122,6 +124,30 @@ class DiaryDialog(QDialog):
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo guardar", str(exc))
 
+    def revise_entry(self):
+        row = self.table.currentRow()
+        cell = self.table.item(row, 0) if row >= 0 else None
+        metadata = cell.data(Qt.ItemDataRole.UserRole) if cell else None
+        if not metadata or metadata.get("kind") != "entry":
+            QMessageBox.information(self, "Selecciona una anotación", "Selecciona una anotación del diario; las incidencias no se editan desde aquí.")
+            return
+        try:
+            with session_scope(self.factory) as session:
+                entry = session.get(DiaryEntry, metadata["id"])
+                if entry is None:
+                    raise ValueError("La anotación ya no existe.")
+                new_content, ok = QInputDialog.getMultiLineText(
+                    self, "Corregir anotación propia",
+                    "Nueva versión del texto (se conservará la anterior):", entry.content)
+                if not ok:
+                    return
+                revise_diary_entry(session, actor_account_id=self.actor_id,
+                    original_entry_id=entry.id, content=new_content)
+            self.refresh()
+            QMessageBox.information(self, "Corrección guardada", "Se ha guardado una nueva versión. La anterior permanece en el historial.")
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo corregir", str(exc))
+
     def add_incident(self):
         title, ok = QInputDialog.getText(self, "Incidencia", "Título:")
         if not ok or not title.strip(): return
@@ -164,14 +190,19 @@ class DiaryDialog(QDialog):
                 DiaryEntry.diary_day_id == day.id).order_by(DiaryEntry.happened_at)) .all() if day else []
             incidents = session.scalars(select(Incident).where(
                 Incident.diary_day_id == day.id).order_by(Incident.happened_at)).all() if day else []
-            rows = [(x.happened_at, x.shift, x.category, x.content, x.author_name_snapshot) for x in entries]
+            rows = [(x.happened_at, x.shift, x.category, x.content, x.author_name_snapshot,
+                {"kind": "entry", "id": x.id}) for x in entries]
             rows += [(x.happened_at, "Incidencia", x.severity,
-                f"{x.title} · {x.description} [{x.status}]", x.author_name_snapshot) for x in incidents]
+                f"{x.title} · {x.description} [{x.status}]", x.author_name_snapshot,
+                {"kind": "incident", "id": x.id}) for x in incidents]
             rows.sort(key=lambda x: x[0])
             is_closed = bool(day and day.closed_at)
         self.table.setRowCount(len(rows))
         for i, values in enumerate(rows):
-            display = [values[0].astimezone().strftime("%d/%m %H:%M"), *values[1:]]
+            display = [values[0].astimezone().strftime("%d/%m %H:%M"), *values[1:5]]
             for j, value in enumerate(display):
-                self.table.setItem(i, j, QTableWidgetItem(str(value)))
+                item = QTableWidgetItem(str(value))
+                if j == 0:
+                    item.setData(Qt.ItemDataRole.UserRole, values[5])
+                self.table.setItem(i, j, item)
         self.content.setReadOnly(is_closed)
