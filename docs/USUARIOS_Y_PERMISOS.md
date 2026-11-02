@@ -61,6 +61,17 @@ El diario profesional será visible para todos los educadores autorizados, pero 
 
 La aplicación deberá distinguir claramente una matización (información complementaria) de una rectificación (señalar o corregir un dato erróneo). Los permisos para exportar o imprimir el diario se definirán por separado.
 
+## 4 bis. Edición de registros propios y rectificaciones
+
+Como regla general, el profesional que crea un registro podrá corregirlo directamente, sin esperar al administrador, mientras el registro esté en estado editable y no exista una restricción específica del módulo.
+
+- La edición de un registro propio no cambia su autoría original.
+- Cada modificación registrará usuario, fecha/hora, registro afectado y versión o diferencias necesarias para reconstruir el contenido anterior.
+- Otro educador no podrá sobrescribir el contenido original de un registro ajeno. Podrá incorporar una aportación, matización o rectificación vinculada, según las funciones del módulo.
+- Los registros cerrados, validados, firmados o enviados oficialmente se corregirán mediante una rectificación vinculada, con el motivo requerido y conservación íntegra del original.
+- El administrador no tendrá que autorizar ni ejecutar las correcciones ordinarias del autor. La administración y supervisión se mantendrán separadas de la autoría.
+- Cada módulo concretará sus estados editables y excepciones. Para el diario se mantiene la regla específica: el autor corrige durante el periodo de apertura del turno, hasta un máximo absoluto de 48 horas; después se incorpora una rectificación vinculada.
+
 ## 5. Protección reforzada del área sanitaria
 
 - El acceso estará limitado a usuarios expresamente autorizados.
