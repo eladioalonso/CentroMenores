@@ -7,7 +7,7 @@ datas = [
     (str(ROOT / "alembic.ini"), "."),
     (str(ROOT / "migrations"), "migrations"),
 ]
-hiddenimports = collect_submodules("alembic")
+hiddenimports = collect_submodules("alembic") + ["logging.config"]
 
 a = Analysis(
     [str(ROOT / "src" / "gestion_centro" / "__main__.py")],
