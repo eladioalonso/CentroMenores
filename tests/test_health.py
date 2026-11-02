@@ -6,7 +6,7 @@ from gestion_centro.persistence.base import Base
 from gestion_centro.auth.models import Professional, UserAccount, AccessAudit
 from gestion_centro.domain.models import Minor, Stay
 from gestion_centro.domain import health as health_models
-from gestion_centro.domain.health_service import save_health_profile, read_health_profile, add_medication_plan, record_medication_administration
+from gestion_centro.domain.health_service import save_health_profile, read_health_profile, add_medication_plan, record_medication_administration, set_medication_schedules, list_daily_medication_schedule
 
 @pytest.fixture
 def health_case():
