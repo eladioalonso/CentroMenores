@@ -51,3 +51,22 @@ def test_stale_notice_after_seven_days(comm_session):
     item=create_communication(s,actor_account_id=edu,title="Aviso",content="Texto")
     old=datetime.now(timezone.utc)+timedelta(days=8)
     assert item in stale_communications(s,now=old)
+
+
+def test_author_can_rectify_own_contribution_without_overwriting_original(comm_session):
+    s, edu, admin = comm_session
+    item = create_communication(s, actor_account_id=edu, title="Entrega", content="Texto inicial")
+    original = item.contributions[0]
+    from gestion_centro.domain.communications_service import revise_communication_contribution
+    with pytest.raises(PermissionError):
+        revise_communication_contribution(s, actor_account_id=admin,
+            contribution_id=original.id, corrected_content="Cambio ajeno")
+    correction = revise_communication_contribution(s, actor_account_id=edu,
+        contribution_id=original.id, corrected_content="Texto corregido")
+    assert original.content == "Texto inicial"
+    assert correction.author_account_id == edu
+    assert correction.content.startswith(f"RECTIFICACIÓN de la aportación {original.id}:")
+    close_communication(s, actor_account_id=edu, communication_id=item.id, reason="Cierre")
+    with pytest.raises(ValueError):
+        revise_communication_contribution(s, actor_account_id=edu,
+            contribution_id=original.id, corrected_content="Demasiado tarde")
