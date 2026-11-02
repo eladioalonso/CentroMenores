@@ -1,10 +1,11 @@
 """Servicios sanitarios de registro; nunca sustituyen indicación clínica."""
 from datetime import date, datetime, timezone
+import re
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from gestion_centro.auth.models import AccessAudit, UserAccount
 from gestion_centro.domain.models import Stay
-from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationAdministration, VaccineRecord
+from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationSchedule, MedicationAdministration, VaccineRecord
 
 MEDICATION_RESULTS={"administered","refused","not_available"}
 
@@ -58,6 +59,55 @@ def add_medication_plan(session: Session, *, actor_account_id: str, stay_id: str
     session.add(plan); session.flush()
     _audit(session,actor,"medication_plan_recorded",plan.id)
     return plan
+
+def set_medication_schedules(session: Session, *, actor_account_id: str, plan_id: str,
+                             schedules: list[tuple[str, str]]):
+    actor = _actor(session, actor_account_id)
+    plan = session.get(MedicationPlan, plan_id)
+    if plan is None or not plan.active:
+        raise ValueError("La pauta no existe o está inactiva")
+    if not schedules:
+        raise ValueError("Indica al menos una hora prescrita")
+    normalized = []
+    for time_text, shift in schedules:
+        if not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", time_text):
+            raise ValueError(f"Hora no válida: {time_text}. Usa HH:MM")
+        if shift not in {"morning", "afternoon", "night"}:
+            raise ValueError("Turno no válido")
+        if any(existing[0] == time_text for existing in normalized):
+            raise ValueError("No repitas una hora dentro de la misma pauta")
+        normalized.append((time_text, shift))
+    plan.schedules.clear()
+    for time_text, shift in normalized:
+        plan.schedules.append(MedicationSchedule(time_of_day=time_text, shift=shift))
+    session.flush()
+    _audit(session, actor, "medication_schedule_set", f"{plan.id}:{normalized}")
+    return plan.schedules
+
+
+def list_daily_medication_schedule(session: Session, *, actor_account_id: str,
+                                   stay_id: str, day: date):
+    actor = _actor(session, actor_account_id)
+    stay = _stay(session, stay_id)
+    plans = session.scalars(select(MedicationPlan).where(
+        MedicationPlan.stay_id == stay.id, MedicationPlan.active.is_(True),
+        MedicationPlan.starts_on <= day
+    ).order_by(MedicationPlan.medication_name)).all()
+    results = []
+    for plan in plans:
+        if plan.ends_on and plan.ends_on < day:
+            continue
+        for schedule in plan.schedules:
+            local_dt = datetime.combine(day, datetime.strptime(schedule.time_of_day, "%H:%M").time()).astimezone()
+            matched = None
+            for record in plan.administrations:
+                recorded_local = record.scheduled_at.astimezone()
+                if recorded_local.date() == day and recorded_local.strftime("%H:%M") == schedule.time_of_day:
+                    matched = record
+                    break
+            results.append((plan, schedule, local_dt, matched))
+    _audit(session, actor, "medication_daily_schedule_accessed", f"{stay_id}:{day.isoformat()}")
+    return results
 
 def record_medication_administration(session: Session, *, actor_account_id: str, plan_id: str,
                                      scheduled_at: datetime, status: str, shift: str = "unspecified", note: str | None = None):
