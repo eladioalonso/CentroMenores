@@ -14,7 +14,7 @@ from gestion_centro.domain.models import Stay
 from gestion_centro.domain.education import EducationGoal, SchoolPlacement
 from gestion_centro.domain.education_service import (
     create_education_goal, add_education_update, set_education_goal_status,
-    create_school_placement, add_school_record,
+    create_school_placement, add_school_record, list_school_placements,
 )
 from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationAdministration, VaccineRecord
 from gestion_centro.domain.health_service import (
@@ -72,6 +72,26 @@ class EducationDialog(StaySelectorDialog):
                                 ("Nueva escolarización", self.add_school)]:
             b = QPushButton(label); b.clicked.connect(callback); actions.addWidget(b)
         self.body.addLayout(actions)
+        self.schools = QTableWidget(0, 4)
+        self.schools.setHorizontalHeaderLabels(["Centro", "Curso", "Desde", "Hasta"])
+        self.schools.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.schools.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.schools.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.body.addWidget(self.schools)
+        self.school_records = QTableWidget(0, 4)
+        self.school_records.setHorizontalHeaderLabels(["Fecha", "Tipo", "Descripción", "Autor"])
+        self.school_records.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.school_records.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.body.addWidget(self.school_records)
+        school_actions = QHBoxLayout()
+        add_record = QPushButton("Añadir registro al centro seleccionado")
+        add_record.clicked.connect(self.add_school_record_ui)
+        school_actions.addWidget(add_record)
+        end_placement = QPushButton("Finalizar escolarización seleccionada")
+        end_placement.clicked.connect(self.end_school_placement)
+        school_actions.addWidget(end_placement)
+        self.body.addLayout(school_actions)
+        self.schools.itemSelectionChanged.connect(self.refresh_school_records)
         self.stay.currentIndexChanged.connect(self.refresh)
         self.refresh()
 
@@ -84,6 +104,9 @@ class EducationDialog(StaySelectorDialog):
             updates = [(u.created_at, u.category, u.objective_description, u.actions_taken,
                 u.response_observed + (" · Seguimiento: " + u.follow_up if u.follow_up else ""))
                 for g in rows for u in g.updates]
+            placements = list_school_placements(session, stay_id=stay_id) if stay_id else []
+            school_data = [(p.id, p.school_name, p.course, p.started_on.strftime("%d/%m/%Y"),
+                p.ended_on.strftime("%d/%m/%Y") if p.ended_on else "En curso") for p in placements]
         self.goals.setRowCount(len(data))
         for i, values in enumerate(data):
             item_id, *display = values
@@ -96,6 +119,35 @@ class EducationDialog(StaySelectorDialog):
         for i, (created, category, observation, actions, response) in enumerate(updates):
             values = [created.astimezone().strftime("%d/%m/%Y %H:%M"), category, observation, actions, response]
             for col, value in enumerate(values): self.updates.setItem(i, col, QTableWidgetItem(value))
+        self.schools.setRowCount(len(school_data))
+        for i, values in enumerate(school_data):
+            placement_id, *display = values
+            for col, value in enumerate(display):
+                cell = QTableWidgetItem(value)
+                if col == 0: cell.setData(Qt.ItemDataRole.UserRole, placement_id)
+                self.schools.setItem(i, col, cell)
+        if self.schools.rowCount():
+            self.schools.selectRow(0)
+        else:
+            self.school_records.setRowCount(0)
+
+    def selected_placement_id(self):
+        row = self.schools.currentRow()
+        cell = self.schools.item(row, 0) if row >= 0 else None
+        return cell.data(Qt.ItemDataRole.UserRole) if cell else None
+
+    def refresh_school_records(self):
+        placement_id = self.selected_placement_id()
+        with session_scope(self.factory) as session:
+            placement = session.get(SchoolPlacement, placement_id) if placement_id else None
+            rows = [(r.occurred_on, r.record_type, r.description, r.author_name_snapshot)
+                for r in placement.records] if placement else []
+        rows.sort(key=lambda x: x[0], reverse=True)
+        self.school_records.setRowCount(len(rows))
+        for i, values in enumerate(rows):
+            display = [values[0].strftime("%d/%m/%Y"), values[1], values[2], values[3]]
+            for col, value in enumerate(display):
+                self.school_records.setItem(i, col, QTableWidgetItem(value))
 
     def create_goal(self):
         if not self.stay.currentData(): return
@@ -162,8 +214,46 @@ class EducationDialog(StaySelectorDialog):
                     stay_id=self.stay.currentData(), school_name=name, course=course,
                     started_on=date.today())
             QMessageBox.information(self, "Escolarización", "Centro registrado.")
+            self.refresh()
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo guardar", str(exc))
+
+    def add_school_record_ui(self):
+        placement_id = self.selected_placement_id()
+        if not placement_id:
+            QMessageBox.information(self, "Selecciona centro", "Selecciona primero un centro escolar.")
+            return
+        label, ok = QInputDialog.getItem(self, "Registro escolar", "Tipo:",
+            ["Asistencia", "Comportamiento", "Reunión", "Tarea", "Logro", "Otro"], 0, False)
+        if not ok: return
+        record_type = {"Asistencia":"attendance","Comportamiento":"behavior","Reunión":"meeting",
+            "Tarea":"task","Logro":"achievement","Otro":"other"}[label]
+        description, ok = QInputDialog.getMultiLineText(self, "Registro escolar", "Descripción objetiva:")
+        if not ok or not description.strip(): return
+        try:
+            with session_scope(self.factory) as session:
+                add_school_record(session, actor_account_id=self.actor_id,
+                    placement_id=placement_id, record_type=record_type,
+                    occurred_on=date.today(), description=description)
+            self.refresh_school_records()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo guardar", str(exc))
+
+    def end_school_placement(self):
+        placement_id = self.selected_placement_id()
+        if not placement_id: return
+        ended_on = QDate.currentDate().toPython()
+        if QMessageBox.question(self, "Finalizar escolarización",
+            "¿Registrar hoy como fecha de finalización del centro seleccionado?") != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            with session_scope(self.factory) as session:
+                from gestion_centro.domain.education_service import end_school_placement
+                end_school_placement(session, actor_account_id=self.actor_id,
+                    placement_id=placement_id, ended_on=ended_on)
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo finalizar", str(exc))
 
 
 class HealthDialog(StaySelectorDialog):
