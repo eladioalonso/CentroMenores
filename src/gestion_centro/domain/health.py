@@ -2,7 +2,7 @@
 from __future__ import annotations
 from datetime import date, datetime, timezone
 from uuid import uuid4
-from sqlalchemy import Date, DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from gestion_centro.persistence.base import Base
 
@@ -42,7 +42,7 @@ class MedicationPlan(Base):
 class MedicationSchedule(Base):
     """Hora diaria explícita de una pauta, transcrita desde la prescripción."""
     __tablename__ = "medication_schedules"
-    __table_args__ = (Index("ix_medication_schedules_plan_shift", "plan_id", "shift"),)
+    __table_args__ = (Index("ix_medication_schedules_plan_shift", "plan_id", "shift"), UniqueConstraint("plan_id", "time_of_day", name="uq_medication_schedule_plan_time"),)
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     plan_id: Mapped[str] = mapped_column(ForeignKey("medication_plans.id"), nullable=False)
     time_of_day: Mapped[str] = mapped_column(String(5), nullable=False)
