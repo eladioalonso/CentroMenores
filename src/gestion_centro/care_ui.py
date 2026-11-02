@@ -15,6 +15,7 @@ from gestion_centro.domain.education import EducationGoal, SchoolPlacement
 from gestion_centro.domain.education_service import (
     create_education_goal, add_education_update, set_education_goal_status,
     create_school_placement, add_school_record, list_school_placements,
+    revise_education_update,
 )
 from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationAdministration, VaccineRecord
 from gestion_centro.domain.health_service import (
@@ -62,13 +63,16 @@ class EducationDialog(StaySelectorDialog):
         self.goals.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.goals.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.body.addWidget(self.goals)
-        self.updates = QTableWidget(0, 5)
-        self.updates.setHorizontalHeaderLabels(["Fecha", "Área", "Observación", "Actuación", "Respuesta / seguimiento"])
+        self.updates = QTableWidget(0, 6)
+        self.updates.setHorizontalHeaderLabels(["ID", "Fecha", "Área", "Observación", "Actuación", "Respuesta / seguimiento"])
+        self.updates.setColumnHidden(0, True)
+        self.updates.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.updates.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.updates.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.body.addWidget(self.updates)
         actions = QHBoxLayout()
         for label, callback in [("Añadir seguimiento", self.add_update),
+                                ("Rectificar mi seguimiento", self.revise_update),
                                 ("Cambiar estado", self.change_status),
                                 ("Nueva escolarización", self.add_school)]:
             b = QPushButton(label); b.clicked.connect(callback); actions.addWidget(b)
@@ -102,7 +106,7 @@ class EducationDialog(StaySelectorDialog):
             rows = session.scalars(select(EducationGoal).where(EducationGoal.stay_id == stay_id)
                 .order_by(EducationGoal.created_at.desc())).all() if stay_id else []
             data = [(g.id, g.title, g.status, g.target_date.isoformat() if g.target_date else "—") for g in rows]
-            updates = [(u.created_at, u.category, u.objective_description, u.actions_taken,
+            updates = [(u.id, u.created_at, u.category, u.objective_description, u.actions_taken,
                 u.response_observed + (" · Seguimiento: " + u.follow_up if u.follow_up else ""))
                 for g in rows for u in g.updates]
             placements = list_school_placements(session, stay_id=stay_id) if stay_id else []
@@ -117,9 +121,12 @@ class EducationDialog(StaySelectorDialog):
                 self.goals.setItem(i, col, cell)
         updates.sort(key=lambda row: row[0], reverse=True)
         self.updates.setRowCount(len(updates))
-        for i, (created, category, observation, actions, response) in enumerate(updates):
-            values = [created.astimezone().strftime("%d/%m/%Y %H:%M"), category, observation, actions, response]
-            for col, value in enumerate(values): self.updates.setItem(i, col, QTableWidgetItem(value))
+        for i, (update_id, created, category, observation, actions, response) in enumerate(updates):
+            values = [update_id, created.astimezone().strftime("%d/%m/%Y %H:%M"), category, observation, actions, response]
+            for col, value in enumerate(values):
+                cell = QTableWidgetItem(str(value))
+                if col == 0: cell.setData(Qt.ItemDataRole.UserRole, update_id)
+                self.updates.setItem(i, col, cell)
         self.schools.setRowCount(len(school_data))
         for i, values in enumerate(school_data):
             placement_id, *display = values
@@ -228,6 +235,54 @@ class EducationDialog(StaySelectorDialog):
             self.refresh()
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo guardar", str(exc))
+
+    def revise_update(self):
+        row = self.updates.currentRow()
+        cell = self.updates.item(row, 0) if row >= 0 else None
+        update_id = cell.data(Qt.ItemDataRole.UserRole) if cell else None
+        if not update_id:
+            QMessageBox.information(self, "Selecciona", "Selecciona primero un seguimiento.")
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Rectificar mi seguimiento")
+        dialog.resize(560, 430)
+        layout = QVBoxLayout(dialog)
+        form = QFormLayout()
+        observation = QTextEdit()
+        actions = QTextEdit()
+        response = QTextEdit()
+        follow_up = QTextEdit()
+        observation.setMinimumHeight(65)
+        actions.setMinimumHeight(65)
+        response.setMinimumHeight(65)
+        form.addRow("Observación corregida", observation)
+        form.addRow("Actuaciones", actions)
+        form.addRow("Respuesta observada", response)
+        form.addRow("Seguimiento pendiente (opcional)", follow_up)
+        layout.addLayout(form)
+        buttons = QHBoxLayout()
+        save = QPushButton("Guardar rectificación")
+        cancel = QPushButton("Cancelar")
+        save.clicked.connect(dialog.accept)
+        cancel.clicked.connect(dialog.reject)
+        buttons.addWidget(save)
+        buttons.addWidget(cancel)
+        layout.addLayout(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            with session_scope(self.factory) as session:
+                revise_education_update(session, actor_account_id=self.actor_id,
+                    update_id=update_id,
+                    objective_description=observation.toPlainText(),
+                    actions_taken=actions.toPlainText(),
+                    response_observed=response.toPlainText(),
+                    follow_up=follow_up.toPlainText())
+            QMessageBox.information(self, "Rectificación guardada",
+                "Se ha añadido una rectificación vinculada. El seguimiento original se conserva.")
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo rectificar", str(exc))
 
     def change_status(self):
         goal_id = self.selected_goal()
