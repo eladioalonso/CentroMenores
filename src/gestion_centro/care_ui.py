@@ -362,15 +362,23 @@ class HealthDialog(StaySelectorDialog):
 
     def add_plan(self):
         fields = []
-        for prompt in ["Medicamento:", "Dosis indicada en prescripción:", "Pauta indicada:", "Referencia de prescripción:"]:
+        for prompt in ["Medicamento:", "Dosis indicada en prescripción:", "Pauta / instrucciones:", "Referencia de prescripción:"]: 
             value, ok = QInputDialog.getText(self, "Nueva pauta", prompt)
             if not ok or not value.strip(): return
             fields.append(value)
+        schedule_text, ok = QInputDialog.getMultiLineText(self, "Horarios prescritos",
+            "Una hora por línea: HH:MM|morning, HH:MM|afternoon o HH:MM|night")
+        if not ok or not schedule_text.strip(): return
+        schedules = []
         try:
+            for line in schedule_text.splitlines():
+                time_text, shift = [part.strip() for part in line.split("|", 1)]
+                schedules.append((time_text, shift.lower()))
             with session_scope(self.factory) as session:
-                add_medication_plan(session, actor_account_id=self.actor_id, stay_id=self.stay.currentData(),
+                plan = add_medication_plan(session, actor_account_id=self.actor_id, stay_id=self.stay.currentData(),
                     medication_name=fields[0], prescribed_dose=fields[1], schedule_text=fields[2],
                     prescriber_reference=fields[3], starts_on=date.today())
+                set_medication_schedules(session, actor_account_id=self.actor_id, plan_id=plan.id, schedules=schedules)
             self.refresh()
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo registrar", str(exc))
