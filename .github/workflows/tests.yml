@@ -25,4 +25,5 @@ jobs:
       - name: Run tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          QT_QPA_PLATFORM: "offscreen"
         run: python -m pytest
