@@ -1,5 +1,6 @@
 """Inicialización versionada del esquema local mediante Alembic."""
 
+import logging.config  # noqa: F401 - fuerza su inclusión en el ejecutable PyInstaller
 import sys
 from pathlib import Path
 
