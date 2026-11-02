@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QVBoxLayout, QWidget, QHBoxLayout, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QInputDialog, QComboBox,
-    QDateTimeEdit, QDateEdit, QTextEdit, QFileDialog, QCheckBox,
+    QDateTimeEdit, QDateEdit, QTextEdit, QFileDialog, QCheckBox, QTabWidget, QGridLayout,
 )
 from sqlalchemy import func, select
 
@@ -742,76 +742,80 @@ class DocumentsDialog(QDialog):
 
 
 class MainWindow(QMainWindow):
+    """Inicio simplificado: prioriza el trabajo del turno y agrupa el resto."""
+
     def __init__(self, display_name: str, role: Role, factory=None, account_id: str | None = None, paths=None) -> None:
         super().__init__()
         self.setWindowTitle("Gestión del Centro")
         self.resize(1100, 720)
         self.setMinimumSize(900, 600)
+
         page = QWidget()
         layout = QVBoxLayout(page)
         heading = QLabel("Gestión del Centro")
         heading.setStyleSheet("font-size: 22px; font-weight: 600;")
         layout.addWidget(heading)
-        layout.addWidget(QLabel(f"Sesión iniciada: {display_name} · Perfil: {'Administrador' if role is Role.ADMIN else 'Educador'}"))
+        layout.addWidget(QLabel(
+            f"Sesión iniciada: {display_name} · Perfil: "
+            f"{'Administrador' if role is Role.ADMIN else 'Educador'}"
+        ))
+
         help_button = QPushButton("Ayuda y preguntas frecuentes")
         help_button.clicked.connect(lambda: HelpDialog(self).exec())
         layout.addWidget(help_button)
-        if role is Role.ADMIN and factory is not None and account_id is not None:
-            manage = QPushButton("Administrar cuentas")
-            manage.clicked.connect(lambda: AccountManagementDialog(factory, account_id).exec())
-            layout.addWidget(manage)
-            backups = QPushButton("Copias de seguridad")
-            backups.clicked.connect(lambda: BackupDialog(paths, factory, account_id).exec())
-            layout.addWidget(backups)
-            maintenance = QPushButton("Mantenimiento y diagnóstico")
-            maintenance.clicked.connect(lambda: MaintenanceDialog(paths, factory, account_id).exec())
-            layout.addWidget(maintenance)
-            reports = QPushButton("Estadísticas y memoria")
-            reports.clicked.connect(lambda: ReportsDialog(factory, account_id).exec())
-            layout.addWidget(reports)
+
+        tabs = QTabWidget()
+        layout.addWidget(tabs, 1)
+
+        def add_actions(tab: QWidget, actions: list[tuple[str, object]], columns: int = 2) -> None:
+            grid = QGridLayout(tab)
+            for index, (label, callback) in enumerate(actions):
+                button = QPushButton(label)
+                button.setMinimumHeight(48)
+                button.clicked.connect(callback)
+                grid.addWidget(button, index // columns, index % columns)
+            grid.setRowStretch((len(actions) + columns - 1) // columns, 1)
+
         if factory is not None and account_id is not None:
-            expedientes = QPushButton("Expedientes y estancias")
-            expedientes.clicked.connect(lambda: ExpedientesDialog(factory, account_id).exec())
-            layout.addWidget(expedientes)
-            diary = QPushButton("Diario e incidencias")
-            diary.clicked.connect(lambda: DiaryDialog(factory, account_id).exec())
-            layout.addWidget(diary)
-            agenda = QPushButton("Agenda común y tareas")
-            agenda.clicked.connect(lambda: AgendaDialog(factory, account_id).exec())
-            layout.addWidget(agenda)
-            calendar = QPushButton("Calendario día / semana / mes / año")
-            calendar.clicked.connect(lambda: CalendarDialog(factory, account_id).exec())
-            layout.addWidget(calendar)
-            documents = QPushButton("Documentación personal")
-            documents.clicked.connect(lambda: DocumentsDialog(factory, account_id, paths).exec())
-            layout.addWidget(documents)
-            authorizations = QPushButton("Autorizaciones")
-            authorizations.clicked.connect(lambda: AuthorizationsDialog(factory, account_id).exec())
-            layout.addWidget(authorizations)
-            outings = QPushButton("Salidas")
-            outings.clicked.connect(lambda: OutingsDialog(factory, account_id).exec())
-            layout.addWidget(outings)
-            education = QPushButton("Seguimiento educativo y escolaridad")
-            education.clicked.connect(lambda: EducationDialog(factory, account_id).exec())
-            layout.addWidget(education)
-            health = QPushButton("Ficha sanitaria y medicación")
-            health.clicked.connect(lambda: HealthDialog(factory, account_id).exec())
-            layout.addWidget(health)
-            communications = QPushButton("Comunicaciones internas")
-            communications.clicked.connect(lambda: CommunicationsDialog(factory, account_id).exec())
-            layout.addWidget(communications)
-            external_reports = QPushButton("Informes externos")
-            external_reports.clicked.connect(lambda: ExternalReportsDialog(factory, account_id).exec())
-            layout.addWidget(external_reports)
+            daily = QWidget()
+            tabs.addTab(daily, "Día a día")
+            add_actions(daily, [
+                ("Expedientes y estancias", lambda: ExpedientesDialog(factory, account_id).exec()),
+                ("Diario e incidencias", lambda: DiaryDialog(factory, account_id).exec()),
+                ("Agenda común y tareas", lambda: AgendaDialog(factory, account_id).exec()),
+                ("Comunicaciones internas", lambda: CommunicationsDialog(factory, account_id).exec()),
+            ])
+
+            management = QWidget()
+            tabs.addTab(management, "Gestión y consultas")
+            add_actions(management, [
+                ("Calendario", lambda: CalendarDialog(factory, account_id).exec()),
+                ("Documentación personal", lambda: DocumentsDialog(factory, account_id, paths).exec()),
+                ("Autorizaciones", lambda: AuthorizationsDialog(factory, account_id).exec()),
+                ("Salidas", lambda: OutingsDialog(factory, account_id).exec()),
+                ("Seguimiento educativo y escolaridad", lambda: EducationDialog(factory, account_id).exec()),
+                ("Ficha sanitaria y medicación", lambda: HealthDialog(factory, account_id).exec()),
+                ("Informes externos", lambda: ExternalReportsDialog(factory, account_id).exec()),
+            ])
+
+        if role is Role.ADMIN and factory is not None and account_id is not None:
+            administration = QWidget()
+            tabs.addTab(administration, "Administración")
+            add_actions(administration, [
+                ("Administrar cuentas", lambda: AccountManagementDialog(factory, account_id).exec()),
+                ("Copias de seguridad", lambda: BackupDialog(paths, factory, account_id).exec()),
+                ("Mantenimiento y diagnóstico", lambda: MaintenanceDialog(paths, factory, account_id).exec()),
+                ("Estadísticas y memoria", lambda: ReportsDialog(factory, account_id).exec()),
+            ])
+
         notice = QLabel(
             "Núcleo técnico en desarrollo. Todavía no está habilitado para introducir datos reales "
             "de menores ni para uso asistencial."
         )
         notice.setWordWrap(True)
-        notice.setStyleSheet("padding: 18px;")
+        notice.setStyleSheet("padding: 12px;")
         layout.addWidget(notice)
         self.setCentralWidget(page)
-
 
 def main() -> int:
     demo_mode = "--demo" in sys.argv
