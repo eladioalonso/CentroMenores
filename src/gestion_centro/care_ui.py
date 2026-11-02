@@ -300,29 +300,44 @@ class HealthDialog(StaySelectorDialog):
     def __init__(self, factory, actor_id):
         super().__init__(factory, "Ficha sanitaria y medicación")
         self.actor_id = actor_id
+        self.resize(1050, 720)
+        self.tabs = QTabWidget()
+        self.body.addWidget(self.tabs)
+
+        profile_tab = QWidget()
+        profile_layout = QVBoxLayout(profile_tab)
         form = QFormLayout()
-        self.allergies = QTextEdit(); self.allergies.setMaximumHeight(55)
-        self.conditions = QTextEdit(); self.conditions.setMaximumHeight(55)
-        self.emergency = QTextEdit(); self.emergency.setMaximumHeight(55)
+        self.allergies = QTextEdit(); self.allergies.setMaximumHeight(65)
+        self.conditions = QTextEdit(); self.conditions.setMaximumHeight(65)
+        self.emergency = QTextEdit(); self.emergency.setMaximumHeight(65)
         form.addRow("Alergias", self.allergies)
         form.addRow("Condiciones relevantes", self.conditions)
         form.addRow("Instrucciones de emergencia", self.emergency)
-        self.body.addLayout(form)
-        save = QPushButton("Guardar ficha sanitaria"); save.clicked.connect(self.save_profile)
-        self.body.addWidget(save)
+        profile_layout.addLayout(form)
+        save = QPushButton("Guardar ficha sanitaria")
+        save.clicked.connect(self.save_profile)
+        profile_layout.addWidget(save)
+        profile_layout.addStretch(1)
+        self.tabs.addTab(profile_tab, "Ficha sanitaria")
+
+        medication_tab = QWidget()
+        medication_layout = QVBoxLayout(medication_tab)
         self.plans = QTableWidget(0, 4)
         self.plans.setHorizontalHeaderLabels(["Medicamento", "Dosis prescrita", "Pauta", "Vigencia"])
         self.plans.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.plans.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.plans.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.body.addWidget(self.plans)
-        actions = QHBoxLayout()
+        medication_layout.addWidget(self.plans)
+        plan_actions = QHBoxLayout()
         for label, callback in [("Registrar pauta prescrita", self.add_plan),
-                                ("Configurar horarios", self.configure_schedule),
-                                ("Registrar administración", self.administer),
-                                ("Registrar vacuna", self.add_vaccine)]:
-            b = QPushButton(label); b.clicked.connect(callback); actions.addWidget(b)
-        self.body.addLayout(actions)
+                                ("Configurar horarios", self.configure_schedule)]:
+            button = QPushButton(label); button.clicked.connect(callback); plan_actions.addWidget(button)
+        medication_layout.addLayout(plan_actions)
+        self.tabs.addTab(medication_tab, "Medicación y pautas")
+
+        administration_tab = QWidget()
+        administration_layout = QVBoxLayout(administration_tab)
+        filters = QHBoxLayout()
         self.admin_day = QDateEdit(QDate.currentDate())
         self.admin_day.setCalendarPopup(True)
         self.admin_shift_filter = QComboBox()
@@ -330,96 +345,181 @@ class HealthDialog(StaySelectorDialog):
         self.admin_shift_filter.addItem("Mañana", "morning")
         self.admin_shift_filter.addItem("Tarde", "afternoon")
         self.admin_shift_filter.addItem("Noche", "night")
-        self.admin_day.dateChanged.connect(self.refresh)
-        self.admin_shift_filter.currentIndexChanged.connect(self.refresh)
-        self.body.addWidget(self.admin_day)
-        self.body.addWidget(self.admin_shift_filter)
+        filters.addWidget(QLabel("Fecha"))
+        filters.addWidget(self.admin_day)
+        filters.addWidget(QLabel("Turno"))
+        filters.addWidget(self.admin_shift_filter)
+        filters.addStretch(1)
+        administration_layout.addLayout(filters)
         self.administrations = QTableWidget(0, 7)
         self.administrations.setHorizontalHeaderLabels(["Hora prevista", "Turno", "Medicamento", "Dosis", "Estado", "Motivo / nota", "Registrado por"])
         self.administrations.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.administrations.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.body.addWidget(self.administrations)
+        administration_layout.addWidget(self.administrations)
+        administer_button = QPushButton("Registrar resultado de administración")
+        administer_button.clicked.connect(self.administer)
+        administration_layout.addWidget(administer_button)
+        self.tabs.addTab(administration_tab, "Administraciones")
+
+        vaccine_tab = QWidget()
+        vaccine_layout = QVBoxLayout(vaccine_tab)
         self.vaccines = QTableWidget(0, 3)
         self.vaccines.setHorizontalHeaderLabels(["Vacuna", "Fecha", "Dosis / referencia"])
         self.vaccines.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.vaccines.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.body.addWidget(self.vaccines)
+        vaccine_layout.addWidget(self.vaccines)
+        vaccine_button = QPushButton("Registrar vacuna")
+        vaccine_button.clicked.connect(self.add_vaccine)
+        vaccine_layout.addWidget(vaccine_button)
+        self.tabs.addTab(vaccine_tab, "Vacunas")
+
+        self.admin_day.dateChanged.connect(self.refresh)
+        self.admin_shift_filter.currentIndexChanged.connect(self.refresh)
         self.stay.currentIndexChanged.connect(self.refresh)
         self.refresh()
 
     def refresh(self):
         stay_id = self.stay.currentData()
-        if not stay_id: return
+        if not stay_id:
+            return
         with session_scope(self.factory) as session:
             profile = read_health_profile(session, actor_account_id=self.actor_id, stay_id=stay_id)
             plans = list_medication_plans(session, actor_account_id=self.actor_id, stay_id=stay_id)
-            vaccine_rows = session.scalars(select(VaccineRecord).where(VaccineRecord.stay_id == stay_id).order_by(VaccineRecord.administered_on.desc())).all()
-            daily_rows = list_daily_medication_schedule(session, actor_account_id=self.actor_id,
-                stay_id=stay_id, day=self.admin_day.date().toPython())
-            administration_rows = [row for row in daily_rows
-                if self.admin_shift_filter.currentData() is None or row[1].shift == self.admin_shift_filter.currentData()]
-        self.allergies.setPlainText(profile.allergies or "" if profile else "")
-        self.conditions.setPlainText(profile.relevant_conditions or "" if profile else "")
-        self.emergency.setPlainText(profile.emergency_instructions or "" if profile else "")
+            vaccine_rows = session.scalars(
+                select(VaccineRecord).where(VaccineRecord.stay_id == stay_id)
+                .order_by(VaccineRecord.administered_on.desc())
+            ).all()
+            daily_rows = list_daily_medication_schedule(
+                session, actor_account_id=self.actor_id, stay_id=stay_id,
+                day=self.admin_day.date().toPython()
+            )
+            administration_rows = [
+                row for row in daily_rows
+                if self.admin_shift_filter.currentData() is None
+                or row[1].shift == self.admin_shift_filter.currentData()
+            ]
+        self.allergies.setPlainText((profile.allergies or "") if profile else "")
+        self.conditions.setPlainText((profile.relevant_conditions or "") if profile else "")
+        self.emergency.setPlainText((profile.emergency_instructions or "") if profile else "")
         self.plans.setRowCount(len(plans))
-        for i, p in enumerate(plans):
-            values = [p.medication_name, p.prescribed_dose, p.schedule_text,
-                      f"{p.starts_on:%d/%m/%Y} – {p.ends_on:%d/%m/%Y}" if p.ends_on else "Sin fecha final"]
-            for col, value in enumerate(values):
-                cell = QTableWidgetItem(value)
-                if col == 0: cell.setData(Qt.ItemDataRole.UserRole, p.id)
-                self.plans.setItem(i, col, cell)
-        admin_rows = sorted(administration_rows, key=lambda x: x[2])
-        self.administrations.setRowCount(len(admin_rows))
-        for i, (plan, schedule, planned_at, record) in enumerate(admin_rows):
-            status_label = {"administered":"Administrada", "refused":"Rechazada",
-                "not_available":"No disponible"}.get(record.status, "Pendiente") if record else "Pendiente"
-            values = [schedule.time_of_day,
-                {"morning":"Mañana","afternoon":"Tarde","night":"Noche"}.get(schedule.shift, schedule.shift),
-                plan.medication_name, plan.prescribed_dose, status_label,
-                (record.note or "—") if record else "—",
-                record.recorded_by_name_snapshot if record else "—"]
+        for i, plan in enumerate(plans):
+            values = [
+                plan.medication_name, plan.prescribed_dose, plan.schedule_text,
+                f"{plan.starts_on:%d/%m/%Y} – {plan.ends_on:%d/%m/%Y}"
+                if plan.ends_on else "Sin fecha final",
+            ]
             for col, value in enumerate(values):
                 cell = QTableWidgetItem(value)
                 if col == 0:
-                    cell.setData(Qt.ItemDataRole.UserRole, (plan.id, planned_at.isoformat(), schedule.shift, record.id if record else None))
+                    cell.setData(Qt.ItemDataRole.UserRole, plan.id)
+                self.plans.setItem(i, col, cell)
+        admin_rows = sorted(administration_rows, key=lambda item: item[2])
+        self.administrations.setRowCount(len(admin_rows))
+        for i, (plan, schedule, planned_at, record) in enumerate(admin_rows):
+            status_label = {
+                "administered": "Administrada", "refused": "Rechazada",
+                "not_available": "No disponible",
+            }.get(record.status, "Pendiente") if record else "Pendiente"
+            values = [
+                schedule.time_of_day,
+                {"morning": "Mañana", "afternoon": "Tarde", "night": "Noche"}.get(
+                    schedule.shift, schedule.shift
+                ),
+                plan.medication_name, plan.prescribed_dose, status_label,
+                (record.note or "—") if record else "—",
+                record.recorded_by_name_snapshot if record else "—",
+            ]
+            for col, value in enumerate(values):
+                cell = QTableWidgetItem(value)
+                if col == 0:
+                    cell.setData(Qt.ItemDataRole.UserRole, (
+                        plan.id, planned_at.isoformat(), schedule.shift,
+                        record.id if record else None,
+                    ))
                 self.administrations.setItem(i, col, cell)
         self.vaccines.setRowCount(len(vaccine_rows))
         for i, record in enumerate(vaccine_rows):
-            values = [record.vaccine_name, record.administered_on.strftime("%d/%m/%Y"), record.dose_reference or "—"]
-            for col, value in enumerate(values): self.vaccines.setItem(i, col, QTableWidgetItem(value))
+            values = [
+                record.vaccine_name, record.administered_on.strftime("%d/%m/%Y"),
+                record.dose_reference or "—",
+            ]
+            for col, value in enumerate(values):
+                self.vaccines.setItem(i, col, QTableWidgetItem(value))
 
     def save_profile(self):
         try:
             with session_scope(self.factory) as session:
-                save_health_profile(session, actor_account_id=self.actor_id,
-                    stay_id=self.stay.currentData(), allergies=self.allergies.toPlainText(),
+                save_health_profile(
+                    session, actor_account_id=self.actor_id, stay_id=self.stay.currentData(),
+                    allergies=self.allergies.toPlainText(),
                     relevant_conditions=self.conditions.toPlainText(),
-                    emergency_instructions=self.emergency.toPlainText())
+                    emergency_instructions=self.emergency.toPlainText(),
+                )
             QMessageBox.information(self, "Ficha sanitaria", "Datos guardados y auditados.")
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo guardar", str(exc))
 
-    def add_plan(self):
-        fields = []
-        for prompt in ["Medicamento:", "Dosis indicada en prescripción:", "Pauta / instrucciones:", "Referencia de prescripción:"]: 
-            value, ok = QInputDialog.getText(self, "Nueva pauta", prompt)
-            if not ok or not value.strip(): return
-            fields.append(value)
-        schedule_text, ok = QInputDialog.getMultiLineText(self, "Horarios prescritos",
-            "Una hora por línea: HH:MM|morning, HH:MM|afternoon o HH:MM|night")
-        if not ok or not schedule_text.strip(): return
+    def _read_schedules(self, text):
         schedules = []
+        for line in text.splitlines():
+            if not line.strip():
+                continue
+            parts = [part.strip() for part in line.split("|", 1)]
+            if len(parts) != 2:
+                raise ValueError("Usa el formato HH:MM|morning, HH:MM|afternoon o HH:MM|night.")
+            schedules.append((parts[0], parts[1].lower()))
+        if not schedules:
+            raise ValueError("Indica al menos un horario prescrito.")
+        return schedules
+
+    def add_plan(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Registrar pauta prescrita")
+        dialog.resize(520, 420)
+        layout = QVBoxLayout(dialog)
+        form = QFormLayout()
+        medication = QLineEdit()
+        dose = QLineEdit()
+        instructions = QTextEdit(); instructions.setMaximumHeight(75)
+        reference = QLineEdit()
+        schedules = QTextEdit()
+        schedules.setPlaceholderText("Una por línea: 08:00|morning")
+        schedules.setMaximumHeight(90)
+        form.addRow("Medicamento", medication)
+        form.addRow("Dosis prescrita", dose)
+        form.addRow("Pauta / instrucciones", instructions)
+        form.addRow("Referencia de prescripción", reference)
+        form.addRow("Horarios prescritos", schedules)
+        layout.addLayout(form)
+        hint = QLabel("Los horarios deben corresponder a la prescripción vigente. No se modifica aquí la pauta clínica.")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        buttons = QHBoxLayout()
+        save = QPushButton("Guardar pauta")
+        cancel = QPushButton("Cancelar")
+        save.clicked.connect(dialog.accept)
+        cancel.clicked.connect(dialog.reject)
+        buttons.addWidget(save); buttons.addWidget(cancel)
+        layout.addLayout(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
         try:
-            for line in schedule_text.splitlines():
-                time_text, shift = [part.strip() for part in line.split("|", 1)]
-                schedules.append((time_text, shift.lower()))
+            parsed_schedules = self._read_schedules(schedules.toPlainText())
+            if not medication.text().strip() or not dose.text().strip() or not reference.text().strip():
+                raise ValueError("Medicamento, dosis y referencia de prescripción son obligatorios.")
             with session_scope(self.factory) as session:
-                plan = add_medication_plan(session, actor_account_id=self.actor_id, stay_id=self.stay.currentData(),
-                    medication_name=fields[0], prescribed_dose=fields[1], schedule_text=fields[2],
-                    prescriber_reference=fields[3], starts_on=date.today())
-                set_medication_schedules(session, actor_account_id=self.actor_id, plan_id=plan.id, schedules=schedules)
+                plan = add_medication_plan(
+                    session, actor_account_id=self.actor_id, stay_id=self.stay.currentData(),
+                    medication_name=medication.text().strip(), prescribed_dose=dose.text().strip(),
+                    schedule_text=instructions.toPlainText().strip(),
+                    prescriber_reference=reference.text().strip(), starts_on=date.today(),
+                )
+                set_medication_schedules(
+                    session, actor_account_id=self.actor_id, plan_id=plan.id,
+                    schedules=parsed_schedules,
+                )
             self.refresh()
+            QMessageBox.information(self, "Pauta registrada", "La pauta y sus horarios han quedado registrados.")
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo registrar", str(exc))
 
@@ -429,17 +529,19 @@ class HealthDialog(StaySelectorDialog):
         if not cell:
             QMessageBox.information(self, "Selecciona pauta", "Selecciona primero una pauta.")
             return
-        schedule_text, ok = QInputDialog.getMultiLineText(self, "Horarios prescritos",
-            "Una hora por línea: HH:MM|morning, HH:MM|afternoon o HH:MM|night")
-        if not ok or not schedule_text.strip(): return
+        schedule_text, ok = QInputDialog.getMultiLineText(
+            self, "Horarios prescritos",
+            "Una hora por línea: HH:MM|morning, HH:MM|afternoon o HH:MM|night",
+        )
+        if not ok:
+            return
         try:
-            schedules = []
-            for line in schedule_text.splitlines():
-                time_text, shift = [part.strip() for part in line.split("|", 1)]
-                schedules.append((time_text, shift.lower()))
+            schedules = self._read_schedules(schedule_text)
             with session_scope(self.factory) as session:
-                set_medication_schedules(session, actor_account_id=self.actor_id,
-                    plan_id=cell.data(Qt.ItemDataRole.UserRole), schedules=schedules)
+                set_medication_schedules(
+                    session, actor_account_id=self.actor_id,
+                    plan_id=cell.data(Qt.ItemDataRole.UserRole), schedules=schedules,
+                )
             self.refresh()
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudieron configurar horarios", str(exc))
@@ -454,19 +556,28 @@ class HealthDialog(StaySelectorDialog):
         if existing_record_id:
             QMessageBox.information(self, "Ya registrada", "Esta dosis ya tiene un registro.")
             return
-        label, ok = QInputDialog.getItem(self, "Administración", "Resultado:",
-            ["Administrada", "Rechazada", "No disponible"], 0, False)
-        if not ok: return
-        status = {"Administrada":"administered","Rechazada":"refused","No disponible":"not_available"}[label]
+        label, ok = QInputDialog.getItem(
+            self, "Administración", "Resultado:",
+            ["Administrada", "Rechazada", "No disponible"], 0, False,
+        )
+        if not ok:
+            return
+        status = {
+            "Administrada": "administered", "Rechazada": "refused",
+            "No disponible": "not_available",
+        }[label]
         note = ""
         if status != "administered":
             note, ok = QInputDialog.getMultiLineText(self, "Motivo", "Motivo obligatorio:")
-            if not ok or not note.strip(): return
+            if not ok or not note.strip():
+                return
         try:
             with session_scope(self.factory) as session:
-                record_medication_administration(session, actor_account_id=self.actor_id,
-                    plan_id=plan_id, scheduled_at=datetime.fromisoformat(planned_iso),
-                    status=status, shift=shift, note=note)
+                record_medication_administration(
+                    session, actor_account_id=self.actor_id, plan_id=plan_id,
+                    scheduled_at=datetime.fromisoformat(planned_iso),
+                    status=status, shift=shift, note=note,
+                )
             self.refresh()
             QMessageBox.information(self, "Administración", "Registro añadido.")
         except (ValueError, PermissionError) as exc:
@@ -474,11 +585,15 @@ class HealthDialog(StaySelectorDialog):
 
     def add_vaccine(self):
         name, ok = QInputDialog.getText(self, "Vacunación", "Vacuna administrada:")
-        if not ok or not name.strip(): return
+        if not ok or not name.strip():
+            return
         try:
             with session_scope(self.factory) as session:
-                add_vaccine_record(session, actor_account_id=self.actor_id, stay_id=self.stay.currentData(),
-                    vaccine_name=name, administered_on=date.today())
+                add_vaccine_record(
+                    session, actor_account_id=self.actor_id, stay_id=self.stay.currentData(),
+                    vaccine_name=name, administered_on=date.today(),
+                )
+            self.refresh()
             QMessageBox.information(self, "Vacunación", "Registro añadido.")
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo registrar", str(exc))
