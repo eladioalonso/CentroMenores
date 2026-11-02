@@ -70,7 +70,7 @@ def set_medication_schedules(session: Session, *, actor_account_id: str, plan_id
         raise ValueError("Indica al menos una hora prescrita")
     normalized = []
     for time_text, shift in schedules:
-        if not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", time_text):
+        if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", time_text):
             raise ValueError(f"Hora no válida: {time_text}. Usa HH:MM")
         if shift not in {"morning", "afternoon", "night"}:
             raise ValueError("Turno no válido")
