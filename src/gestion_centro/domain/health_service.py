@@ -99,8 +99,13 @@ def list_daily_medication_schedule(session: Session, *, actor_account_id: str,
             continue
         for schedule in plan.schedules:
             local_dt = datetime.combine(day, datetime.strptime(schedule.time_of_day, "%H:%M").time()).astimezone()
+            # Consultar directamente la tabla: la colección ORM puede estar ya
+            # cargada en la sesión antes de registrar la administración.
+            day_records = session.scalars(select(MedicationAdministration).where(
+                MedicationAdministration.plan_id == plan.id
+            )).all()
             matched = None
-            for record in plan.administrations:
+            for record in day_records:
                 recorded_local = record.scheduled_at.astimezone()
                 if recorded_local.date() == day and recorded_local.strftime("%H:%M") == schedule.time_of_day:
                     matched = record
@@ -122,8 +127,13 @@ def record_medication_administration(session: Session, *, actor_account_id: str,
     local_time = scheduled_at.astimezone().strftime("%H:%M")
     if plan.schedules and not any(item.time_of_day == local_time and item.shift == shift for item in plan.schedules):
         raise ValueError("La hora y el turno no coinciden con un horario de la pauta")
-    for existing in plan.administrations:
-        if existing.scheduled_at.astimezone().date() == scheduled_at.astimezone().date() and existing.scheduled_at.astimezone().strftime("%H:%M") == local_time:
+    existing_records = session.scalars(select(MedicationAdministration).where(
+        MedicationAdministration.plan_id == plan.id
+    )).all()
+    target_local = scheduled_at.astimezone()
+    for existing in existing_records:
+        existing_local = existing.scheduled_at.astimezone()
+        if existing_local.date() == target_local.date() and existing_local.strftime("%H:%M") == local_time:
             raise ValueError("Ya existe un registro para esta dosis prevista")
     record=MedicationAdministration(plan_id=plan.id,scheduled_at=scheduled_at,shift=shift,status=status,
         note=note.strip() if note else None,recorded_by_account_id=actor.id,
