@@ -317,7 +317,7 @@ class HealthDialog(StaySelectorDialog):
             daily_rows = list_daily_medication_schedule(session, actor_account_id=self.actor_id,
                 stay_id=stay_id, day=self.admin_day.date().toPython())
             administration_rows = [row for row in daily_rows
-                if self.admin_shift_filter.currentData() is None or row[1].shift == self.admin_shift_filter.currentData()]]
+                if self.admin_shift_filter.currentData() is None or row[1].shift == self.admin_shift_filter.currentData()]
         self.allergies.setPlainText(profile.allergies or "" if profile else "")
         self.conditions.setPlainText(profile.relevant_conditions or "" if profile else "")
         self.emergency.setPlainText(profile.emergency_instructions or "" if profile else "")
