@@ -67,7 +67,7 @@ def test_administrator_sees_ordinary_and_administration_modules():
             "Expedientes y estancias",
             "Diario e incidencias",
             "Agenda común y tareas",
-            "Calendario día / semana / mes / año",
+            "Calendario",
             "Documentación personal",
             "Autorizaciones",
             "Salidas",
