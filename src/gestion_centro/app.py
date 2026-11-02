@@ -34,6 +34,8 @@ from gestion_centro.domain.service import (
     set_agenda_item_status,
 )
 from gestion_centro.domain.models import Stay
+from gestion_centro.domain.models import AgendaItem, Incident
+from gestion_centro.domain.documents import Outing
 from gestion_centro.domain.documents import PersonalDocument
 from gestion_centro.domain.documents_service import register_document, list_documents
 from gestion_centro.operations_ui import AuthorizationsDialog, OutingsDialog
@@ -784,6 +786,73 @@ class MainWindow(QMainWindow):
 
         tabs = QTabWidget()
         layout.addWidget(tabs, 1)
+
+        if factory is not None and account_id is not None:
+            dashboard = QWidget()
+            tabs.addTab(dashboard, "Resumen del turno")
+            dashboard_layout = QVBoxLayout(dashboard)
+            dashboard_layout.addWidget(QLabel(
+                "Pendientes que requieren atención. Los contadores se calculan desde los registros actuales."
+            ))
+            counters = {}
+            dashboard_grid = QGridLayout()
+            dashboard_layout.addLayout(dashboard_grid)
+
+            def refresh_dashboard():
+                now = datetime.now(timezone.utc)
+                with session_scope(factory) as session:
+                    counters["outings"].setText(str(session.scalar(
+                        select(func.count()).select_from(Outing).where(Outing.status == "in_progress")
+                    ) or 0))
+                    counters["incidents"].setText(str(session.scalar(
+                        select(func.count()).select_from(Incident).where(Incident.status == "open")
+                    ) or 0))
+                    counters["tasks"].setText(str(session.scalar(
+                        select(func.count()).select_from(AgendaItem).where(
+                            AgendaItem.kind == "task", AgendaItem.status.in_(("pending", "in_progress")),
+                            AgendaItem.starts_at < now,
+                        )
+                    ) or 0))
+                    counters["agenda"].setText(str(session.scalar(
+                        select(func.count()).select_from(AgendaItem).where(
+                            AgendaItem.status.in_(("pending", "in_progress")),
+                            AgendaItem.starts_at >= now,
+                        )
+                    ) or 0))
+
+            def dashboard_card(row, column, key, title, description, callback):
+                card = QWidget()
+                card_layout = QVBoxLayout(card)
+                heading = QLabel(title)
+                heading.setStyleSheet("font-weight: 600;")
+                value = QLabel("—")
+                value.setStyleSheet("font-size: 28px; font-weight: 600;")
+                counters[key] = value
+                card_layout.addWidget(heading)
+                card_layout.addWidget(value)
+                card_layout.addWidget(QLabel(description))
+                action = QPushButton("Abrir módulo")
+                action.clicked.connect(callback)
+                card_layout.addWidget(action)
+                dashboard_grid.addWidget(card, row, column)
+
+            dashboard_card(0, 0, "outings", "Salidas en curso",
+                "Salidas con salida registrada y sin regreso registrado.",
+                lambda: OutingsDialog(factory, account_id).exec())
+            dashboard_card(0, 1, "incidents", "Incidencias abiertas",
+                "Incidencias formales pendientes de cierre.",
+                lambda: DiaryDialog(factory, account_id).exec())
+            dashboard_card(1, 0, "tasks", "Tareas vencidas",
+                "Tareas pendientes o en curso cuya fecha ya ha pasado.",
+                lambda: AgendaDialog(factory, account_id).exec())
+            dashboard_card(1, 1, "agenda", "Agenda próxima",
+                "Elementos pendientes o en curso con fecha futura.",
+                lambda: AgendaDialog(factory, account_id).exec())
+            refresh_button = QPushButton("Actualizar contadores")
+            refresh_button.clicked.connect(refresh_dashboard)
+            dashboard_layout.addWidget(refresh_button)
+            dashboard_layout.addStretch(1)
+            refresh_dashboard()
 
         def add_actions(tab: QWidget, actions: list[tuple[str, object]], columns: int = 2) -> None:
             grid = QGridLayout(tab)
