@@ -108,3 +108,29 @@ def stale_communications(session: Session, *, now: datetime | None = None):
         Communication.status == "draft", Communication.deleted_at.is_(None),
         Communication.updated_at <= moment - timedelta(days=7)
     ).order_by(Communication.updated_at)).all()
+
+
+def revise_communication_contribution(session: Session, *, actor_account_id: str,
+                                      contribution_id: str, corrected_content: str):
+    """Añade una rectificación vinculada; nunca sobrescribe una aportación compartida."""
+    actor = _actor(session, actor_account_id)
+    original = session.get(CommunicationContribution, contribution_id)
+    if original is None:
+        raise ValueError("La aportación original no existe")
+    if original.author_account_id != actor.id:
+        raise PermissionError("Solo puedes rectificar tus propias aportaciones")
+    item = session.get(Communication, original.communication_id)
+    if item is None or item.deleted_at is not None or item.status != "draft":
+        raise ValueError("La comunicación está cerrada o no disponible")
+    if not corrected_content.strip():
+        raise ValueError("La rectificación no puede estar vacía")
+    correction = CommunicationContribution(
+        communication_id=item.id, author_account_id=actor.id,
+        author_name_snapshot=actor.professional.display_name,
+        content=f"RECTIFICACIÓN de la aportación {original.id}: {corrected_content.strip()}",
+    )
+    item.updated_at = datetime.now(timezone.utc)
+    session.add(correction)
+    _audit(session, actor, "communication_contribution_revised",
+           f"Original:{original.id}; rectificación:{correction.id}")
+    return correction
