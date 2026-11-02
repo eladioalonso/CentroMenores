@@ -184,6 +184,52 @@ def record_diary_entry(
     return entry
 
 
+
+def revise_diary_entry(
+    session: Session, *, actor_account_id: str, original_entry_id: str, content: str,
+    now: datetime | None = None,
+):
+    """Crea una nueva versión de una anotación propia mientras el diario siga abierto.
+
+    La versión anterior nunca se sobrescribe; la nueva queda enlazada mediante
+    correction_of_id y conserva turno, categoría, hora y participantes.
+    """
+    from gestion_centro.domain.models import DiaryDay, DiaryEntry, DiaryEntryStayLink
+    actor = _active_author(session, actor_account_id)
+    original = session.get(DiaryEntry, original_entry_id)
+    if original is None:
+        raise ValueError("La anotación original no existe")
+    if original.author_account_id != actor.id:
+        raise PermissionError("Solo puedes corregir tus propias anotaciones")
+    day = session.get(DiaryDay, original.diary_day_id)
+    if day is None:
+        raise ValueError("No se encuentra el día del diario")
+    _ensure_diary_open(session, day, actor, now=now)
+    if not content.strip():
+        raise ValueError("El contenido de la anotación es obligatorio")
+    revised = DiaryEntry(
+        diary_day_id=original.diary_day_id, shift=original.shift,
+        category=original.category, content=content.strip(),
+        happened_at=original.happened_at, author_account_id=actor.id,
+        author_name_snapshot=actor.professional.display_name,
+        correction_of_id=original.id,
+    )
+    session.add(revised)
+    session.flush()
+    links = session.scalars(select(DiaryEntryStayLink).where(
+        DiaryEntryStayLink.entry_id == original.id
+    )).all()
+    for link in links:
+        session.add(DiaryEntryStayLink(
+            entry_id=revised.id, stay_id=link.stay_id,
+            minor_code_snapshot=link.minor_code_snapshot,
+            minor_name_snapshot=link.minor_name_snapshot,
+        ))
+    _audit(session, actor, "diary_entry_revised",
+        f"Versión anterior: {original.id}; nueva versión: {revised.id}")
+    return revised
+
+
 def close_diary_day(session: Session, *, actor_account_id: str, diary_date: date, now: datetime | None = None):
     from datetime import timedelta
     from gestion_centro.domain.models import DiaryDay
