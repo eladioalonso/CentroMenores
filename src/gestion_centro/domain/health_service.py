@@ -122,15 +122,16 @@ def record_medication_administration(session: Session, *, actor_account_id: str,
     if shift not in {"morning", "afternoon", "night", "unspecified"}: raise ValueError("Turno no válido")
     if status!="administered" and not (note and note.strip()):
         raise ValueError("Indica el motivo si no se administra")
-    if scheduled_at.date()<plan.starts_on or (plan.ends_on and scheduled_at.date()>plan.ends_on):
+    target_local = scheduled_at.astimezone()
+    scheduled_local_date = target_local.date()
+    if scheduled_local_date < plan.starts_on or (plan.ends_on and scheduled_local_date > plan.ends_on):
         raise ValueError("La fecha queda fuera de la vigencia de la pauta")
-    local_time = scheduled_at.astimezone().strftime("%H:%M")
+    local_time = target_local.strftime("%H:%M")
     if plan.schedules and not any(item.time_of_day == local_time and item.shift == shift for item in plan.schedules):
         raise ValueError("La hora y el turno no coinciden con un horario de la pauta")
     existing_records = session.scalars(select(MedicationAdministration).where(
         MedicationAdministration.plan_id == plan.id
     )).all()
-    target_local = scheduled_at.astimezone()
     for existing in existing_records:
         existing_local = existing.scheduled_at.astimezone()
         if existing_local.date() == target_local.date() and existing_local.strftime("%H:%M") == local_time:
