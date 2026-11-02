@@ -52,7 +52,7 @@ from gestion_centro.help_ui import HelpDialog
 from gestion_centro.domain.communications_service import (
     create_communication, add_communication_contribution, close_communication,
     list_communications, move_communication_to_trash, restore_communication,
-    reopen_communication,
+    reopen_communication, revise_communication_contribution,
 )
 from gestion_centro.domain.communications import CommunicationContribution
 
@@ -441,7 +441,7 @@ class CommunicationsDialog(QDialog):
         actions = QHBoxLayout()
         controls = [
             ("Nueva", self.create_item), ("Ver aportaciones", self.view_notes),
-            ("Añadir aportación", self.add_note), ("Cerrar", self.close_item),
+            ("Añadir aportación", self.add_note), ("Rectificar mi aportación", self.revise_note), ("Cerrar", self.close_item),
             ("Enviar a papelera", self.trash_item), ("Reabrir", self.reopen_item),
             ("Papelera / bandeja", self.toggle_trash), ("Recuperar", self.restore_item),
             ("Actualizar", self.refresh),
@@ -510,6 +510,39 @@ class CommunicationsDialog(QDialog):
             self.refresh()
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo añadir", str(exc))
+
+    def revise_note(self) -> None:
+        item_id = self.selected_id()
+        if not item_id:
+            QMessageBox.information(self, "Selecciona", "Selecciona una comunicación.")
+            return
+        with session_scope(self.factory) as session:
+            notes = session.scalars(select(CommunicationContribution)
+                .where(CommunicationContribution.communication_id == item_id)
+                .order_by(CommunicationContribution.created_at)).all()
+            choices = [(n.id, f"{n.created_at.astimezone().strftime('%d/%m/%Y %H:%M')} · {n.author_name_snapshot} · {n.content[:90]}") for n in notes]
+            actor = session.get(UserAccount, self.actor_id)
+            choices = [(note_id, label) for note_id, label in choices
+                       if actor and any(n.id == note_id and n.author_account_id == actor.id for n in notes)]
+        if not choices:
+            QMessageBox.information(self, "Sin aportaciones propias", "No hay aportaciones tuyas que puedas rectificar.")
+            return
+        labels = [label for _, label in choices]
+        selected, ok = QInputDialog.getItem(self, "Rectificar aportación", "Elige tu aportación:", labels, 0, False)
+        if not ok:
+            return
+        note_id = choices[labels.index(selected)][0]
+        content, ok = QInputDialog.getMultiLineText(self, "Rectificación", "Escribe la rectificación vinculada:")
+        if not ok or not content.strip():
+            return
+        try:
+            with session_scope(self.factory) as session:
+                revise_communication_contribution(session, actor_account_id=self.actor_id,
+                    contribution_id=note_id, corrected_content=content)
+            self.refresh()
+            QMessageBox.information(self, "Rectificación guardada", "Se ha añadido una nueva aportación vinculada. El texto original se conserva.")
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo rectificar", str(exc))
 
     def close_item(self) -> None:
         item_id = self.selected_id()
