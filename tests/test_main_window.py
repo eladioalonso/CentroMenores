@@ -2,7 +2,7 @@
 
 from PySide6.QtWidgets import QApplication, QPushButton, QTabWidget
 
-from gestion_centro.app import MainWindow
+from gestion_centro.app import MainWindow, CredentialsDialog
 from gestion_centro.auth.service import Role
 
 
@@ -106,3 +106,31 @@ def test_administration_is_separate_tab_only_for_admin():
     finally:
         educator.close()
         admin.close()
+
+
+
+def test_login_account_selector_fills_username_and_requires_password():
+    app = _application()
+    dialog = CredentialsDialog(
+        available_accounts=[("Ana Educadora", "ana"), ("Luis Educador", "luis")]
+    )
+    try:
+        assert dialog.account_selector.count() == 2
+        assert dialog.username.text() == "ana"
+        assert dialog.username.isReadOnly()
+        dialog.account_selector.setCurrentIndex(1)
+        assert dialog.username.text() == "luis"
+        assert dialog.password.text() == ""
+    finally:
+        dialog.close()
+
+
+def test_main_window_exposes_logout_action():
+    window = _window(Role.EDUCATOR)
+    try:
+        logout = next(button for button in window.findChildren(QPushButton)
+                      if button.text() == "Cerrar sesión")
+        logout.click()
+        assert window.logout_requested is True
+    finally:
+        window.close()
