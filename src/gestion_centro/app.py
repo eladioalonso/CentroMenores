@@ -787,7 +787,9 @@ class MainWindow(QMainWindow):
         tabs = QTabWidget()
         layout.addWidget(tabs, 1)
 
-        if factory is not None and account_id is not None:
+        # Las pruebas de navegación pueden inyectar objetos centinela como
+        # infraestructura; el panel solo consulta la BD con una fábrica invocable.
+        if callable(factory) and account_id is not None:
             dashboard = QWidget()
             tabs.addTab(dashboard, "Resumen del turno")
             dashboard_layout = QVBoxLayout(dashboard)
