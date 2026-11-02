@@ -58,14 +58,23 @@ IDLE_LIMIT_MS = 15 * 60 * 1000
 
 
 class CredentialsDialog(QDialog):
-    def __init__(self, *, first_admin: bool = False, fixed_username: str | None = None) -> None:
+    def __init__(self, *, first_admin: bool = False, fixed_username: str | None = None, available_accounts: list[tuple[str, str]] | None = None) -> None:
         super().__init__()
         self.first_admin = first_admin
         self.fixed_username = fixed_username
+        self.available_accounts = available_accounts or []
         self.setWindowTitle("Crear administrador inicial" if first_admin else "Iniciar sesión")
         self.username = QLineEdit(fixed_username or "")
         self.username.setMaxLength(80)
-        self.username.setReadOnly(fixed_username is not None)
+        self.username.setReadOnly(fixed_username is not None or bool(self.available_accounts))
+        self.account_selector = QComboBox()
+        for display_name, account_username in self.available_accounts:
+            self.account_selector.addItem(display_name, account_username)
+        if self.available_accounts:
+            self.username.setText(self.account_selector.currentData() or "")
+            self.account_selector.currentIndexChanged.connect(
+                lambda _index: self.username.setText(self.account_selector.currentData() or "")
+            )
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
         self.name = QLineEdit()
@@ -74,6 +83,8 @@ class CredentialsDialog(QDialog):
         form = QFormLayout()
         if first_admin:
             form.addRow("Nombre profesional", self.name)
+        if self.available_accounts:
+            form.addRow("Selecciona tu cuenta", self.account_selector)
         form.addRow("Usuario", self.username)
         form.addRow("Contraseña", self.password)
         layout.addLayout(form)
@@ -752,6 +763,7 @@ class MainWindow(QMainWindow):
 
         page = QWidget()
         layout = QVBoxLayout(page)
+        self.logout_requested = False
         heading = QLabel("Gestión del Centro")
         heading.setStyleSheet("font-size: 22px; font-weight: 600;")
         layout.addWidget(heading)
@@ -760,9 +772,15 @@ class MainWindow(QMainWindow):
             f"{'Administrador' if role is Role.ADMIN else 'Educador'}"
         ))
 
+        top_actions = QHBoxLayout()
         help_button = QPushButton("Ayuda y preguntas frecuentes")
         help_button.clicked.connect(lambda: HelpDialog(self).exec())
-        layout.addWidget(help_button)
+        logout_button = QPushButton("Cerrar sesión")
+        logout_button.clicked.connect(self.request_logout)
+        top_actions.addWidget(help_button)
+        top_actions.addStretch(1)
+        top_actions.addWidget(logout_button)
+        layout.addLayout(top_actions)
 
         tabs = QTabWidget()
         layout.addWidget(tabs, 1)
@@ -817,6 +835,10 @@ class MainWindow(QMainWindow):
         layout.addWidget(notice)
         self.setCentralWidget(page)
 
+    def request_logout(self) -> None:
+        self.logout_requested = True
+        self.close()
+
 def main() -> int:
     demo_mode = "--demo" in sys.argv
     qt_args = [arg for arg in sys.argv if arg != "--demo"]
@@ -862,81 +884,96 @@ def main() -> int:
         close_expired_diary_days(session)
         first_admin = session.scalar(select(func.count()).select_from(UserAccount)) == 0
 
-    authenticated = None
-    login_failures = 0
-    while authenticated is None:
-        dialog = CredentialsDialog(first_admin=first_admin)
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            engine.dispose()
-            instance_lock.unlock()
-            return 0
-        name, username, password = dialog.values()
-        try:
+    result_code = 0
+    while True:
+        authenticated = None
+        login_failures = 0
+        while authenticated is None:
             with session_scope(factory) as session:
-                if first_admin:
-                    create_professional_account(
-                        session, display_name=name, username=username,
-                        password=password, role=Role.ADMIN,
-                    )
-                    first_admin = False
-                result = authenticate(session, username=username, password=password)
-            if result.status is AuthStatus.SUCCESS:
-                authenticated = result
-                login_failures = 0
-            else:
-                login_failures += 1
-            if result.status is AuthStatus.RETRY_FLOW_CLOSED or login_failures >= 5:
-                QMessageBox.warning(None, "Acceso cerrado", "Cinco intentos fallidos. El proceso de acceso se cerrará.")
+                active_accounts = session.scalars(
+                    select(UserAccount).where(UserAccount.active.is_(True))
+                ).all()
+                available_accounts = sorted(
+                    [(account.professional.display_name, account.username)
+                     for account in active_accounts if account.professional],
+                    key=lambda item: item[0].casefold(),
+                )
+            dialog = CredentialsDialog(
+                first_admin=first_admin, available_accounts=available_accounts
+            )
+            if dialog.exec() != QDialog.DialogCode.Accepted:
                 engine.dispose()
                 instance_lock.unlock()
-                return 1
-            elif result.status is not AuthStatus.SUCCESS:
-                QMessageBox.warning(None, "Acceso no válido", "Usuario o contraseña incorrectos, o cuenta inactiva.")
-        except ValueError as exc:
-            QMessageBox.warning(None, "No se pudo crear la cuenta", str(exc))
+                return 0
+            name, username, password = dialog.values()
+            try:
+                with session_scope(factory) as session:
+                    if first_admin:
+                        create_professional_account(
+                            session, display_name=name, username=username,
+                            password=password, role=Role.ADMIN,
+                        )
+                        first_admin = False
+                    auth_result = authenticate(session, username=username, password=password)
+                if auth_result.status is AuthStatus.SUCCESS:
+                    authenticated = auth_result
+                else:
+                    login_failures += 1
+                if auth_result.status is AuthStatus.RETRY_FLOW_CLOSED or login_failures >= 5:
+                    QMessageBox.warning(None, "Acceso cerrado", "Cinco intentos fallidos. El proceso de acceso se cerrará.")
+                    engine.dispose()
+                    instance_lock.unlock()
+                    return 1
+                elif auth_result.status is not AuthStatus.SUCCESS:
+                    QMessageBox.warning(None, "Acceso no válido", "Usuario o contraseña incorrectos, o cuenta inactiva.")
+            except ValueError as exc:
+                QMessageBox.warning(None, "No se pudo crear la cuenta", str(exc))
 
-    with session_scope(factory) as session:
-        account = session.get(UserAccount, authenticated.account_id)
-        display_name = account.professional.display_name if account else "Profesional"
-        username = account.username if account else ""
-        role = authenticated.role or Role.EDUCATOR
+        with session_scope(factory) as session:
+            account = session.get(UserAccount, authenticated.account_id)
+            display_name = account.professional.display_name if account else "Profesional"
+            username = account.username if account else ""
+            role = authenticated.role or Role.EDUCATOR
+        window = MainWindow(display_name, role, factory, authenticated.account_id, paths)
+        if demo_mode:
+            window.setWindowTitle("Gestión del Centro · DEMOSTRACIÓN · datos separados")
 
-    window = MainWindow(display_name, role, factory, authenticated.account_id, paths)
-    if demo_mode:
-        window.setWindowTitle("Gestión del Centro · DEMOSTRACIÓN · datos separados")
-    monitor = None
+        monitor = None
+        def lock_session() -> None:
+            nonlocal monitor
+            window.hide()
+            QMessageBox.information(None, "Sesión bloqueada", "La sesión se ha bloqueado por 15 minutos de inactividad. Introduce de nuevo tu contraseña para continuar.")
+            failures = 0
+            while True:
+                lock_dialog = CredentialsDialog(fixed_username=username)
+                if lock_dialog.exec() != QDialog.DialogCode.Accepted:
+                    app.quit()
+                    return
+                _, _, lock_password = lock_dialog.values()
+                with session_scope(factory) as session:
+                    lock_result = authenticate(session, username=username, password=lock_password)
+                if lock_result.status is AuthStatus.SUCCESS and lock_result.account_id == authenticated.account_id:
+                    window.show()
+                    monitor.resume()
+                    return
+                failures += 1
+                if failures >= 5 or lock_result.status is AuthStatus.RETRY_FLOW_CLOSED:
+                    QMessageBox.warning(None, "Acceso cerrado", "Se ha cerrado la sesión tras cinco intentos fallidos.")
+                    app.quit()
+                    return
+                QMessageBox.warning(None, "Contraseña incorrecta", "La contraseña no es válida. La sesión continúa bloqueada.")
 
-    def lock_session() -> None:
-        nonlocal monitor
-        window.hide()
-        QMessageBox.information(None, "Sesión bloqueada", "La sesión se ha bloqueado por 15 minutos de inactividad. Introduce de nuevo tu contraseña para continuar.")
-        failures = 0
-        while True:
-            lock_dialog = CredentialsDialog(fixed_username=username)
-            if lock_dialog.exec() != QDialog.DialogCode.Accepted:
-                app.quit()
-                return
-            _, _, lock_password = lock_dialog.values()
-            with session_scope(factory) as session:
-                result = authenticate(session, username=username, password=lock_password)
-            if result.status is AuthStatus.SUCCESS and result.account_id == authenticated.account_id:
-                window.show()
-                monitor.resume()
-                return
-            failures += 1
-            if failures >= 5 or result.status is AuthStatus.RETRY_FLOW_CLOSED:
-                QMessageBox.warning(None, "Acceso cerrado", "Se ha cerrado la sesión tras cinco intentos fallidos.")
-                app.quit()
-                return
-            QMessageBox.warning(None, "Contraseña incorrecta", "La contraseña no es válida. La sesión continúa bloqueada.")
+        monitor = IdleMonitor(app, lock_session)
+        window.show()
+        result_code = app.exec()
+        monitor.stop()
+        with session_scope(factory) as session:
+            session.add(AccessAudit(
+                account_id=authenticated.account_id, username_snapshot=username, event="logout"
+            ))
+        if not window.logout_requested:
+            break
 
-    monitor = IdleMonitor(app, lock_session)
-    window.show()
-    result = app.exec()
-    monitor.stop()
-    with session_scope(factory) as session:
-        from gestion_centro.auth.models import AccessAudit
-        session.add(AccessAudit(account_id=authenticated.account_id, username_snapshot=username, event="logout"))
     engine.dispose()
     instance_lock.unlock()
-    return result
+    return result_code
