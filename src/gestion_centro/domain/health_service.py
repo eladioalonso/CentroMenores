@@ -119,6 +119,12 @@ def record_medication_administration(session: Session, *, actor_account_id: str,
         raise ValueError("Indica el motivo si no se administra")
     if scheduled_at.date()<plan.starts_on or (plan.ends_on and scheduled_at.date()>plan.ends_on):
         raise ValueError("La fecha queda fuera de la vigencia de la pauta")
+    local_time = scheduled_at.astimezone().strftime("%H:%M")
+    if plan.schedules and not any(item.time_of_day == local_time and item.shift == shift for item in plan.schedules):
+        raise ValueError("La hora y el turno no coinciden con un horario de la pauta")
+    for existing in plan.administrations:
+        if existing.scheduled_at.astimezone().date() == scheduled_at.astimezone().date() and existing.scheduled_at.astimezone().strftime("%H:%M") == local_time:
+            raise ValueError("Ya existe un registro para esta dosis prevista")
     record=MedicationAdministration(plan_id=plan.id,scheduled_at=scheduled_at,shift=shift,status=status,
         note=note.strip() if note else None,recorded_by_account_id=actor.id,
         recorded_by_name_snapshot=actor.professional.display_name)
