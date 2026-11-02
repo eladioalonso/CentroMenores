@@ -5,7 +5,6 @@ from sqlalchemy.orm import sessionmaker
 from gestion_centro.persistence.base import Base
 from gestion_centro.auth.models import Professional, UserAccount
 from gestion_centro.domain.models import Minor, Stay
-from gestion_centro.domain import education as education_models
 from gestion_centro.domain.education_service import (
  create_education_goal, add_education_update, set_education_goal_status,
  create_school_placement, add_school_record
@@ -46,9 +45,25 @@ def test_author_can_rectify_own_education_update_without_overwriting_original(ed
  original=add_education_update(s,actor_account_id=actor,goal_id=goal.id,category="autonomy",
   objective_description="Observación original",actions_taken="Apoyo inicial",response_observed="Respuesta inicial")
  from gestion_centro.domain.education_service import revise_education_update
- other_prof=education_models.Professional(display_name="Otro") if hasattr(education_models,"Professional") else None
  correction=revise_education_update(s,actor_account_id=actor,update_id=original.id,
   objective_description="Observación corregida",actions_taken="Apoyo corregido",response_observed="Respuesta corregida")
  assert original.objective_description=="Observación original"
  assert correction.author_account_id==actor
  assert correction.objective_description.startswith(f"RECTIFICACIÓN de la actualización {original.id}:")
+
+
+
+def test_other_professional_cannot_rectify_education_update(edu):
+ s,actor,stay=edu
+ goal=create_education_goal(s,actor_account_id=actor,stay_id=stay,title="Convivencia",description="Objetivo ficticio")
+ original=add_education_update(s,actor_account_id=actor,goal_id=goal.id,category="coexistence",
+  objective_description="Observación original",actions_taken="Apoyo",response_observed="Respuesta")
+ other_prof=Professional(display_name="Otro educador")
+ s.add(other_prof); s.flush()
+ other_account=UserAccount(professional_id=other_prof.id,username="otro",password_hash="x",role="educator")
+ s.add(other_account); s.flush()
+ from gestion_centro.domain.education_service import revise_education_update
+ with pytest.raises(PermissionError):
+  revise_education_update(s,actor_account_id=other_account.id,update_id=original.id,
+   objective_description="Intento ajeno",actions_taken="Cambio",response_observed="Cambio")
+ assert original.objective_description=="Observación original"
