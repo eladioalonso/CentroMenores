@@ -20,6 +20,7 @@ from gestion_centro.domain.health import HealthProfile, MedicationPlan, Medicati
 from gestion_centro.domain.health_service import (
     read_health_profile, save_health_profile, add_medication_plan,
     record_medication_administration, add_vaccine_record, list_medication_plans,
+    set_medication_schedules, list_daily_medication_schedule,
 )
 
 
@@ -293,8 +294,8 @@ class HealthDialog(StaySelectorDialog):
         self.admin_shift_filter.currentIndexChanged.connect(self.refresh)
         self.body.addWidget(self.admin_day)
         self.body.addWidget(self.admin_shift_filter)
-        self.administrations = QTableWidget(0, 6)
-        self.administrations.setHorizontalHeaderLabels(["Fecha / hora", "Turno", "Medicamento", "Resultado", "Motivo / nota", "Registrado por"])
+        self.administrations = QTableWidget(0, 7)
+        self.administrations.setHorizontalHeaderLabels(["Hora prevista", "Turno", "Medicamento", "Dosis", "Estado", "Motivo / nota", "Registrado por"])
         self.administrations.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.administrations.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.body.addWidget(self.administrations)
@@ -313,9 +314,10 @@ class HealthDialog(StaySelectorDialog):
             profile = read_health_profile(session, actor_account_id=self.actor_id, stay_id=stay_id)
             plans = list_medication_plans(session, actor_account_id=self.actor_id, stay_id=stay_id)
             vaccine_rows = session.scalars(select(VaccineRecord).where(VaccineRecord.stay_id == stay_id).order_by(VaccineRecord.administered_on.desc())).all()
-            administration_rows = [(a, p.medication_name) for p in plans for a in p.administrations
-                if a.scheduled_at.astimezone().date() == self.admin_day.date().toPython()
-                and (self.admin_shift_filter.currentData() is None or a.shift == self.admin_shift_filter.currentData())]
+            daily_rows = list_daily_medication_schedule(session, actor_account_id=self.actor_id,
+                stay_id=stay_id, day=self.admin_day.date().toPython())
+            administration_rows = [row for row in daily_rows
+                if self.admin_shift_filter.currentData() is None or row[1].shift == self.admin_shift_filter.currentData()]]
         self.allergies.setPlainText(profile.allergies or "" if profile else "")
         self.conditions.setPlainText(profile.relevant_conditions or "" if profile else "")
         self.emergency.setPlainText(profile.emergency_instructions or "" if profile else "")
@@ -327,13 +329,21 @@ class HealthDialog(StaySelectorDialog):
                 cell = QTableWidgetItem(value)
                 if col == 0: cell.setData(Qt.ItemDataRole.UserRole, p.id)
                 self.plans.setItem(i, col, cell)
-        admin_rows = sorted(administration_rows, key=lambda x: x[0].scheduled_at, reverse=True)
+        admin_rows = sorted(administration_rows, key=lambda x: x[2])
         self.administrations.setRowCount(len(admin_rows))
-        for i, (record, medication) in enumerate(admin_rows):
-            values = [record.scheduled_at.astimezone().strftime("%d/%m/%Y %H:%M"),
-                {"morning":"Mañana","afternoon":"Tarde","night":"Noche","unspecified":"Sin turno"}.get(record.shift, record.shift),
-                medication, record.status, record.note or "—", record.recorded_by_name_snapshot]
-            for col, value in enumerate(values): self.administrations.setItem(i, col, QTableWidgetItem(value))
+        for i, (plan, schedule, planned_at, record) in enumerate(admin_rows):
+            status_label = {"administered":"Administrada", "refused":"Rechazada",
+                "not_available":"No disponible"}.get(record.status, "Pendiente") if record else "Pendiente"
+            values = [schedule.time_of_day,
+                {"morning":"Mañana","afternoon":"Tarde","night":"Noche"}.get(schedule.shift, schedule.shift),
+                plan.medication_name, plan.prescribed_dose, status_label,
+                (record.note or "—") if record else "—",
+                record.recorded_by_name_snapshot if record else "—"]
+            for col, value in enumerate(values):
+                cell = QTableWidgetItem(value)
+                if col == 0:
+                    cell.setData(Qt.ItemDataRole.UserRole, (plan.id, planned_at.isoformat(), schedule.shift, record.id if record else None))
+                self.administrations.setItem(i, col, cell)
         self.vaccines.setRowCount(len(vaccine_rows))
         for i, record in enumerate(vaccine_rows):
             values = [record.vaccine_name, record.administered_on.strftime("%d/%m/%Y"), record.dose_reference or "—"]
