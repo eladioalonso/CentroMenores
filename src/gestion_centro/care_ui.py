@@ -279,6 +279,7 @@ class HealthDialog(StaySelectorDialog):
         self.body.addWidget(self.plans)
         actions = QHBoxLayout()
         for label, callback in [("Registrar pauta prescrita", self.add_plan),
+                                ("Configurar horarios", self.configure_schedule),
                                 ("Registrar administración", self.administer),
                                 ("Registrar vacuna", self.add_vaccine)]:
             b = QPushButton(label); b.clicked.connect(callback); actions.addWidget(b)
@@ -382,6 +383,27 @@ class HealthDialog(StaySelectorDialog):
             self.refresh()
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo registrar", str(exc))
+
+    def configure_schedule(self):
+        row = self.plans.currentRow()
+        cell = self.plans.item(row, 0) if row >= 0 else None
+        if not cell:
+            QMessageBox.information(self, "Selecciona pauta", "Selecciona primero una pauta.")
+            return
+        schedule_text, ok = QInputDialog.getMultiLineText(self, "Horarios prescritos",
+            "Una hora por línea: HH:MM|morning, HH:MM|afternoon o HH:MM|night")
+        if not ok or not schedule_text.strip(): return
+        try:
+            schedules = []
+            for line in schedule_text.splitlines():
+                time_text, shift = [part.strip() for part in line.split("|", 1)]
+                schedules.append((time_text, shift.lower()))
+            with session_scope(self.factory) as session:
+                set_medication_schedules(session, actor_account_id=self.actor_id,
+                    plan_id=cell.data(Qt.ItemDataRole.UserRole), schedules=schedules)
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudieron configurar horarios", str(exc))
 
     def administer(self):
         row = self.administrations.currentRow()
