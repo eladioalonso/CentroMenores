@@ -137,7 +137,19 @@ class ExternalReportsDialog(QDialog):
     def review(self):
         report_id = self.selected_report_id()
         if not report_id: return
-        if QMessageBox.question(self, "Revisión", "¿Has comprobado el contenido, los campos seleccionados y la autorización antes de aprobar?") != QMessageBox.StandardButton.Yes:
+        with session_scope(self.factory) as session:
+            report = session.get(ExternalReport, report_id)
+            if report is None:
+                return
+            preview = (f"Destinatario: {report.recipient}\\nFinalidad: {report.purpose}\\n"
+                f"Campos seleccionados: {report.included_fields}\\n\\nContenido propuesto:\\n{report.content}")
+        confirmation = QMessageBox(self)
+        confirmation.setWindowTitle("Revisión del informe")
+        confirmation.setText("Revisa el contenido completo antes de aprobarlo.")
+        confirmation.setDetailedText(preview)
+        confirmation.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        confirmation.setDefaultButton(QMessageBox.StandardButton.No)
+        if confirmation.exec() != QMessageBox.StandardButton.Yes:
             return
         try:
             with session_scope(self.factory) as session:
