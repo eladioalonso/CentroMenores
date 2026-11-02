@@ -39,6 +39,8 @@ class NewMinorDialog(QDialog):
         self.birth_date.setMinimumDate(QDate(1900, 1, 1))
         self.birth_date.setSpecialValueText("No indicada")
         self.birth_date.setDate(self.birth_date.minimumDate())
+        self.age_label = QLabel("—")
+        self.birth_date.dateChanged.connect(self.update_age)
         self.nif_nie = QLineEdit()
         self.passport = QLineEdit()
         self.address = QTextEdit()
@@ -48,7 +50,8 @@ class NewMinorDialog(QDialog):
             ("Código interno *", self.code), ("Nombre(s) *", self.given),
             ("Apellidos *", self.family), ("País de nacimiento", self.birth_country),
             ("Localidad", self.locality), ("Nacionalidad", self.nationality),
-            ("Fecha de nacimiento", self.birth_date), ("NIF o NIE", self.nif_nie),
+            ("Fecha de nacimiento", self.birth_date), ("Edad (calculada)", self.age_label),
+            ("NIF o NIE", self.nif_nie),
             ("Pasaporte", self.passport), ("Dirección", self.address), ("Email", self.email),
         ]:
             personal_form.addRow(label, widget)
@@ -85,6 +88,15 @@ class NewMinorDialog(QDialog):
         buttons.addWidget(save)
         buttons.addWidget(cancel)
         root.addLayout(buttons)
+
+    def update_age(self, birth_date):
+        if birth_date <= self.birth_date.minimumDate():
+            self.age_label.setText("—")
+            return
+        born = birth_date.toPython()
+        today = date.today()
+        years = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+        self.age_label.setText(str(years))
 
     def values(self):
         birth = self.birth_date.date().toPython() if self.birth_date.date() > self.birth_date.minimumDate() else None
