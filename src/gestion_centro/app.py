@@ -11,11 +11,12 @@ from pathlib import Path
 from uuid import uuid4
 
 from PySide6.QtCore import QEvent, QObject, QTimer, Qt, QLockFile, QDateTime, QDate, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QVBoxLayout, QWidget, QHBoxLayout, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QInputDialog, QComboBox,
-    QDateTimeEdit, QDateEdit, QTextEdit, QFileDialog, QDesktopServices, QCheckBox,
+    QDateTimeEdit, QDateEdit, QTextEdit, QFileDialog, QCheckBox,
 )
 from sqlalchemy import func, select
 
