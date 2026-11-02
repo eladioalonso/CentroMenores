@@ -10,7 +10,14 @@ from gestion_centro.domain.models import Event, EventStayLink, Minor, Stay
 
 
 def create_minor(
-    session: Session, *, actor_account_id: str, internal_code: str, given_names: str, family_names: str
+    session: Session, *, actor_account_id: str, internal_code: str, given_names: str, family_names: str,
+    birth_country: str | None = None, locality: str | None = None,
+    nationality: str | None = None, birth_date: date | None = None,
+    nif_nie: str | None = None, passport_number: str | None = None,
+    cip: str | None = None, address: str | None = None,
+    health_center: str | None = None, physician: str | None = None,
+    nurse: str | None = None, health_card_expires_on: date | None = None,
+    clinical_history: str | None = None, email: str | None = None
 ) -> Minor:
     actor = _active_author(session, actor_account_id)
     code = internal_code.strip().upper()
@@ -18,7 +25,26 @@ def create_minor(
         raise ValueError("El código y el nombre completo son obligatorios")
     if session.scalar(select(Minor.id).where(Minor.internal_code == code)) is not None:
         raise ValueError("El identificador interno ya existe")
-    minor = Minor(internal_code=code, given_names=given_names.strip(), family_names=family_names.strip())
+    if birth_date and birth_date > date.today():
+        raise ValueError("La fecha de nacimiento no puede ser futura")
+    if health_card_expires_on and health_card_expires_on < date(1900, 1, 1):
+        raise ValueError("La fecha de caducidad de la tarjeta sanitaria no es válida")
+    if email and ("@" not in email or email.strip().startswith("@") or email.strip().endswith("@")):
+        raise ValueError("El correo electrónico no tiene un formato válido")
+    minor = Minor(
+        internal_code=code, given_names=given_names.strip(), family_names=family_names.strip(),
+        birth_country=(birth_country or "").strip() or None,
+        locality=(locality or "").strip() or None,
+        nationality=(nationality or "").strip() or None, birth_date=birth_date,
+        nif_nie=(nif_nie or "").strip().upper() or None,
+        passport_number=(passport_number or "").strip() or None,
+        cip=(cip or "").strip() or None, address=(address or "").strip() or None,
+        health_center=(health_center or "").strip() or None,
+        physician=(physician or "").strip() or None, nurse=(nurse or "").strip() or None,
+        health_card_expires_on=health_card_expires_on,
+        clinical_history=(clinical_history or "").strip() or None,
+        email=(email or "").strip() or None,
+    )
     session.add(minor)
     session.flush()
     _audit(session, actor, "minor_created", f"Expediente: {minor.id}")
