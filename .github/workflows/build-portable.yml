@@ -25,7 +25,8 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
           QT_QPA_PLATFORM: "offscreen"
-        run: python -m pytest
+          PYTHONFAULTHANDLER: "1"
+        run: python -X faulthandler -m pytest -s
       - name: Build onedir portable application
         run: pyinstaller --clean --noconfirm GestionCentro.spec
       - name: Verify packaged resources
