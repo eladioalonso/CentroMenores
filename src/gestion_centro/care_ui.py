@@ -171,22 +171,61 @@ class EducationDialog(StaySelectorDialog):
         if not goal_id:
             QMessageBox.information(self, "Selecciona", "Selecciona un objetivo.")
             return
-        category, ok = QInputDialog.getItem(self, "Seguimiento", "Área:",
-            ["Autonomía", "Convivencia", "Emocional", "Social", "Aprendizaje", "Hábitos de salud", "Otra"], 0, False)
-        if not ok: return
-        mapping = {"Autonomía":"autonomy","Convivencia":"coexistence","Emocional":"emotional",
-                   "Social":"social","Aprendizaje":"learning","Hábitos de salud":"health_habits","Otra":"other"}
-        fields = []
-        for prompt in ["Observación objetiva:", "Actuaciones realizadas:", "Respuesta observada:", "Seguimiento pendiente (opcional):"]:
-            value, ok = QInputDialog.getMultiLineText(self, "Seguimiento educativo", prompt)
-            if not ok: return
-            fields.append(value)
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Nuevo seguimiento educativo")
+        dialog.resize(620, 560)
+        layout = QVBoxLayout(dialog)
+        form = QFormLayout()
+        category = QComboBox()
+        mapping = [
+            ("Autonomía", "autonomy"), ("Convivencia", "coexistence"),
+            ("Emocional", "emotional"), ("Social", "social"),
+            ("Aprendizaje", "learning"), ("Hábitos de salud", "health_habits"),
+            ("Otra", "other"),
+        ]
+        for label, value in mapping:
+            category.addItem(label, value)
+        observation = QTextEdit()
+        observation.setPlaceholderText("Describe hechos observables, evitando interpretaciones.")
+        actions = QTextEdit()
+        actions.setPlaceholderText("Indica qué actuaciones se realizaron.")
+        response = QTextEdit()
+        response.setPlaceholderText("Describe la respuesta observada.")
+        follow_up = QTextEdit()
+        follow_up.setPlaceholderText("Opcional: qué queda pendiente y cuándo revisarlo.")
+        for widget in (observation, actions, response):
+            widget.setMinimumHeight(75)
+        follow_up.setMinimumHeight(60)
+        form.addRow("Área", category)
+        form.addRow("Observación objetiva", observation)
+        form.addRow("Actuaciones realizadas", actions)
+        form.addRow("Respuesta observada", response)
+        form.addRow("Seguimiento pendiente (opcional)", follow_up)
+        layout.addLayout(form)
+        buttons = QHBoxLayout()
+        save = QPushButton("Guardar seguimiento")
+        cancel = QPushButton("Cancelar")
+        save.clicked.connect(dialog.accept)
+        cancel.clicked.connect(dialog.reject)
+        buttons.addWidget(save)
+        buttons.addWidget(cancel)
+        layout.addLayout(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
         try:
             with session_scope(self.factory) as session:
-                add_education_update(session, actor_account_id=self.actor_id, goal_id=goal_id,
-                    category=mapping[category], objective_description=fields[0],
-                    actions_taken=fields[1], response_observed=fields[2], follow_up=fields[3])
+                add_education_update(
+                    session, actor_account_id=self.actor_id, goal_id=goal_id,
+                    category=category.currentData(),
+                    objective_description=observation.toPlainText(),
+                    actions_taken=actions.toPlainText(),
+                    response_observed=response.toPlainText(),
+                    follow_up=follow_up.toPlainText(),
+                )
             QMessageBox.information(self, "Guardado", "Seguimiento añadido al historial.")
+            self.refresh()
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo guardar", str(exc))
 
