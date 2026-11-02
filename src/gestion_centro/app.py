@@ -42,6 +42,7 @@ from gestion_centro.care_ui import EducationDialog, HealthDialog
 from gestion_centro.expedientes_ui import ExpedientesDialog
 from gestion_centro.maintenance_ui import MaintenanceDialog
 from gestion_centro.reports_ui import ReportsDialog
+from gestion_centro.external_reports_ui import ExternalReportsDialog
 from gestion_centro.diary_ui import DiaryDialog
 from gestion_centro.calendar_ui import CalendarDialog
 from gestion_centro.help_ui import HelpDialog
@@ -798,6 +799,9 @@ class MainWindow(QMainWindow):
             communications = QPushButton("Comunicaciones internas")
             communications.clicked.connect(lambda: CommunicationsDialog(factory, account_id).exec())
             layout.addWidget(communications)
+            external_reports = QPushButton("Informes externos")
+            external_reports.clicked.connect(lambda: ExternalReportsDialog(factory, account_id).exec())
+            layout.addWidget(external_reports)
         notice = QLabel(
             "Núcleo técnico en desarrollo. Todavía no está habilitado para introducir datos reales "
             "de menores ni para uso asistencial."
