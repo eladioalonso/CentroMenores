@@ -6,9 +6,17 @@ from gestion_centro.app import MainWindow, CredentialsDialog
 from gestion_centro.auth.service import Role
 
 
+# Mantener viva la envoltura Python de QApplication durante toda la suite.
+# Si solo se conserva la instancia C++ de Qt, su destrucción al finalizar
+# puede provocar una salida anómala del intérprete en Windows.
+_APP: QApplication | None = None
+
+
 def _application() -> QApplication:
-    app = QApplication.instance()
-    return app if app is not None else QApplication([])
+    global _APP
+    if _APP is None:
+        _APP = QApplication.instance() or QApplication([])
+    return _APP
 
 
 def _window(role: Role) -> MainWindow:
