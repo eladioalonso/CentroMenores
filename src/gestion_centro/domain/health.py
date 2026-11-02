@@ -37,6 +37,17 @@ class MedicationPlan(Base):
     recorded_by_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
     administrations: Mapped[list[MedicationAdministration]] = relationship(back_populates="plan", order_by="MedicationAdministration.scheduled_at")
+    schedules: Mapped[list[MedicationSchedule]] = relationship(back_populates="plan", cascade="all, delete-orphan", order_by="MedicationSchedule.time_of_day")
+
+class MedicationSchedule(Base):
+    """Hora diaria explícita de una pauta, transcrita desde la prescripción."""
+    __tablename__ = "medication_schedules"
+    __table_args__ = (Index("ix_medication_schedules_plan_shift", "plan_id", "shift"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    plan_id: Mapped[str] = mapped_column(ForeignKey("medication_plans.id"), nullable=False)
+    time_of_day: Mapped[str] = mapped_column(String(5), nullable=False)
+    shift: Mapped[str] = mapped_column(String(16), nullable=False)
+    plan: Mapped[MedicationPlan] = relationship(back_populates="schedules")
 
 class MedicationAdministration(Base):
     __tablename__ = "medication_administrations"
