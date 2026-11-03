@@ -51,6 +51,50 @@ def create_minor(
     return minor
 
 
+
+def update_minor_personal_data(
+    session: Session, *, actor_account_id: str, minor_id: str,
+    given_names: str, family_names: str, birth_country: str | None = None,
+    locality: str | None = None, nationality: str | None = None,
+    birth_date: date | None = None, nif_nie: str | None = None,
+    passport_number: str | None = None, address: str | None = None,
+    email: str | None = None,
+) -> Minor:
+    """Actualiza datos identificativos y deja constancia auditable del cambio."""
+    actor = _active_author(session, actor_account_id)
+    minor = session.get(Minor, minor_id)
+    if minor is None:
+        raise ValueError("El expediente no existe")
+    if not given_names.strip() or not family_names.strip():
+        raise ValueError("El nombre y los apellidos son obligatorios")
+    if birth_date and birth_date > date.today():
+        raise ValueError("La fecha de nacimiento no puede ser futura")
+    clean_email = (email or "").strip() or None
+    if clean_email and ("@" not in clean_email or clean_email.startswith("@") or clean_email.endswith("@")):
+        raise ValueError("El correo electrónico no tiene un formato válido")
+    values = {
+        "given_names": given_names.strip(),
+        "family_names": family_names.strip(),
+        "birth_country": (birth_country or "").strip() or None,
+        "locality": (locality or "").strip() or None,
+        "nationality": (nationality or "").strip() or None,
+        "birth_date": birth_date,
+        "nif_nie": (nif_nie or "").strip().upper() or None,
+        "passport_number": (passport_number or "").strip() or None,
+        "address": (address or "").strip() or None,
+        "email": clean_email,
+    }
+    changed = [name for name, value in values.items() if getattr(minor, name) != value]
+    if not changed:
+        return minor
+    for name, value in values.items():
+        setattr(minor, name, value)
+    minor.updated_at = datetime.now(timezone.utc)
+    _audit(session, actor, "minor_personal_data_updated",
+        f"Expediente: {minor.id}; campos modificados: {', '.join(changed)}")
+    return minor
+
+
 def open_stay(session: Session, *, actor_account_id: str, minor_id: str, started_on: date) -> Stay:
     actor = _active_author(session, actor_account_id)
     minor = session.get(Minor, minor_id)
