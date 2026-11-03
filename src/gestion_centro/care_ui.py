@@ -707,9 +707,6 @@ class HealthDialog(StaySelectorDialog):
                     medication_name=medication.text().strip(), prescribed_dose=dose.text().strip(),
                     schedule_text=instructions.toPlainText().strip(),
                     prescriber_reference=reference.text().strip(), starts_on=date.today(),
-                )
-                set_medication_schedules(
-                    session, actor_account_id=self.actor_id, plan_id=plan.id,
                     schedules=parsed_schedules,
                 )
             self.refresh()
