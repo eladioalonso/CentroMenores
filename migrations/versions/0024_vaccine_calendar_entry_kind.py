@@ -13,12 +13,11 @@ ACCELERATED_EDITION_ID = str(uuid5(NAMESPACE_URL, "melilla-accelerated-2025"))
 
 
 def upgrade():
-    with op.batch_alter_table("vaccine_calendar_items") as batch_op:
-        batch_op.add_column(
-            sa.Column("entry_kind", sa.String(length=16), nullable=False, server_default="dose")
-        )
-    # El calendario acelerado se almacena como secuencia completa por grupo de edad,
-    # no como una fila por dosis individual.
+    # SQLite admite ADD COLUMN sin reconstruir la tabla referenciada por revisiones.
+    op.add_column(
+        "vaccine_calendar_items",
+        sa.Column("entry_kind", sa.String(length=16), nullable=False, server_default="dose"),
+    )
     op.execute(
         sa.text(
             "UPDATE vaccine_calendar_items SET entry_kind = 'schedule' "
@@ -28,5 +27,4 @@ def upgrade():
 
 
 def downgrade():
-    with op.batch_alter_table("vaccine_calendar_items") as batch_op:
-        batch_op.drop_column("entry_kind")
+    op.drop_column("vaccine_calendar_items", "entry_kind")
