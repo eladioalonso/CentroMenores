@@ -273,14 +273,19 @@ def record_medication_administration(session: Session, *, actor_account_id: str,
 
 def add_vaccine_record(session: Session, *, actor_account_id: str, vaccine_name: str,
                        administered_on: date, minor_id: str | None = None, stay_id: str | None = None,
-                       dose_reference: str | None = None):
+                       dose_reference: str | None = None, calendar_item_id: str | None = None):
+    from gestion_centro.domain.health import VaccineCalendarItem
     actor=_actor(session,actor_account_id); minor, stay = _resolve_minor(session,minor_id=minor_id,stay_id=stay_id)
     if not vaccine_name.strip(): raise ValueError("La vacuna es obligatoria")
     if administered_on > date.today():
         raise ValueError("La fecha de administración no puede ser futura")
+    if calendar_item_id:
+        item = session.get(VaccineCalendarItem, calendar_item_id)
+        if item is None or item.entry_kind != "dose":
+            raise ValueError("La referencia del calendario no es una dosis individual válida")
     # El registro vacunal pertenece al expediente permanente del menor.
     # Solo se vincula a una estancia cuando se indica expresamente.
-    record=VaccineRecord(minor_id=minor.id,stay_id=stay_id,
+    record=VaccineRecord(minor_id=minor.id,stay_id=stay_id, calendar_item_id=calendar_item_id,
         vaccine_name=vaccine_name.strip(),administered_on=administered_on,dose_reference=dose_reference,
         recorded_by_account_id=actor.id,recorded_by_name_snapshot=actor.professional.display_name)
     session.add(record); session.flush()
@@ -394,6 +399,13 @@ def record_vaccine_dose_review(session: Session, *, actor_account_id: str, minor
             raise ValueError("La administración no pertenece al expediente seleccionado")
         if status != "administered":
             raise ValueError("Una administración vinculada debe figurar como administrada")
+        if calendar_item_id and record.calendar_item_id != calendar_item_id:
+            raise ValueError("La administración no está vinculada a la dosis seleccionada; no se puede asumir esa correspondencia")
+        if record.calendar_item_id and not calendar_item_id:
+            linked_item = session.get(VaccineCalendarItem, record.calendar_item_id)
+            if linked_item is None or linked_item.category != category:
+                raise ValueError("La categoría no coincide con la dosis vinculada a la administración")
+            calendar_item_id = linked_item.id
     review = VaccineDoseReview(
         minor_id=minor.id, calendar_item_id=calendar_item_id,
         vaccine_record_id=vaccine_record_id, category=category, status=status,
