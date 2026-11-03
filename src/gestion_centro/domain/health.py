@@ -147,7 +147,6 @@ class VaccineDoseReview(Base):
     __tablename__ = "vaccine_dose_reviews"
     __table_args__ = (
         Index("ix_vaccine_dose_reviews_minor_status", "minor_id", "status"),
-        UniqueConstraint("minor_id", "calendar_item_id", name="uq_vaccine_review_minor_item"),
     )
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     minor_id: Mapped[str] = mapped_column(ForeignKey("minors.id"), nullable=False)
