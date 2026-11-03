@@ -2,7 +2,7 @@
 from __future__ import annotations
 from datetime import date, datetime, timezone
 from uuid import uuid4
-from sqlalchemy import Date, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, Index, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from gestion_centro.persistence.base import Base
 
@@ -21,6 +21,20 @@ class HealthProfile(Base):
     updated_by_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
     updated_by_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
+class HealthProfileVersion(Base):
+    """Instantánea inmutable de cada versión de la ficha sanitaria general."""
+    __tablename__ = "health_profile_versions"
+    __table_args__ = (Index("ix_health_profile_versions_minor_changed", "minor_id", "changed_at"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    minor_id: Mapped[str] = mapped_column(ForeignKey("minors.id"), nullable=False)
+    profile_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    changed_by_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
+    changed_by_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    old_values: Mapped[dict] = mapped_column(JSON, nullable=False)
+    new_values: Mapped[dict] = mapped_column(JSON, nullable=False)
 
 class MedicationPlan(Base):
     __tablename__ = "medication_plans"
