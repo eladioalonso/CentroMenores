@@ -948,7 +948,134 @@ def main() -> int:
     qt_args = [arg for arg in sys.argv if arg != "--demo"]
     app = QApplication(qt_args)
     app.setApplicationName("Gestión del Centro")
-    app.setFont(QFont("Segoe UI", 11))
+    app.setFont(QFont("Segoe UI", 10))
+    app.setStyleSheet("""
+        QWidget {
+            color: #243247;
+            font-family: "Segoe UI";
+            font-size: 10pt;
+        }
+        QMainWindow, QDialog, QWidget#centralwidget {
+            background: #F4F7FB;
+        }
+        QDialog {
+            background: #F7F9FC;
+        }
+        QLabel {
+            background: transparent;
+        }
+        QTabWidget::pane {
+            border: 1px solid #DCE4EE;
+            border-radius: 8px;
+            background: #FFFFFF;
+            top: -1px;
+        }
+        QTabBar::tab {
+            background: #EAF0F6;
+            color: #53657B;
+            border: 1px solid #DCE4EE;
+            padding: 9px 16px;
+            margin-right: 3px;
+            border-top-left-radius: 7px;
+            border-top-right-radius: 7px;
+        }
+        QTabBar::tab:selected {
+            background: #FFFFFF;
+            color: #175C8E;
+            border-bottom-color: #FFFFFF;
+            font-weight: 600;
+        }
+        QLineEdit, QTextEdit, QPlainTextEdit, QComboBox, QDateEdit,
+        QDateTimeEdit, QSpinBox, QDoubleSpinBox {
+            background: #FFFFFF;
+            border: 1px solid #CBD6E2;
+            border-radius: 6px;
+            padding: 7px 9px;
+            selection-background-color: #B8D8F0;
+        }
+        QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QDateEdit:focus,
+        QDateTimeEdit:focus {
+            border: 1px solid #3985B8;
+        }
+        QComboBox::drop-down {
+            border: 0;
+            width: 25px;
+        }
+        QPushButton {
+            background: #E8F0F7;
+            color: #234E70;
+            border: 1px solid #D2DFEA;
+            border-radius: 6px;
+            padding: 8px 13px;
+            min-height: 18px;
+            font-weight: 600;
+        }
+        QPushButton:hover {
+            background: #DCEAF5;
+            border-color: #AFC9DD;
+        }
+        QPushButton:pressed {
+            background: #C9DFEF;
+        }
+        QPushButton:disabled {
+            background: #EEF1F4;
+            color: #98A4B1;
+        }
+        QTableWidget, QTableView, QTreeWidget, QListWidget {
+            background: #FFFFFF;
+            alternate-background-color: #F6F9FC;
+            border: 1px solid #DCE4EE;
+            border-radius: 7px;
+            gridline-color: #E9EEF4;
+            selection-background-color: #DCECF8;
+            selection-color: #183B56;
+        }
+        QHeaderView::section {
+            background: #EDF2F7;
+            color: #42566D;
+            border: 0;
+            border-bottom: 1px solid #DCE4EE;
+            padding: 9px 7px;
+            font-weight: 600;
+        }
+        QTableWidget::item {
+            padding: 5px;
+            border-bottom: 1px solid #EEF2F6;
+        }
+        QGroupBox {
+            background: #FFFFFF;
+            border: 1px solid #DCE4EE;
+            border-radius: 8px;
+            margin-top: 12px;
+            padding: 12px;
+            font-weight: 600;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 12px;
+            padding: 0 5px;
+            color: #385B78;
+        }
+        QScrollBar:vertical {
+            background: #F1F4F8;
+            width: 11px;
+            margin: 2px;
+        }
+        QScrollBar::handle:vertical {
+            background: #C5D1DD;
+            min-height: 24px;
+            border-radius: 5px;
+        }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+            height: 0;
+        }
+        QToolTip {
+            background: #26384A;
+            color: #FFFFFF;
+            border: 0;
+            padding: 5px 7px;
+        }
+    """)
     if demo_mode:
         demo_root = (Path(sys.executable).resolve().parent / "demo_data"
                      if getattr(sys, "frozen", False)
