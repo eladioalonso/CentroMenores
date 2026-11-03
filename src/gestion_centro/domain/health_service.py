@@ -292,3 +292,126 @@ def list_medication_plans(session: Session, *, actor_account_id: str,
     actor=_actor(session,actor_account_id); minor, _ = _resolve_minor(session,minor_id=minor_id,stay_id=stay_id)
     _audit(session,actor,"medication_plans_accessed",minor.id)
     return session.scalars(select(MedicationPlan).where(MedicationPlan.minor_id==minor.id).order_by(MedicationPlan.starts_on.desc())).all()
+
+
+VACCINE_CATEGORIES = {"systematic", "catch_up", "risk", "campaign", "passive_immunization"}
+VACCINE_REVIEW_STATUSES = {
+    "unverified", "pending_confirmed", "administered", "deferred",
+    "not_administered", "not_applicable",
+}
+
+
+def create_vaccine_calendar_edition(session: Session, *, actor_account_id: str,
+                                    jurisdiction: str, edition_code: str, title: str,
+                                    effective_from: date, source_title: str,
+                                    source_reference: str, source_url: str,
+                                    effective_until: date | None = None):
+    """Registra una fuente/version documental; no la activa como pauta clínica."""
+    from gestion_centro.domain.health import VaccineCalendarEdition
+    actor = _actor(session, actor_account_id)
+    values = (jurisdiction, edition_code, title, source_title, source_reference, source_url)
+    if not all(value and value.strip() for value in values):
+        raise ValueError("Jurisdicción, edición, título y referencia documental son obligatorios")
+    if effective_until and effective_until < effective_from:
+        raise ValueError("La vigencia final precede a la inicial")
+    edition = VaccineCalendarEdition(
+        jurisdiction=jurisdiction.strip(), edition_code=edition_code.strip(),
+        title=title.strip(), effective_from=effective_from, effective_until=effective_until,
+        source_title=source_title.strip(), source_reference=source_reference.strip(),
+        source_url=source_url.strip(), status="documentary",
+    )
+    session.add(edition)
+    session.flush()
+    _audit(session, actor, "vaccine_calendar_edition_created", f"{edition.jurisdiction}:{edition.edition_code}")
+    return edition
+
+
+def add_vaccine_calendar_item(session: Session, *, actor_account_id: str, edition_id: str,
+                              vaccine_code: str, display_name: str, dose_label: str,
+                              target_age_text: str, category: str = "systematic",
+                              documentary_note: str | None = None, source_page: str | None = None):
+    from gestion_centro.domain.health import VaccineCalendarEdition, VaccineCalendarItem
+    actor = _actor(session, actor_account_id)
+    edition = session.get(VaccineCalendarEdition, edition_id)
+    if edition is None:
+        raise ValueError("La edición del calendario no existe")
+    if category not in VACCINE_CATEGORIES:
+        raise ValueError("Categoría vacunal no válida")
+    if not all(value and value.strip() for value in (vaccine_code, display_name, dose_label, target_age_text)):
+        raise ValueError("Código, vacuna, dosis y edad de referencia son obligatorios")
+    item = VaccineCalendarItem(
+        edition_id=edition.id, vaccine_code=vaccine_code.strip(),
+        display_name=display_name.strip(), dose_label=dose_label.strip(),
+        target_age_text=target_age_text.strip(), category=category,
+        documentary_note=documentary_note.strip() if documentary_note else None,
+        source_page=source_page.strip() if source_page else None,
+    )
+    session.add(item)
+    session.flush()
+    _audit(session, actor, "vaccine_calendar_item_created", f"{edition.id}:{item.id}")
+    return item
+
+
+def list_vaccine_calendar_items(session: Session, *, actor_account_id: str, edition_id: str):
+    from gestion_centro.domain.health import VaccineCalendarEdition, VaccineCalendarItem
+    actor = _actor(session, actor_account_id)
+    if session.get(VaccineCalendarEdition, edition_id) is None:
+        raise ValueError("La edición del calendario no existe")
+    _audit(session, actor, "vaccine_calendar_accessed", edition_id)
+    return session.scalars(
+        select(VaccineCalendarItem).where(VaccineCalendarItem.edition_id == edition_id)
+        .order_by(VaccineCalendarItem.target_age_text, VaccineCalendarItem.vaccine_code, VaccineCalendarItem.dose_label)
+    ).all()
+
+
+def record_vaccine_dose_review(session: Session, *, actor_account_id: str, minor_id: str,
+                               rationale: str, status: str = "unverified",
+                               calendar_item_id: str | None = None,
+                               vaccine_record_id: str | None = None,
+                               category: str = "systematic", target_date: date | None = None,
+                               notes: str | None = None):
+    """Guarda una revisión humana individual; nunca deriva dosis desde edad/cohorte."""
+    from gestion_centro.domain.health import VaccineCalendarItem, VaccineDoseReview
+    actor = _actor(session, actor_account_id)
+    minor, _ = _resolve_minor(session, minor_id=minor_id)
+    if status not in VACCINE_REVIEW_STATUSES:
+        raise ValueError("Estado de revisión vacunal no válido")
+    if category not in VACCINE_CATEGORIES:
+        raise ValueError("Categoría vacunal no válida")
+    if not rationale or not rationale.strip():
+        raise ValueError("La revisión debe indicar su fundamento y quién la ha confirmado")
+    if calendar_item_id:
+        item = session.get(VaccineCalendarItem, calendar_item_id)
+        if item is None:
+            raise ValueError("La referencia del calendario no existe")
+        if item.category != category:
+            raise ValueError("La categoría no coincide con la referencia del calendario")
+    if vaccine_record_id:
+        record = session.get(VaccineRecord, vaccine_record_id)
+        if record is None or record.minor_id != minor.id:
+            raise ValueError("La administración no pertenece al expediente seleccionado")
+        if status != "administered":
+            raise ValueError("Una administración vinculada debe figurar como administrada")
+    review = VaccineDoseReview(
+        minor_id=minor.id, calendar_item_id=calendar_item_id,
+        vaccine_record_id=vaccine_record_id, category=category, status=status,
+        target_date=target_date, reviewed_by_account_id=actor.id,
+        reviewed_by_name_snapshot=actor.professional.display_name,
+        reviewed_at=datetime.now(timezone.utc), rationale=rationale.strip(),
+        notes=notes.strip() if notes else None,
+    )
+    session.add(review)
+    session.flush()
+    _audit(session, actor, "vaccine_dose_review_recorded", f"{minor.id}:{review.id}:{status}")
+    return review
+
+
+def list_vaccine_dose_reviews(session: Session, *, actor_account_id: str, minor_id: str):
+    from gestion_centro.domain.health import VaccineDoseReview
+    actor = _actor(session, actor_account_id)
+    minor, _ = _resolve_minor(session, minor_id=minor_id)
+    _audit(session, actor, "vaccine_dose_reviews_accessed", minor.id)
+    return session.scalars(
+        select(VaccineDoseReview).where(VaccineDoseReview.minor_id == minor.id)
+        .order_by(VaccineDoseReview.target_date, VaccineDoseReview.created_at)
+    ).all()
