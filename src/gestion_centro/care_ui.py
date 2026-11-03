@@ -380,6 +380,12 @@ class HealthDialog(StaySelectorDialog):
             if index >= 0:
                 self.stay.setCurrentIndex(index)
         self.resize(1050, 720)
+        self.resident_context = QLabel("Selecciona un residente para consultar su información sanitaria.")
+        self.resident_context.setWordWrap(True)
+        self.resident_context.setStyleSheet(
+            "background: #EAF2F8; color: #31536F; padding: 9px 12px; border-radius: 6px; font-weight: 600;"
+        )
+        self.body.addWidget(self.resident_context)
         self.tabs = QTabWidget()
         self.body.addWidget(self.tabs)
 
@@ -401,11 +407,13 @@ class HealthDialog(StaySelectorDialog):
 
         medication_tab = QWidget()
         medication_layout = QVBoxLayout(medication_tab)
-        self.plans = QTableWidget(0, 4)
-        self.plans.setHorizontalHeaderLabels(["Medicamento", "Dosis prescrita", "Pauta", "Vigencia"])
+        self.plans = QTableWidget(0, 5)
+        self.plans.setHorizontalHeaderLabels(["Medicamento", "Dosis prescrita", "Pauta", "Vigencia", "Ingreso / estado"])
         self.plans.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.plans.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.plans.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.plans.setAlternatingRowColors(True)
+        self.plans.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         medication_layout.addWidget(self.plans)
         plan_actions = QHBoxLayout()
         for label, callback in [("Registrar pauta prescrita", self.add_plan),
@@ -434,6 +442,8 @@ class HealthDialog(StaySelectorDialog):
         self.administrations.setHorizontalHeaderLabels(["Hora prevista", "Turno", "Medicamento", "Dosis", "Estado", "Motivo / nota", "Registrado por"])
         self.administrations.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.administrations.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.administrations.setAlternatingRowColors(True)
+        self.administrations.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         administration_layout.addWidget(self.administrations)
         administer_button = QPushButton("Registrar resultado de administración")
         administer_button.clicked.connect(self.administer)
@@ -446,6 +456,7 @@ class HealthDialog(StaySelectorDialog):
         self.vaccines.setHorizontalHeaderLabels(["Vacuna", "Fecha", "Dosis / referencia"])
         self.vaccines.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.vaccines.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.vaccines.setAlternatingRowColors(True)
         vaccine_layout.addWidget(self.vaccines)
         vaccine_button = QPushButton("Registrar vacuna")
         vaccine_button.clicked.connect(self.add_vaccine)
@@ -460,10 +471,15 @@ class HealthDialog(StaySelectorDialog):
     def refresh(self):
         minor_id = self.stay.currentData()
         if not minor_id:
+            self.resident_context.setText("Selecciona un residente para consultar su información sanitaria.")
             self.allergies.clear(); self.conditions.clear(); self.emergency.clear()
             self.plans.setRowCount(0); self.administrations.setRowCount(0); self.vaccines.setRowCount(0)
             return
         with session_scope(self.factory) as session:
+            minor = session.get(Minor, minor_id)
+            active_stay = session.scalar(select(Stay).where(
+                Stay.minor_id == minor_id, Stay.status == "active"
+            ))
             profile = read_health_profile(session, actor_account_id=self.actor_id, minor_id=minor_id)
             plans = list_medication_plans(session, actor_account_id=self.actor_id, minor_id=minor_id)
             vaccine_rows = session.scalars(
@@ -474,11 +490,33 @@ class HealthDialog(StaySelectorDialog):
                 session, actor_account_id=self.actor_id, minor_id=minor_id,
                 day=self.admin_day.date().toPython()
             )
+            stay_labels = {}
+            for plan in plans:
+                stay = session.get(Stay, plan.stay_id) if plan.stay_id else None
+                if stay is None:
+                    stay_labels[plan.id] = "Sin ingreso asociado · Histórica"
+                elif stay.status == "active":
+                    stay_labels[plan.id] = f"Ingreso actual · desde {stay.started_on:%d/%m/%Y}"
+                else:
+                    stay_labels[plan.id] = f"Ingreso cerrado · desde {stay.started_on:%d/%m/%Y}"
+                if not plan.active:
+                    stay_labels[plan.id] += " · Pauta inactiva"
             administration_rows = [
                 row for row in daily_rows
                 if self.admin_shift_filter.currentData() is None
                 or row[1].shift == self.admin_shift_filter.currentData()
             ]
+        resident_name = f"{minor.internal_code} · {minor.given_names} {minor.family_names}"
+        if active_stay:
+            self.resident_context.setText(
+                f"{resident_name}  |  Ingreso activo desde {active_stay.started_on:%d/%m/%Y}  |  "
+                "Las pautas de otros ingresos se muestran solo como historial."
+            )
+        else:
+            self.resident_context.setText(
+                f"{resident_name}  |  Sin ingreso activo  |  Consulta histórica disponible; "
+                "no se pueden registrar administraciones de medicación."
+            )
         self.allergies.setPlainText((profile.allergies or "") if profile else "")
         self.conditions.setPlainText((profile.relevant_conditions or "") if profile else "")
         self.emergency.setPlainText((profile.emergency_instructions or "") if profile else "")
@@ -488,6 +526,7 @@ class HealthDialog(StaySelectorDialog):
                 plan.medication_name, plan.prescribed_dose, plan.schedule_text,
                 f"{plan.starts_on:%d/%m/%Y} – {plan.ends_on:%d/%m/%Y}"
                 if plan.ends_on else "Sin fecha final",
+                stay_labels.get(plan.id, "—"),
             ]
             for col, value in enumerate(values):
                 cell = QTableWidgetItem(value)
