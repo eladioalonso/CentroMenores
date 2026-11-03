@@ -490,9 +490,9 @@ class HealthDialog(StaySelectorDialog):
         )
         vaccine_hint.setWordWrap(True)
         vaccine_layout.addWidget(vaccine_hint)
-        self.vaccine_reviews = QTableWidget(0, 6)
+        self.vaccine_reviews = QTableWidget(0, 7)
         self.vaccine_reviews.setHorizontalHeaderLabels(
-            ["Vacuna / referencia", "Categoría", "Estado", "Fecha orientativa", "Revisado por", "Fundamento"]
+            ["Vacuna / referencia", "Categoría", "Estado", "Fecha orientativa", "Fecha de revisión", "Revisado por", "Fundamento"]
         )
         self.vaccine_reviews.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.vaccine_reviews.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -639,6 +639,7 @@ class HealthDialog(StaySelectorDialog):
                  "administered": "Administrada", "deferred": "Aplazada",
                  "not_administered": "No administrada", "not_applicable": "No aplicable"}.get(review.status, review.status),
                 review.target_date.strftime("%d/%m/%Y") if review.target_date else "—",
+                review.reviewed_at.strftime("%d/%m/%Y %H:%M"),
                 review.reviewed_by_name_snapshot,
                 review.rationale,
             ]
