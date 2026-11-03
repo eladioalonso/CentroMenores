@@ -28,7 +28,9 @@ def _resolve_minor(session: Session, *, minor_id: str | None = None, stay_id: st
         minor=None
     if minor is None:
         raise ValueError("El residente no existe")
-    stay = session.get(Stay, stay_id) if stay_id else None
+    stay = session.get(Stay, stay_id) if stay_id else session.scalar(
+        select(Stay).where(Stay.minor_id == minor.id, Stay.status == "active")
+    )
     if stay is not None and stay.minor_id != minor.id:
         raise ValueError("La estancia seleccionada no pertenece al residente")
     return minor, stay
