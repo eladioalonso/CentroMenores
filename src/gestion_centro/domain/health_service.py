@@ -63,17 +63,28 @@ def save_health_profile(session: Session, *, actor_account_id: str, allergies: s
         "relevant_conditions": relevant_conditions.strip() if relevant_conditions else None,
         "emergency_instructions": emergency_instructions.strip() if emergency_instructions else None,
     }
-    if profile is None:
-        profile=HealthProfile(minor_id=minor.id,stay_id=stay.id if stay else None); session.add(profile)
-        session.flush()
     if old_values != new_values:
         changed_at = datetime.now(timezone.utc)
-        profile.allergies = new_values["allergies"]
-        profile.relevant_conditions = new_values["relevant_conditions"]
-        profile.emergency_instructions = new_values["emergency_instructions"]
-        profile.updated_by_account_id=actor.id
-        profile.updated_by_name_snapshot=actor.professional.display_name
-        profile.updated_at=changed_at
+        if profile is None:
+            profile = HealthProfile(
+                minor_id=minor.id,
+                stay_id=stay.id if stay else None,
+                allergies=new_values["allergies"],
+                relevant_conditions=new_values["relevant_conditions"],
+                emergency_instructions=new_values["emergency_instructions"],
+                updated_by_account_id=actor.id,
+                updated_by_name_snapshot=actor.professional.display_name,
+                updated_at=changed_at,
+            )
+            session.add(profile)
+            session.flush()
+        else:
+            profile.allergies = new_values["allergies"]
+            profile.relevant_conditions = new_values["relevant_conditions"]
+            profile.emergency_instructions = new_values["emergency_instructions"]
+            profile.updated_by_account_id = actor.id
+            profile.updated_by_name_snapshot = actor.professional.display_name
+            profile.updated_at = changed_at
         session.add(HealthProfileVersion(
             minor_id=minor.id, profile_id=profile.id,
             changed_by_account_id=actor.id,
