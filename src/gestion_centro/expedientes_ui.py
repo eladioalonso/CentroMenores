@@ -340,6 +340,19 @@ class MinorWorkspaceDialog(QDialog):
             birth.setSpecialValueText('No indicada')
             birth.setDate(QDate(minor.birth_date.year, minor.birth_date.month, minor.birth_date.day) if minor.birth_date else birth.minimumDate())
             personal_form.addRow('Fecha de nacimiento', birth)
+            age_label = QLabel(str(minor.age) if minor.age is not None else '—')
+            personal_form.addRow('Edad (calculada)', age_label)
+            def refresh_age(selected):
+                if selected <= birth.minimumDate():
+                    age_label.setText('—')
+                    return
+                today = QDate.currentDate()
+                years = today.year() - selected.year() - (
+                    (today.month(), today.day()) < (selected.month(), selected.day())
+                )
+                age_label.setText(str(years))
+            birth.dateChanged.connect(refresh_age)
+            refresh_age(birth.date())
             expiry = QDateEdit()
             expiry.setCalendarPopup(True)
             expiry.setDisplayFormat('dd/MM/yyyy')
