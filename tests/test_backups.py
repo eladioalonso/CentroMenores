@@ -103,3 +103,35 @@ def test_restore_refuses_different_schema_without_replacing_live_database(tmp_pa
     with pytest.raises(ValueError, match="versión de esquema"):
         restore_backup(paths, archive)
     assert (paths.documents / "sample.pdf").read_bytes() == before
+
+
+def test_restore_rolls_back_documents_and_images_if_database_swap_fails(tmp_path, monkeypatch):
+    from gestion_centro.persistence import backups
+
+    paths = prepare_paths(tmp_path / "portable")
+    archive = create_backup(paths, kind="manual",
+        now=datetime(2026, 5, 6, tzinfo=timezone.utc))
+    (paths.documents / "sample.pdf").write_bytes(b"current document")
+    (paths.images / "sample.png").write_bytes(b"current image")
+
+    real_replace = backups.os.replace
+    failed = False
+
+    def fail_database_install(source, destination):
+        nonlocal failed
+        if Path(destination) == paths.database and not failed:
+            failed = True
+            raise OSError("fallo simulado al instalar la base")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(backups.os, "replace", fail_database_install)
+
+    import pytest
+    with pytest.raises(OSError, match="fallo simulado"):
+        restore_backup(paths, archive)
+
+    assert failed
+    assert (paths.documents / "sample.pdf").read_bytes() == b"current document"
+    assert (paths.images / "sample.png").read_bytes() == b"current image"
+    with closing(sqlite3.connect(paths.database)) as connection:
+        assert connection.execute("SELECT value FROM sample").fetchone() == ("fictitious",)
