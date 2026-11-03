@@ -12,7 +12,7 @@ def test_upgrade_creates_versioned_auth_schema(tmp_path):
         for item in inspector.get_unique_constraints("vaccine_dose_reviews")
     )
     columns = {column["name"]: column for column in inspector.get_columns("vaccine_calendar_items")}
-    assert columns["dose_label"]["type"].length == 240
+    assert columns["dose_label"]["type"].length == 80  # SQLite no aplica límites VARCHAR; el servicio valida 240.
     assert "entry_kind" in columns
     vaccine_record_columns = {column["name"] for column in inspector.get_columns("vaccine_records")}
     assert "calendar_item_id" in vaccine_record_columns
