@@ -103,6 +103,7 @@ class VaccineRecord(Base):
     vaccine_name: Mapped[str] = mapped_column(String(180), nullable=False)
     administered_on: Mapped[date] = mapped_column(Date, nullable=False)
     dose_reference: Mapped[str | None] = mapped_column(String(80))
+    calendar_item_id: Mapped[str | None] = mapped_column(ForeignKey("vaccine_calendar_items.id"))
     source_document_id: Mapped[str | None] = mapped_column(String(36))
     recorded_by_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
     recorded_by_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
