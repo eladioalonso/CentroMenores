@@ -138,3 +138,16 @@ def test_medication_plan_changes_keep_immutable_versions_and_preserve_administra
  # La administración pasada permanece intacta aunque cambie el horario futuro.
  assert s.get(health_models.MedicationAdministration,record.id).status=="administered"
  assert s.get(health_models.MedicationAdministration,record.id).scheduled_at==record.scheduled_at
+
+
+def test_new_medication_plan_starts_with_complete_initial_schedule_version(health_case):
+ s,actor,stay=health_case
+ plan=add_medication_plan(s,actor_account_id=actor,stay_id=stay,
+  medication_name="Tratamiento ficticio",prescribed_dose="1 unidad",
+  schedule_text="Según prescripción",prescriber_reference="Documento ficticio",
+  starts_on=date(2026,1,1),schedules=[("08:00","morning"),("20:00","night")])
+ versions=list_medication_plan_versions(s,actor_account_id=actor,plan_id=plan.id)
+ assert len(versions)==1
+ assert versions[0].old_values=={}
+ assert versions[0].new_values["schedules"]==[
+  {"time":"08:00","shift":"morning"},{"time":"20:00","shift":"night"}]
