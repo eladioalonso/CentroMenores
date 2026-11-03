@@ -1054,8 +1054,10 @@ class HealthDialog(StaySelectorDialog):
             ).all()
             for edition in editions:
                 items = session.scalars(
-                    select(VaccineCalendarItem).where(VaccineCalendarItem.edition_id == edition.id)
-                    .order_by(VaccineCalendarItem.target_age_text, VaccineCalendarItem.display_name)
+                    select(VaccineCalendarItem).where(
+                        VaccineCalendarItem.edition_id == edition.id,
+                        VaccineCalendarItem.entry_kind == "dose",
+                    ).order_by(VaccineCalendarItem.target_age_text, VaccineCalendarItem.display_name)
                 ).all()
                 for catalog_item in items:
                     label = f"{edition.title} · {catalog_item.display_name} · {catalog_item.dose_label} · {catalog_item.target_age_text}"
