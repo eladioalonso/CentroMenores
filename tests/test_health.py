@@ -6,7 +6,7 @@ from gestion_centro.persistence.base import Base
 from gestion_centro.auth.models import Professional, UserAccount, AccessAudit
 from gestion_centro.domain.models import Minor, Stay
 from gestion_centro.domain import health as health_models
-from gestion_centro.domain.health_service import save_health_profile, read_health_profile, add_medication_plan, record_medication_administration, set_medication_schedules, list_daily_medication_schedule
+from gestion_centro.domain.health_service import save_health_profile, read_health_profile, add_medication_plan, record_medication_administration, set_medication_schedules, list_daily_medication_schedule, list_medication_plans, add_vaccine_record
 
 @pytest.fixture
 def health_case():
@@ -51,3 +51,39 @@ def test_medication_schedule_rejects_invalid_or_duplicate_times(health_case):
   set_medication_schedules(s,actor_account_id=actor,plan_id=plan.id,schedules=[("25:00","morning")])
  with pytest.raises(ValueError):
   set_medication_schedules(s,actor_account_id=actor,plan_id=plan.id,schedules=[("08:00","morning"),("08:00","night")])
+
+
+def test_health_profile_and_medication_belong_to_resident_across_closed_stays(health_case):
+ s,actor,stay_id=health_case
+ stay=s.get(Stay,stay_id)
+ minor=s.get(Minor,stay.minor_id)
+ save_health_profile(s,actor_account_id=actor,stay_id=stay_id,
+  allergies="Alergia ficticia",relevant_conditions=None,emergency_instructions=None)
+ plan=add_medication_plan(s,actor_account_id=actor,stay_id=stay_id,
+  medication_name="Tratamiento histórico",prescribed_dose="1 unidad",
+  schedule_text="08:00",prescriber_reference="Prescripción ficticia",starts_on=date(2026,1,1))
+ stay.status="closed"
+ assert read_health_profile(s,actor_account_id=actor,minor_id=minor.id).allergies=="Alergia ficticia"
+ assert [item.id for item in list_medication_plans(s,actor_account_id=actor,minor_id=minor.id)]==[plan.id]
+ # Un reingreso crea una estancia nueva, pero no una segunda ficha ni pierde el plan anterior.
+ new_stay=Stay(minor_id=minor.id,sequence_number=2,started_on=date(2026,2,1),status="active")
+ s.add(new_stay); s.flush()
+ assert read_health_profile(s,actor_account_id=actor,minor_id=minor.id).allergies=="Alergia ficticia"
+ assert [item.id for item in list_medication_plans(s,actor_account_id=actor,minor_id=minor.id)]==[plan.id]
+
+
+def test_health_records_can_be_assigned_to_resident_without_active_stay(health_case):
+ s,actor,stay_id=health_case
+ minor=s.get(Stay,stay_id).minor
+ s.get(Stay,stay_id).status="closed"
+ profile=save_health_profile(s,actor_account_id=actor,minor_id=minor.id,
+  allergies="Dato persistente",relevant_conditions=None,emergency_instructions=None)
+ plan=add_medication_plan(s,actor_account_id=actor,minor_id=minor.id,
+  medication_name="Tratamiento ficticio",prescribed_dose="Según prescripción",
+  schedule_text="Pauta",prescriber_reference="Documento ficticio",starts_on=date(2026,1,1))
+ vaccine=add_vaccine_record(s,actor_account_id=actor,minor_id=minor.id,
+  vaccine_name="Vacuna ficticia",administered_on=date(2026,1,2))
+ assert profile.minor_id==minor.id and profile.stay_id is None
+ assert plan.minor_id==minor.id and plan.stay_id is None
+ assert vaccine.minor_id==minor.id and vaccine.stay_id is None
+ assert len(list_daily_medication_schedule(s,actor_account_id=actor,minor_id=minor.id,day=date(2026,1,2)))==0
