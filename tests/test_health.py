@@ -250,3 +250,31 @@ def test_full_accelerated_schedule_cannot_be_linked_as_one_dose_review(health_ca
    s,actor_account_id=actor,minor_id=minor_id,calendar_item_id=item.id,
    category="catch_up",status="unverified",
    rationale="Revisión ficticia de prueba")
+
+
+def test_vaccine_administration_and_review_must_share_the_same_catalog_dose(health_case):
+ s,actor,stay=health_case
+ minor_id=s.get(Stay,stay).minor_id
+ edition=create_vaccine_calendar_edition(
+  s,actor_account_id=actor,jurisdiction="Melilla",edition_code="2026-link-test",
+  title="Calendario de prueba",effective_from=date(2026,1,1),
+  source_title="Fuente ficticia",source_reference="Tabla de prueba",
+  source_url="https://example.invalid/link")
+ first_item=add_vaccine_calendar_item(
+  s,actor_account_id=actor,edition_id=edition.id,vaccine_code="LINK-1",
+  display_name="Vacuna A",dose_label="Dosis 1",target_age_text="Edad de prueba")
+ second_item=add_vaccine_calendar_item(
+  s,actor_account_id=actor,edition_id=edition.id,vaccine_code="LINK-2",
+  display_name="Vacuna B",dose_label="Dosis 1",target_age_text="Edad de prueba")
+ record=add_vaccine_record(
+  s,actor_account_id=actor,minor_id=minor_id,vaccine_name="Vacuna A",
+  administered_on=date(2026,1,2),calendar_item_id=first_item.id)
+ with pytest.raises(ValueError,match="otra dosis"):
+  record_vaccine_dose_review(
+   s,actor_account_id=actor,minor_id=minor_id,calendar_item_id=second_item.id,
+   vaccine_record_id=record.id,category="systematic",status="administered",
+   rationale="Comprobación ficticia")
+ review=record_vaccine_dose_review(
+  s,actor_account_id=actor,minor_id=minor_id,vaccine_record_id=record.id,
+  category="systematic",status="administered",rationale="Correspondencia confirmada")
+ assert review.calendar_item_id==first_item.id
