@@ -6,7 +6,7 @@ from gestion_centro.persistence.base import Base
 from gestion_centro.auth.models import Professional, UserAccount, AccessAudit
 from gestion_centro.domain.models import Minor, Stay
 from gestion_centro.domain import health as health_models
-from gestion_centro.domain.health_service import save_health_profile, read_health_profile, list_health_profile_versions, add_medication_plan, record_medication_administration, set_medication_schedules, list_daily_medication_schedule, list_medication_plans, add_vaccine_record
+from gestion_centro.domain.health_service import save_health_profile, read_health_profile, list_health_profile_versions, add_medication_plan, record_medication_administration, set_medication_schedules, list_daily_medication_schedule, list_medication_plans, list_medication_plan_versions, add_vaccine_record
 
 @pytest.fixture
 def health_case():
@@ -110,3 +110,31 @@ def test_health_profile_changes_keep_immutable_versions_with_actor_and_before_af
  save_health_profile(s,actor_account_id=actor,minor_id=profile.minor_id,
   allergies="Alergia actualizada",relevant_conditions="Dato inicial",emergency_instructions="Instrucción nueva")
  assert len(list_health_profile_versions(s,actor_account_id=actor,minor_id=profile.minor_id))==2
+
+
+
+def test_medication_plan_changes_keep_immutable_versions_and_preserve_administrations(health_case):
+ s,actor,stay=health_case
+ plan=add_medication_plan(s,actor_account_id=actor,stay_id=stay,
+  medication_name="Tratamiento ficticio",prescribed_dose="1 unidad",
+  schedule_text="Pauta inicial",prescriber_reference="Prescripción ficticia",starts_on=date(2026,1,1))
+ set_medication_schedules(s,actor_account_id=actor,plan_id=plan.id,
+  schedules=[("08:00","morning")])
+ record=record_medication_administration(s,actor_account_id=actor,plan_id=plan.id,
+  scheduled_at=datetime(2026,1,2,8,tzinfo=timezone.utc),status="administered",shift="morning")
+ set_medication_schedules(s,actor_account_id=actor,plan_id=plan.id,
+  schedules=[("09:00","morning"),("20:00","night")])
+ versions=list_medication_plan_versions(s,actor_account_id=actor,plan_id=plan.id)
+ assert len(versions)==3
+ latest=versions[0]
+ assert latest.changed_by_account_id==actor
+ assert latest.old_values["schedules"]==[{"time":"08:00","shift":"morning"}]
+ assert latest.new_values["schedules"]==[
+  {"time":"09:00","shift":"morning"},{"time":"20:00","shift":"night"}]
+ initial=versions[-1]
+ assert initial.old_values=={}
+ assert initial.new_values["medication_name"]=="Tratamiento ficticio"
+ assert initial.new_values["schedules"]==[]
+ # La administración pasada permanece intacta aunque cambie el horario futuro.
+ assert s.get(health_models.MedicationAdministration,record.id).status=="administered"
+ assert s.get(health_models.MedicationAdministration,record.id).scheduled_at==record.scheduled_at
