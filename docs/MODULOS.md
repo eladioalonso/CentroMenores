@@ -203,3 +203,14 @@ La eliminación lógica o física de registros, los plazos de conservación y la
 
 
 > **Especificación vigente:** consultar [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md). Este documento reúne las decisiones aprobadas más recientes y prevalece sobre cualquier apartado anterior que las contradiga.
+
+
+## Revisión individual de vacunación en la ficha sanitaria
+
+La pestaña **Vacunas** del expediente permanente muestra por separado:
+- Administraciones registradas, con fecha real y referencia de dosis.
+- Revisiones profesionales individuales, con categoría, estado, fecha orientativa, profesional y fundamento.
+
+La ausencia de una administración no equivale a una dosis pendiente. El estado «Pendiente confirmado» exige una revisión profesional documentada. El catálogo de calendario es documental y versionado; no genera indicaciones clínicas ni pautas de rescate automáticamente.
+
+Las categorías disponibles separan calendario sistemático, vacunación acelerada, grupos de riesgo, campañas e inmunización pasiva. La administración de vacunas se sigue registrando como un hecho histórico inmutable. Las revisiones no sustituyen el registro de administración ni la validación del profesional sanitario.
