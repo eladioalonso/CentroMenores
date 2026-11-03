@@ -107,3 +107,58 @@ class VaccineRecord(Base):
     recorded_by_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
     recorded_by_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
+class VaccineCalendarEdition(Base):
+    """Edición documental de un calendario; no contiene prescripción ejecutable."""
+    __tablename__ = "vaccine_calendar_editions"
+    __table_args__ = (UniqueConstraint("jurisdiction", "edition_code", name="uq_vaccine_calendar_jurisdiction_edition"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    jurisdiction: Mapped[str] = mapped_column(String(80), nullable=False)
+    edition_code: Mapped[str] = mapped_column(String(40), nullable=False)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    effective_from: Mapped[date] = mapped_column(Date, nullable=False)
+    effective_until: Mapped[date | None] = mapped_column(Date)
+    source_title: Mapped[str] = mapped_column(String(240), nullable=False)
+    source_reference: Mapped[str] = mapped_column(String(240), nullable=False)
+    source_url: Mapped[str] = mapped_column(String(600), nullable=False)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="documentary")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
+class VaccineCalendarItem(Base):
+    """Fila de calendario transcrita como referencia; no calcula indicaciones."""
+    __tablename__ = "vaccine_calendar_items"
+    __table_args__ = (Index("ix_vaccine_calendar_items_edition", "edition_id"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    edition_id: Mapped[str] = mapped_column(ForeignKey("vaccine_calendar_editions.id"), nullable=False)
+    vaccine_code: Mapped[str] = mapped_column(String(40), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(180), nullable=False)
+    dose_label: Mapped[str] = mapped_column(String(80), nullable=False)
+    target_age_text: Mapped[str] = mapped_column(String(100), nullable=False)
+    category: Mapped[str] = mapped_column(String(24), nullable=False, default="systematic")
+    documentary_note: Mapped[str | None] = mapped_column(Text)
+    source_page: Mapped[str | None] = mapped_column(String(40))
+
+
+class VaccineDoseReview(Base):
+    """Revisión individual y validada por profesional de una dosis orientativa."""
+    __tablename__ = "vaccine_dose_reviews"
+    __table_args__ = (
+        Index("ix_vaccine_dose_reviews_minor_status", "minor_id", "status"),
+        UniqueConstraint("minor_id", "calendar_item_id", name="uq_vaccine_review_minor_item"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    minor_id: Mapped[str] = mapped_column(ForeignKey("minors.id"), nullable=False)
+    calendar_item_id: Mapped[str | None] = mapped_column(ForeignKey("vaccine_calendar_items.id"))
+    vaccine_record_id: Mapped[str | None] = mapped_column(ForeignKey("vaccine_records.id"))
+    category: Mapped[str] = mapped_column(String(24), nullable=False, default="systematic")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="unverified")
+    target_date: Mapped[date | None] = mapped_column(Date)
+    reviewed_by_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
+    reviewed_by_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
