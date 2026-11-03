@@ -68,6 +68,7 @@ class MedicationAdministration(Base):
 
 class VaccineRecord(Base):
     __tablename__ = "vaccine_records"
+    __table_args__ = (Index("ix_vaccine_records_minor_date", "minor_id", "administered_on"),)
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     minor_id: Mapped[str] = mapped_column(ForeignKey("minors.id"), nullable=False)
     stay_id: Mapped[str | None] = mapped_column(ForeignKey("stays.id"), nullable=True)
