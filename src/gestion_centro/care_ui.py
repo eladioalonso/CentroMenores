@@ -18,11 +18,11 @@ from gestion_centro.domain.education_service import (
     create_school_placement, add_school_record, list_school_placements,
     revise_education_update,
 )
-from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationAdministration, VaccineRecord
+from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationAdministration, VaccineRecord, VaccineDoseReview, VaccineCalendarItem
 from gestion_centro.domain.health_service import (
     read_health_profile, save_health_profile, list_health_profile_versions, add_medication_plan,
     record_medication_administration, add_vaccine_record, list_medication_plans, list_medication_plan_versions,
-    set_medication_schedules, list_daily_medication_schedule,
+    set_medication_schedules, list_daily_medication_schedule, record_vaccine_dose_review, list_vaccine_dose_reviews,
 )
 
 
@@ -484,9 +484,29 @@ class HealthDialog(StaySelectorDialog):
         self.vaccines.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.vaccines.setAlternatingRowColors(True)
         vaccine_layout.addWidget(self.vaccines)
-        vaccine_button = QPushButton("Registrar vacuna")
+        vaccine_hint = QLabel(
+            "Las dosis del calendario son referencias documentales. La ausencia de un registro no significa que una vacuna esté pendiente. "
+            "Solo una revisión individual realizada por un profesional puede confirmar ese estado."
+        )
+        vaccine_hint.setWordWrap(True)
+        vaccine_layout.addWidget(vaccine_hint)
+        self.vaccine_reviews = QTableWidget(0, 6)
+        self.vaccine_reviews.setHorizontalHeaderLabels(
+            ["Vacuna / referencia", "Categoría", "Estado", "Fecha orientativa", "Revisado por", "Fundamento"]
+        )
+        self.vaccine_reviews.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.vaccine_reviews.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.vaccine_reviews.setAlternatingRowColors(True)
+        vaccine_layout.addWidget(QLabel("Revisiones individuales de dosis"))
+        vaccine_layout.addWidget(self.vaccine_reviews)
+        vaccine_actions = QHBoxLayout()
+        vaccine_button = QPushButton("Registrar vacuna administrada")
         vaccine_button.clicked.connect(self.add_vaccine)
-        vaccine_layout.addWidget(vaccine_button)
+        review_button = QPushButton("Añadir revisión profesional")
+        review_button.clicked.connect(self.add_vaccine_review)
+        vaccine_actions.addWidget(vaccine_button)
+        vaccine_actions.addWidget(review_button)
+        vaccine_layout.addLayout(vaccine_actions)
         self.tabs.addTab(vaccine_tab, "Vacunas")
 
         self.admin_day.dateChanged.connect(self.refresh)
@@ -499,7 +519,7 @@ class HealthDialog(StaySelectorDialog):
         if not minor_id:
             self.resident_context.setText("Selecciona un residente para consultar su información sanitaria.")
             self.allergies.clear(); self.conditions.clear(); self.emergency.clear()
-            self.plans.setRowCount(0); self.administrations.setRowCount(0); self.vaccines.setRowCount(0)
+            self.plans.setRowCount(0); self.administrations.setRowCount(0); self.vaccines.setRowCount(0); self.vaccine_reviews.setRowCount(0)
             return
         with session_scope(self.factory) as session:
             minor = session.get(Minor, minor_id)
@@ -512,6 +532,12 @@ class HealthDialog(StaySelectorDialog):
                 select(VaccineRecord).where(VaccineRecord.minor_id == minor_id)
                 .order_by(VaccineRecord.administered_on.desc())
             ).all()
+            vaccine_reviews = list_vaccine_dose_reviews(
+                session, actor_account_id=self.actor_id, minor_id=minor_id
+            )
+            calendar_items = {
+                item.id: item for item in session.scalars(select(VaccineCalendarItem)).all()
+            }
             daily_rows = list_daily_medication_schedule(
                 session, actor_account_id=self.actor_id, minor_id=minor_id,
                 day=self.admin_day.date().toPython()
@@ -591,6 +617,22 @@ class HealthDialog(StaySelectorDialog):
             ]
             for col, value in enumerate(values):
                 self.vaccines.setItem(i, col, QTableWidgetItem(value))
+        self.vaccine_reviews.setRowCount(len(vaccine_reviews))
+        for i, review in enumerate(vaccine_reviews):
+            item = calendar_items.get(review.calendar_item_id) if review.calendar_item_id else None
+            values = [
+                item.display_name if item else "Revisión individual",
+                {"systematic": "Sistemática", "catch_up": "Acelerada / rescate",
+                 "risk": "Grupo de riesgo", "campaign": "Campaña", "passive_immunization": "Inmunización pasiva"}.get(review.category, review.category),
+                {"unverified": "Sin verificar", "pending_confirmed": "Pendiente confirmado",
+                 "administered": "Administrada", "deferred": "Aplazada",
+                 "not_administered": "No administrada", "not_applicable": "No aplicable"}.get(review.status, review.status),
+                review.target_date.strftime("%d/%m/%Y") if review.target_date else "—",
+                review.reviewed_by_name_snapshot,
+                review.rationale,
+            ]
+            for col, value in enumerate(values):
+                self.vaccine_reviews.setItem(i, col, QTableWidgetItem(value))
 
     def show_profile_history(self):
         minor_id = self.stay.currentData()
@@ -859,3 +901,61 @@ class HealthDialog(StaySelectorDialog):
             QMessageBox.information(self, "Vacunación", "Registro añadido.")
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo registrar", str(exc))
+
+
+    def add_vaccine_review(self):
+        minor_id = self.stay.currentData()
+        if not minor_id:
+            QMessageBox.information(self, "Selecciona residente", "Selecciona un residente antes de añadir una revisión.")
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Revisión profesional de vacunación")
+        form = QFormLayout(dialog)
+        category = QComboBox()
+        for label, value in [
+            ("Calendario sistemático", "systematic"), ("Vacunación acelerada / rescate", "catch_up"),
+            ("Grupo de riesgo", "risk"), ("Campaña estacional", "campaign"),
+            ("Inmunización pasiva (VRS, por ejemplo)", "passive_immunization"),
+        ]:
+            category.addItem(label, value)
+        status = QComboBox()
+        for label, value in [
+            ("Sin verificar", "unverified"), ("Pendiente confirmado", "pending_confirmed"),
+            ("Administrada", "administered"), ("Aplazada", "deferred"),
+            ("No administrada", "not_administered"), ("No aplicable", "not_applicable"),
+        ]:
+            status.addItem(label, value)
+        target = QDateEdit()
+        target.setCalendarPopup(True)
+        target.setDate(QDate.currentDate())
+        target_check = QComboBox()
+        target_check.addItem("Sin fecha orientativa", False)
+        target_check.addItem("Indicar fecha orientativa", True)
+        rationale = QTextEdit()
+        rationale.setPlaceholderText("Indica la fuente revisada, antecedentes comprobados y motivo de la valoración profesional.")
+        rationale.setMaximumHeight(100)
+        notes = QLineEdit()
+        form.addRow("Categoría", category)
+        form.addRow("Estado", status)
+        form.addRow("Fecha orientativa", target_check)
+        form.addRow("Fecha", target)
+        form.addRow("Fundamento de la revisión", rationale)
+        form.addRow("Observaciones", notes)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            with session_scope(self.factory) as session:
+                record_vaccine_dose_review(
+                    session, actor_account_id=self.actor_id, minor_id=minor_id,
+                    category=category.currentData(), status=status.currentData(),
+                    target_date=target.date().toPython() if target_check.currentData() else None,
+                    rationale=rationale.toPlainText(), notes=notes.text().strip() or None,
+                )
+            self.refresh()
+            QMessageBox.information(self, "Vacunación", "Revisión profesional registrada.")
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo registrar la revisión", str(exc))
