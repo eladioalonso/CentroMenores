@@ -34,14 +34,32 @@ def verify_backup(archive: Path) -> dict:
     if not archive.is_file():
         raise FileNotFoundError(archive)
     with zipfile.ZipFile(archive, "r") as bundle:
-        names = bundle.namelist()
+        infos = bundle.infolist()
+        names = [info.filename for info in infos]
+        if len(names) != len(set(names)):
+            raise ValueError("El backup contiene rutas duplicadas")
         if any(not _safe_archive_name(name) for name in names):
             raise ValueError("El backup contiene rutas no seguras")
+        if bundle.testzip() is not None:
+            raise ValueError("El ZIP contiene un miembro dañado")
         if "manifest.json" not in names or "database/centro.db" not in names:
             raise ValueError("El backup está incompleto")
-        manifest = json.loads(bundle.read("manifest.json"))
-        for name, expected in manifest["files"].items():
-            if not _safe_archive_name(name) or name not in names or hashlib.sha256(bundle.read(name)).hexdigest() != expected:
+        try:
+            manifest = json.loads(bundle.read("manifest.json"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("El manifiesto del backup no es válido") from exc
+        if not isinstance(manifest, dict) or manifest.get("format") != 1:
+            raise ValueError("Formato de manifiesto no compatible")
+        files = manifest.get("files")
+        if not isinstance(files, dict) or "database/centro.db" not in files:
+            raise ValueError("El manifiesto no contiene la base de datos")
+        expected_names = set(files) | {"manifest.json"}
+        if set(names) != expected_names:
+            raise ValueError("El contenido del ZIP no coincide con el manifiesto")
+        for name, expected in files.items():
+            if (not isinstance(name, str) or not _safe_archive_name(name)
+                    or not isinstance(expected, str)
+                    or hashlib.sha256(bundle.read(name)).hexdigest() != expected):
                 raise ValueError(f"Integridad incorrecta en {name}")
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temp:
             temp.write(bundle.read("database/centro.db"))
