@@ -272,3 +272,16 @@ Estas decisiones complementan las decisiones funcionales anteriores y quedan apr
 ### Pruebas obligatorias antes de producción
 
 Ninguna versión se considerará preparada para producción hasta superar pruebas con datos ficticios, incluyendo cierres forzados durante escrituras, apagados simulados, recuperación de formularios, restauración integral, migración a otro equipo, adjuntos ausentes/dañados/duplicados, conflictos de edición, fallos durante copias, permisos, auditoría y volúmenes representativos de información.
+
+
+## Vacunación individual y calendario oficial
+
+- El historial vacunal pertenece al expediente sanitario permanente de cada menor y se relaciona directamente con su identificador de expediente (`minor_id`). No pertenece a una estancia concreta; la estancia, si se conoce, se conserva únicamente como contexto histórico opcional.
+- Cada menor tendrá su propio seguimiento de vacunas y dosis: previstas/recomendadas, pendientes, administradas, aplazadas, contraindicadas o no administradas, con motivo y trazabilidad.
+- El calendario de referencia principal será el oficial de la Ciudad Autónoma de Melilla. Se conservará también la referencia al calendario común del Sistema Nacional de Salud para contextualizar equivalencias y cambios.
+- La configuración del calendario será versionada por fecha de vigencia y fuente oficial. No se sobrescribirán reglas antiguas: el calendario aplicable dependerá de la cohorte/fecha de nacimiento y de la pauta individual documentada.
+- Las recomendaciones por grupos de riesgo o situaciones especiales se mostrarán separadas del calendario sistemático y no se activarán automáticamente por inferencia. Requerirán condición documentada y validación sanitaria.
+- La aplicación podrá calcular edades/fechas orientativas y señalar dosis pendientes, pero no prescribirá ni decidirá por sí misma vacunas, productos, intervalos clínicos, contraindicaciones o pautas de rescate. Toda pauta individual debe contrastarse con el profesional sanitario y el documento oficial vigente.
+- Cada administración registrada será un evento inmutable con vacuna, dosis, fecha, profesional/centro sanitario si consta, lote y fabricante si se dispone, fuente documental y autor del registro en la aplicación. Las correcciones se harán mediante rectificación vinculada, sin borrar el evento original.
+- Las vacunas administradas fuera del centro o antes del ingreso podrán incorporarse al expediente con su fecha real y procedencia documental; no se exigirá estancia activa.
+- Se mantendrá la separación entre calendario recomendado, pauta individual del menor y administración efectivamente realizada.
