@@ -4,7 +4,7 @@ import re
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from gestion_centro.auth.models import AccessAudit, UserAccount
-from gestion_centro.domain.models import Stay
+from gestion_centro.domain.models import Minor, Stay
 from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationSchedule, MedicationAdministration, VaccineRecord
 
 MEDICATION_RESULTS={"administered","refused","not_available"}
@@ -18,46 +18,65 @@ def _actor(session: Session, account_id: str) -> UserAccount:
 def _audit(session: Session, actor: UserAccount, event: str, details: str):
     session.add(AccessAudit(account_id=actor.id,username_snapshot=actor.username,event=event,details=details))
 
-def _stay(session: Session, stay_id: str):
-    stay=session.get(Stay,stay_id)
-    if stay is None or stay.status!="active": raise ValueError("La estancia no existe o está cerrada")
-    return stay
+def _resolve_minor(session: Session, *, minor_id: str | None = None, stay_id: str | None = None):
+    if minor_id:
+        minor=session.get(Minor,minor_id)
+    elif stay_id:
+        stay=session.get(Stay,stay_id)
+        minor=stay.minor if stay else None
+    else:
+        minor=None
+    if minor is None:
+        raise ValueError("El residente no existe")
+    stay = session.get(Stay, stay_id) if stay_id else None
+    if stay is not None and stay.minor_id != minor.id:
+        raise ValueError("La estancia seleccionada no pertenece al residente")
+    return minor, stay
 
-def read_health_profile(session: Session, *, actor_account_id: str, stay_id: str):
-    actor=_actor(session,actor_account_id); _stay(session,stay_id)
-    _audit(session,actor,"health_profile_accessed",stay_id)
-    return session.scalar(select(HealthProfile).where(HealthProfile.stay_id==stay_id))
+def _active_stay(session: Session, minor: Minor, stay_id: str | None = None):
+    if stay_id:
+        stay=session.get(Stay,stay_id)
+        if stay is None or stay.minor_id != minor.id or stay.status != "active":
+            raise ValueError("La estancia no existe, no pertenece al residente o está cerrada")
+        return stay
+    return session.scalar(select(Stay).where(Stay.minor_id==minor.id, Stay.status=="active"))
 
-def save_health_profile(session: Session, *, actor_account_id: str, stay_id: str,
-                         allergies: str | None, relevant_conditions: str | None,
-                         emergency_instructions: str | None):
-    actor=_actor(session,actor_account_id); _stay(session,stay_id)
-    profile=session.scalar(select(HealthProfile).where(HealthProfile.stay_id==stay_id))
-    if profile is None: profile=HealthProfile(stay_id=stay_id); session.add(profile)
+def read_health_profile(session: Session, *, actor_account_id: str, minor_id: str | None = None, stay_id: str | None = None):
+    actor=_actor(session,actor_account_id); minor, _ = _resolve_minor(session,minor_id=minor_id,stay_id=stay_id)
+    _audit(session,actor,"health_profile_accessed",minor.id)
+    return session.scalar(select(HealthProfile).where(HealthProfile.minor_id==minor.id))
+
+def save_health_profile(session: Session, *, actor_account_id: str, allergies: str | None,
+                         relevant_conditions: str | None, emergency_instructions: str | None,
+                         minor_id: str | None = None, stay_id: str | None = None):
+    actor=_actor(session,actor_account_id); minor, stay = _resolve_minor(session,minor_id=minor_id,stay_id=stay_id)
+    profile=session.scalar(select(HealthProfile).where(HealthProfile.minor_id==minor.id))
+    if profile is None:
+        profile=HealthProfile(minor_id=minor.id,stay_id=stay.id if stay else None); session.add(profile)
     profile.allergies=allergies.strip() if allergies else None
     profile.relevant_conditions=relevant_conditions.strip() if relevant_conditions else None
     profile.emergency_instructions=emergency_instructions.strip() if emergency_instructions else None
     profile.updated_by_account_id=actor.id
     profile.updated_by_name_snapshot=actor.professional.display_name
     profile.updated_at=datetime.now(timezone.utc)
-    _audit(session,actor,"health_profile_updated",stay_id)
+    _audit(session,actor,"health_profile_updated",minor.id)
     return profile
 
-def add_medication_plan(session: Session, *, actor_account_id: str, stay_id: str,
-                        medication_name: str, prescribed_dose: str, schedule_text: str,
-                        prescriber_reference: str, starts_on: date, ends_on: date | None = None,
-                        instructions: str | None = None):
-    actor=_actor(session,actor_account_id); _stay(session,stay_id)
+def add_medication_plan(session: Session, *, actor_account_id: str, medication_name: str,
+                        prescribed_dose: str, schedule_text: str, prescriber_reference: str,
+                        starts_on: date, minor_id: str | None = None, stay_id: str | None = None,
+                        ends_on: date | None = None, instructions: str | None = None):
+    actor=_actor(session,actor_account_id); minor, _ = _resolve_minor(session,minor_id=minor_id,stay_id=stay_id)
     if not all(x.strip() for x in (medication_name,prescribed_dose,schedule_text,prescriber_reference)):
         raise ValueError("Medicamento, dosis prescrita, pauta y referencia del prescriptor son obligatorios")
     if ends_on and ends_on<starts_on: raise ValueError("La fecha final precede al inicio")
-    plan=MedicationPlan(stay_id=stay_id,medication_name=medication_name.strip(),
+    plan=MedicationPlan(minor_id=minor.id,stay_id=stay_id,medication_name=medication_name.strip(),
         prescribed_dose=prescribed_dose.strip(),schedule_text=schedule_text.strip(),
         prescriber_reference=prescriber_reference.strip(),starts_on=starts_on,ends_on=ends_on,
         instructions=instructions.strip() if instructions else None,
         recorded_by_account_id=actor.id,recorded_by_name_snapshot=actor.professional.display_name)
     session.add(plan); session.flush()
-    _audit(session,actor,"medication_plan_recorded",plan.id)
+    _audit(session,actor,"medication_plan_recorded",f"{minor.id}:{plan.id}")
     return plan
 
 def set_medication_schedules(session: Session, *, actor_account_id: str, plan_id: str,
@@ -84,13 +103,12 @@ def set_medication_schedules(session: Session, *, actor_account_id: str, plan_id
     _audit(session, actor, "medication_schedule_set", f"{plan.id}:{normalized}")
     return plan.schedules
 
-
 def list_daily_medication_schedule(session: Session, *, actor_account_id: str,
-                                   stay_id: str, day: date):
+                                   day: date, minor_id: str | None = None, stay_id: str | None = None):
     actor = _actor(session, actor_account_id)
-    stay = _stay(session, stay_id)
+    minor, stay = _resolve_minor(session,minor_id=minor_id,stay_id=stay_id)
     plans = session.scalars(select(MedicationPlan).where(
-        MedicationPlan.stay_id == stay.id, MedicationPlan.active.is_(True),
+        MedicationPlan.minor_id == minor.id, MedicationPlan.active.is_(True),
         MedicationPlan.starts_on <= day
     ).order_by(MedicationPlan.medication_name)).all()
     results = []
@@ -99,8 +117,6 @@ def list_daily_medication_schedule(session: Session, *, actor_account_id: str,
             continue
         for schedule in plan.schedules:
             local_dt = datetime.combine(day, datetime.strptime(schedule.time_of_day, "%H:%M").time()).astimezone()
-            # Consultar directamente la tabla: la colección ORM puede estar ya
-            # cargada en la sesión antes de registrar la administración.
             day_records = session.scalars(select(MedicationAdministration).where(
                 MedicationAdministration.plan_id == plan.id
             )).all()
@@ -111,7 +127,7 @@ def list_daily_medication_schedule(session: Session, *, actor_account_id: str,
                     matched = record
                     break
             results.append((plan, schedule, local_dt, matched))
-    _audit(session, actor, "medication_daily_schedule_accessed", f"{stay_id}:{day.isoformat()}")
+    _audit(session, actor, "medication_daily_schedule_accessed", f"{minor.id}:{day.isoformat()}")
     return results
 
 def record_medication_administration(session: Session, *, actor_account_id: str, plan_id: str,
@@ -143,18 +159,20 @@ def record_medication_administration(session: Session, *, actor_account_id: str,
     _audit(session,actor,"medication_administration_recorded",f"{plan.id}:{record.id}:{status}")
     return record
 
-def add_vaccine_record(session: Session, *, actor_account_id: str, stay_id: str,
-                       vaccine_name: str, administered_on: date, dose_reference: str | None = None):
-    actor=_actor(session,actor_account_id); _stay(session,stay_id)
+def add_vaccine_record(session: Session, *, actor_account_id: str, vaccine_name: str,
+                       administered_on: date, minor_id: str | None = None, stay_id: str | None = None,
+                       dose_reference: str | None = None):
+    actor=_actor(session,actor_account_id); minor, stay = _resolve_minor(session,minor_id=minor_id,stay_id=stay_id)
     if not vaccine_name.strip(): raise ValueError("La vacuna es obligatoria")
-    record=VaccineRecord(stay_id=stay_id,vaccine_name=vaccine_name.strip(),
-        administered_on=administered_on,dose_reference=dose_reference,
+    record=VaccineRecord(minor_id=minor.id,stay_id=stay.id if stay else None,
+        vaccine_name=vaccine_name.strip(),administered_on=administered_on,dose_reference=dose_reference,
         recorded_by_account_id=actor.id,recorded_by_name_snapshot=actor.professional.display_name)
     session.add(record); session.flush()
-    _audit(session,actor,"vaccine_recorded",record.id)
+    _audit(session,actor,"vaccine_recorded",f"{minor.id}:{record.id}")
     return record
 
-def list_medication_plans(session: Session, *, actor_account_id: str, stay_id: str):
-    actor=_actor(session,actor_account_id); _stay(session,stay_id)
-    _audit(session,actor,"medication_plans_accessed",stay_id)
-    return session.scalars(select(MedicationPlan).where(MedicationPlan.stay_id==stay_id).order_by(MedicationPlan.starts_on.desc())).all()
+def list_medication_plans(session: Session, *, actor_account_id: str,
+                          minor_id: str | None = None, stay_id: str | None = None):
+    actor=_actor(session,actor_account_id); minor, _ = _resolve_minor(session,minor_id=minor_id,stay_id=stay_id)
+    _audit(session,actor,"medication_plans_accessed",minor.id)
+    return session.scalars(select(MedicationPlan).where(MedicationPlan.minor_id==minor.id).order_by(MedicationPlan.starts_on.desc())).all()
