@@ -155,11 +155,24 @@ def add_medication_plan(session: Session, *, actor_account_id: str, medication_n
     if not all(x.strip() for x in (medication_name,prescribed_dose,schedule_text,prescriber_reference)):
         raise ValueError("Medicamento, dosis prescrita, pauta y referencia del prescriptor son obligatorios")
     if ends_on and ends_on<starts_on: raise ValueError("La fecha final precede al inicio")
+    normalized_schedules = []
+    for time_text, shift in schedules or []:
+        if not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", time_text):
+            raise ValueError(f"Hora no válida: {time_text}. Usa HH:MM")
+        if shift not in {"morning", "afternoon", "night"}:
+            raise ValueError("Turno no válido")
+        if any(existing[0] == time_text for existing in normalized_schedules):
+            raise ValueError("No repitas una hora dentro de la misma pauta")
+        normalized_schedules.append((time_text, shift))
+    if schedules is not None and not normalized_schedules:
+        raise ValueError("Indica al menos una hora prescrita")
     plan=MedicationPlan(minor_id=minor.id,stay_id=stay_id,medication_name=medication_name.strip(),
         prescribed_dose=prescribed_dose.strip(),schedule_text=schedule_text.strip(),
         prescriber_reference=prescriber_reference.strip(),starts_on=starts_on,ends_on=ends_on,
         instructions=instructions.strip() if instructions else None,
         recorded_by_account_id=actor.id,recorded_by_name_snapshot=actor.professional.display_name)
+    for time_text, shift in normalized_schedules:
+        plan.schedules.append(MedicationSchedule(time_of_day=time_text, shift=shift))
     session.add(plan); session.flush()
     _record_medication_plan_version(session, plan, actor, {}, _medication_plan_values(plan))
     _audit(session,actor,"medication_plan_recorded",f"{minor.id}:{plan.id}")
