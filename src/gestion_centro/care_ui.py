@@ -829,14 +829,31 @@ class HealthDialog(StaySelectorDialog):
         if not self.stay.currentData():
             QMessageBox.information(self, "Selecciona residente", "Selecciona un residente antes de registrar una vacuna.")
             return
-        name, ok = QInputDialog.getText(self, "Vacunación", "Vacuna administrada:")
-        if not ok or not name.strip():
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Registrar administración de vacuna")
+        form = QFormLayout(dialog)
+        name = QLineEdit()
+        dose = QLineEdit()
+        administered = QDateEdit()
+        administered.setCalendarPopup(True)
+        administered.setDate(QDate.currentDate())
+        form.addRow("Vacuna", name)
+        form.addRow("Dosis / referencia", dose)
+        form.addRow("Fecha real de administración", administered)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted or not name.text().strip():
             return
         try:
             with session_scope(self.factory) as session:
                 add_vaccine_record(
                     session, actor_account_id=self.actor_id, minor_id=self.stay.currentData(),
-                    vaccine_name=name, administered_on=date.today(),
+                    vaccine_name=name.text().strip(), administered_on=administered.date().toPython(),
+                    dose_reference=dose.text().strip() or None,
                 )
             self.refresh()
             QMessageBox.information(self, "Vacunación", "Registro añadido.")
