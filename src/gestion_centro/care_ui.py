@@ -1,5 +1,6 @@
 """Interfaces de seguimiento educativo y sanitario."""
 from datetime import date, datetime, timezone
+import json
 
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import (
@@ -19,7 +20,7 @@ from gestion_centro.domain.education_service import (
 )
 from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationAdministration, VaccineRecord
 from gestion_centro.domain.health_service import (
-    read_health_profile, save_health_profile, add_medication_plan,
+    read_health_profile, save_health_profile, list_health_profile_versions, add_medication_plan,
     record_medication_administration, add_vaccine_record, list_medication_plans,
     set_medication_schedules, list_daily_medication_schedule,
 )
@@ -418,9 +419,14 @@ class HealthDialog(StaySelectorDialog):
         form.addRow("Condiciones relevantes", self.conditions)
         form.addRow("Instrucciones de emergencia", self.emergency)
         profile_layout.addLayout(form)
+        profile_actions = QHBoxLayout()
         save = QPushButton("Guardar ficha sanitaria")
         save.clicked.connect(self.save_profile)
-        profile_layout.addWidget(save)
+        history = QPushButton("Ver historial de cambios")
+        history.clicked.connect(self.show_profile_history)
+        profile_actions.addWidget(save)
+        profile_actions.addWidget(history)
+        profile_layout.addLayout(profile_actions)
         profile_layout.addStretch(1)
         self.tabs.addTab(profile_tab, "Ficha sanitaria")
 
@@ -584,6 +590,48 @@ class HealthDialog(StaySelectorDialog):
             ]
             for col, value in enumerate(values):
                 self.vaccines.setItem(i, col, QTableWidgetItem(value))
+
+    def show_profile_history(self):
+        minor_id = self.stay.currentData()
+        if not minor_id:
+            QMessageBox.information(self, "Selecciona residente", "Selecciona un residente para consultar el historial.")
+            return
+        with session_scope(self.factory) as session:
+            versions = list_health_profile_versions(
+                session, actor_account_id=self.actor_id, minor_id=minor_id
+            )
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Historial de la ficha sanitaria")
+        dialog.resize(900, 480)
+        layout = QVBoxLayout(dialog)
+        hint = QLabel("Cada fila representa una versión guardada. Los datos anteriores y nuevos quedan conservados; este historial no sustituye la valoración ni la documentación clínica.")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        table = QTableWidget(len(versions), 4)
+        table.setHorizontalHeaderLabels(["Fecha y hora", "Profesional", "Datos anteriores", "Datos guardados"])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.setWordWrap(True)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        table.setAlternatingRowColors(True)
+        labels = {"allergies": "Alergias", "relevant_conditions": "Condiciones relevantes",
+                  "emergency_instructions": "Instrucciones de emergencia"}
+        for row, version in enumerate(versions):
+            values = [
+                version.changed_at.astimezone().strftime("%d/%m/%Y %H:%M"),
+                version.changed_by_name_snapshot,
+                json.dumps({labels.get(k, k): v for k, v in version.old_values.items()},
+                           ensure_ascii=False, indent=2),
+                json.dumps({labels.get(k, k): v for k, v in version.new_values.items()},
+                           ensure_ascii=False, indent=2),
+            ]
+            for col, value in enumerate(values):
+                table.setItem(row, col, QTableWidgetItem(value))
+            table.setRowHeight(row, 92)
+        layout.addWidget(table)
+        close = QPushButton("Cerrar")
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close)
+        dialog.exec()
 
     def save_profile(self):
         if not self.stay.currentData():
