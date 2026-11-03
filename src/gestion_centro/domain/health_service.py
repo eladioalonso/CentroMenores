@@ -150,14 +150,15 @@ def list_medication_plan_versions(session: Session, *, actor_account_id: str, pl
 def add_medication_plan(session: Session, *, actor_account_id: str, medication_name: str,
                         prescribed_dose: str, schedule_text: str, prescriber_reference: str,
                         starts_on: date, minor_id: str | None = None, stay_id: str | None = None,
-                        ends_on: date | None = None, instructions: str | None = None):
+                        ends_on: date | None = None, instructions: str | None = None,
+                        schedules: list[tuple[str, str]] | None = None):
     actor=_actor(session,actor_account_id); minor, _ = _resolve_minor(session,minor_id=minor_id,stay_id=stay_id)
     if not all(x.strip() for x in (medication_name,prescribed_dose,schedule_text,prescriber_reference)):
         raise ValueError("Medicamento, dosis prescrita, pauta y referencia del prescriptor son obligatorios")
     if ends_on and ends_on<starts_on: raise ValueError("La fecha final precede al inicio")
     normalized_schedules = []
     for time_text, shift in schedules or []:
-        if not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", time_text):
+        if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", time_text):
             raise ValueError(f"Hora no válida: {time_text}. Usa HH:MM")
         if shift not in {"morning", "afternoon", "night"}:
             raise ValueError("Turno no válido")
