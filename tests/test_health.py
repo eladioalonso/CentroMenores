@@ -269,7 +269,7 @@ def test_vaccine_administration_and_review_must_share_the_same_catalog_dose(heal
  record=add_vaccine_record(
   s,actor_account_id=actor,minor_id=minor_id,vaccine_name="Vacuna A",
   administered_on=date(2026,1,2),calendar_item_id=first_item.id)
- with pytest.raises(ValueError,match="otra dosis"):
+ with pytest.raises(ValueError,match="no está vinculada"):
   record_vaccine_dose_review(
    s,actor_account_id=actor,minor_id=minor_id,calendar_item_id=second_item.id,
    vaccine_record_id=record.id,category="systematic",status="administered",
