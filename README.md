@@ -39,6 +39,7 @@ En desarrollo, la carpeta de datos se puede indicar con `CENTRO_DATOS_DIR`; por 
 - [Flujos de trabajo](docs/FLUJOS_DE_TRABAJO.md)
 - [Modelo conceptual de datos](docs/MODELO_DATOS.md)
 - [Decisiones consolidadas](docs/DECISIONES_CONSOLIDADAS.md)
+- [Catálogos vacunales y trazabilidad documental](docs/VACUNACION_CATALOGOS.md)
 
 ## Funciones recientes de desarrollo
 
