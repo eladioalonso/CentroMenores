@@ -6,7 +6,7 @@ from gestion_centro.persistence.migrations import upgrade_database
 def test_upgrade_creates_versioned_auth_schema(tmp_path):
     engine = create_engine(f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
     upgrade_database(engine)
-    inspector = inspect(engine)
+    inspector = inspect(engine)\n    assert not any(item.get("name") == "uq_vaccine_review_minor_item" for item in inspector.get_unique_constraints("vaccine_dose_reviews"))\n    dose_column = next(column for column in inspector.get_columns("vaccine_calendar_items") if column["name"] == "dose_label")\n    assert dose_column["type"].length == 240
     assert {"professionals", "user_accounts", "access_audit", "alembic_version", "minors", "stays", "events", "event_stay_links", "diary_days", "diary_entries", "diary_entry_stay_links", "incidents", "incident_participants", "agenda_items", "agenda_item_stay_links", "communications", "communication_contributions", "education_goals", "education_updates", "school_placements", "school_records", "health_profiles", "medication_plans", "medication_administrations", "vaccine_records", "personal_documents", "authorizations", "outings", "outing_stays", "outing_authorizations", "vaccine_calendar_editions", "vaccine_calendar_items", "vaccine_dose_reviews"} <= set(inspector.get_table_names())
     with engine.connect() as connection:
         editions = connection.exec_driver_sql("SELECT jurisdiction, edition_code, status FROM vaccine_calendar_editions").all()
