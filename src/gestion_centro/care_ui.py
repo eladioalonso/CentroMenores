@@ -915,8 +915,8 @@ class HealthDialog(StaySelectorDialog):
         )
         layout.addWidget(source_label)
 
-        table = QTableWidget(0, 5)
-        table.setHorizontalHeaderLabels(["Vacuna", "Dosis / secuencia documental", "Edad / población", "Categoría", "Notas y condiciones de la fuente"])
+        table = QTableWidget(0, 6)
+        table.setHorizontalHeaderLabels(["Vacuna", "Tipo de referencia", "Dosis / secuencia documental", "Edad / población", "Categoría", "Notas y condiciones de la fuente"])
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -948,7 +948,7 @@ class HealthDialog(StaySelectorDialog):
                     "source_reference": edition.source_reference,
                     "source_url": edition.source_url,
                     "items": [
-                        (item.display_name, item.dose_label, item.target_age_text,
+                        (item.display_name, item.entry_kind, item.dose_label, item.target_age_text,
                          item.category, item.documentary_note or "—", item.source_page or "—")
                         for item in items
                     ],
@@ -979,8 +979,8 @@ class HealthDialog(StaySelectorDialog):
                     values = [row[0], "Secuencia completa" if row[1] == "schedule" else "Dosis individual", row[2], row[3], category_labels.get(row[4], row[4]), row[5]]
                     for column, value in enumerate(values):
                         cell = QTableWidgetItem(str(value))
-                        if column == 4 and row[5] != "—":
-                            cell.setToolTip(f"Página de la fuente: {row[5]}")
+                        if column == 5 and row[6] != "—":
+                            cell.setToolTip(f"Página de la fuente: {row[6]}")
                         table.setItem(row_index, column, cell)
                 table.resizeRowsToContents()
             edition_filter.currentIndexChanged.connect(refresh_catalog)
