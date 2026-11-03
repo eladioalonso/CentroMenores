@@ -16,7 +16,11 @@ def test_upgrade_creates_versioned_auth_schema(tmp_path):
     assert "entry_kind" in columns
     vaccine_record_columns = {column["name"] for column in inspector.get_columns("vaccine_records")}
     assert "calendar_item_id" in vaccine_record_columns
-    assert any(\n        "calendar_item_id" in foreign_key["constrained_columns"]\n        and foreign_key["referred_table"] == "vaccine_calendar_items"\n        for foreign_key in inspector.get_foreign_keys("vaccine_records")\n    )
+    assert any(
+        "calendar_item_id" in foreign_key["constrained_columns"]
+        and foreign_key["referred_table"] == "vaccine_calendar_items"
+        for foreign_key in inspector.get_foreign_keys("vaccine_records")
+    )
     assert {
         "professionals", "user_accounts", "access_audit", "alembic_version",
         "minors", "stays", "events", "event_stay_links", "diary_days",
