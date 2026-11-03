@@ -22,7 +22,7 @@ from gestion_centro.domain.health import HealthProfile, MedicationPlan, Medicati
 from gestion_centro.domain.health_service import (
     read_health_profile, save_health_profile, list_health_profile_versions, add_medication_plan,
     record_medication_administration, add_vaccine_record, list_medication_plans, list_medication_plan_versions,
-    set_medication_schedules, list_daily_medication_schedule, record_vaccine_dose_review, list_vaccine_dose_reviews,
+    set_medication_schedules, list_daily_medication_schedule, record_vaccine_dose_review, list_vaccine_dose_reviews, list_vaccine_calendar_items,
 )
 
 
@@ -500,11 +500,11 @@ class HealthDialog(StaySelectorDialog):
         vaccine_layout.addWidget(QLabel("Revisiones individuales de dosis"))
         vaccine_layout.addWidget(self.vaccine_reviews)
         vaccine_actions = QHBoxLayout()
-        vaccine_button = QPushButton("Registrar vacuna administrada")
+        catalog_button = QPushButton("Consultar calendarios oficiales")\n        catalog_button.clicked.connect(self.show_vaccine_catalog)\n        vaccine_button = QPushButton("Registrar vacuna administrada")
         vaccine_button.clicked.connect(self.add_vaccine)
         review_button = QPushButton("Añadir revisión profesional")
         review_button.clicked.connect(self.add_vaccine_review)
-        vaccine_actions.addWidget(vaccine_button)
+        vaccine_actions.addWidget(catalog_button)\n        vaccine_actions.addWidget(vaccine_button)
         vaccine_actions.addWidget(review_button)
         vaccine_layout.addLayout(vaccine_actions)
         self.tabs.addTab(vaccine_tab, "Vacunas")
@@ -875,6 +875,123 @@ class HealthDialog(StaySelectorDialog):
             QMessageBox.information(self, "Administración", "Registro añadido.")
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo registrar", str(exc))
+
+
+    def show_vaccine_catalog(self):
+        """Consulta las ediciones documentales sin convertirlas en pautas automáticas."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Catálogos y calendarios de vacunación")
+        dialog.resize(1120, 720)
+        layout = QVBoxLayout(dialog)
+
+        intro = QLabel(
+            "Consulta de fuentes oficiales versionadas. Los calendarios son referencias documentales: "
+            "no generan dosis pendientes ni sustituyen la valoración de un profesional sanitario."
+        )
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+
+        filters = QHBoxLayout()
+        edition_filter = QComboBox()
+        category_filter = QComboBox()
+        category_filter.addItem("Todas las categorías", None)
+        category_labels = {
+            "systematic": "Sistemática", "catch_up": "Acelerada / rescate",
+            "risk": "Grupos de riesgo", "campaign": "Campaña",
+            "passive_immunization": "Inmunización pasiva",
+        }
+        for key, label in category_labels.items():
+            category_filter.addItem(label, key)
+        filters.addWidget(QLabel("Edición"))
+        filters.addWidget(edition_filter, 3)
+        filters.addWidget(QLabel("Categoría"))
+        filters.addWidget(category_filter, 1)
+        layout.addLayout(filters)
+
+        source_label = QLabel()
+        source_label.setWordWrap(True)
+        source_label.setStyleSheet(
+            "background: #EAF2F8; color: #31536F; padding: 8px 10px; border-radius: 6px;"
+        )
+        layout.addWidget(source_label)
+
+        table = QTableWidget(0, 5)
+        table.setHorizontalHeaderLabels(["Vacuna", "Dosis / secuencia documental", "Edad / población", "Categoría", "Notas y condiciones de la fuente"])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setAlternatingRowColors(True)
+        table.setWordWrap(True)
+        layout.addWidget(table)
+
+        with session_scope(self.factory) as session:
+            editions = session.scalars(
+                select(VaccineCalendarEdition).order_by(
+                    VaccineCalendarEdition.effective_from.desc(),
+                    VaccineCalendarEdition.jurisdiction,
+                    VaccineCalendarEdition.title,
+                )
+            ).all()
+            edition_rows = []
+            for edition in editions:
+                items = list_vaccine_calendar_items(
+                    session, actor_account_id=self.actor_id, edition_id=edition.id
+                )
+                edition_rows.append({
+                    "id": edition.id,
+                    "label": f"{edition.jurisdiction} · {edition.title} · {edition.edition_code}",
+                    "title": edition.title,
+                    "jurisdiction": edition.jurisdiction,
+                    "effective_from": edition.effective_from,
+                    "effective_until": edition.effective_until,
+                    "source_title": edition.source_title,
+                    "source_reference": edition.source_reference,
+                    "source_url": edition.source_url,
+                    "items": [
+                        (item.display_name, item.dose_label, item.target_age_text,
+                         item.category, item.documentary_note or "—", item.source_page or "—")
+                        for item in items
+                    ],
+                })
+
+        if not edition_rows:
+            layout.addWidget(QLabel("Todavía no hay ediciones documentales cargadas."))
+        else:
+            for edition in edition_rows:
+                edition_filter.addItem(edition["label"], edition["id"])
+            def refresh_catalog():
+                selected_id = edition_filter.currentData()
+                selected = next((item for item in edition_rows if item["id"] == selected_id), None)
+                if selected is None:
+                    table.setRowCount(0)
+                    source_label.setText("No hay una edición seleccionada.")
+                    return
+                end = selected["effective_until"].strftime("%d/%m/%Y") if selected["effective_until"] else "sin fecha final registrada"
+                source_label.setText(
+                    f"{selected['jurisdiction']} · Vigencia desde {selected['effective_from']:%d/%m/%Y} · "
+                    f"Hasta {end}\nFuente: {selected['source_title']} · {selected['source_reference']}\n"
+                    f"Documento: {selected['source_url']}"
+                )
+                category = category_filter.currentData()
+                rows = [row for row in selected["items"] if category is None or row[3] == category]
+                table.setRowCount(len(rows))
+                for row_index, row in enumerate(rows):
+                    values = [row[0], row[1], row[2], category_labels.get(row[3], row[3]), row[4]]
+                    for column, value in enumerate(values):
+                        cell = QTableWidgetItem(str(value))
+                        if column == 4 and row[5] != "—":
+                            cell.setToolTip(f"Página de la fuente: {row[5]}")
+                        table.setItem(row_index, column, cell)
+                table.resizeRowsToContents()
+            edition_filter.currentIndexChanged.connect(refresh_catalog)
+            category_filter.currentIndexChanged.connect(refresh_catalog)
+            refresh_catalog()
+
+        close = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        close.rejected.connect(dialog.reject)
+        close.accepted.connect(dialog.accept)
+        layout.addWidget(close)
+        dialog.exec()
 
     def add_vaccine(self):
         if not self.stay.currentData():
