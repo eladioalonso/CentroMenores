@@ -206,3 +206,27 @@ def test_vaccine_review_rejects_cross_minor_administration_and_unknown_status(he
    rationale="Comprobación",status="automatic_due")
  with pytest.raises(ValueError,match="fundamento"):
   record_vaccine_dose_review(s,actor_account_id=actor,minor_id=minor_id,rationale=" ")
+
+
+def test_vaccine_reviews_preserve_repeated_assessments_for_same_dose(health_case):
+ s,actor,stay=health_case
+ minor_id=s.get(Stay,stay).minor_id
+ edition=create_vaccine_calendar_edition(
+  s,actor_account_id=actor,jurisdiction="Melilla",edition_code="2026-history",
+  title="Calendario de prueba",effective_from=date(2026,1,1),
+  source_title="Fuente ficticia",source_reference="Referencia de prueba",
+  source_url="https://example.invalid/test")
+ item=add_vaccine_calendar_item(
+  s,actor_account_id=actor,edition_id=edition.id,vaccine_code="TEST-1",
+  display_name="Vacuna ficticia",dose_label="Dosis 1",target_age_text="Edad de prueba")
+ first=record_vaccine_dose_review(
+  s,actor_account_id=actor,minor_id=minor_id,calendar_item_id=item.id,
+  rationale="Primera revisión documentada",status="unverified")
+ second=record_vaccine_dose_review(
+  s,actor_account_id=actor,minor_id=minor_id,calendar_item_id=item.id,
+  rationale="Nueva revisión tras recibir documentación",status="pending_confirmed")
+ history=list_vaccine_dose_reviews(s,actor_account_id=actor,minor_id=minor_id)
+ assert len([review for review in history if review.calendar_item_id==item.id])==2
+ assert {review.id for review in history} >= {first.id,second.id}
+ assert first.rationale=="Primera revisión documentada"
+ assert second.rationale=="Nueva revisión tras recibir documentación"
