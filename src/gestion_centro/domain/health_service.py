@@ -109,9 +109,16 @@ def list_daily_medication_schedule(session: Session, *, actor_account_id: str,
                                    day: date, minor_id: str | None = None, stay_id: str | None = None):
     actor = _actor(session, actor_account_id)
     minor, stay = _resolve_minor(session,minor_id=minor_id,stay_id=stay_id)
+    # Solo se programa y administra desde la estancia activa actual. Las pautas
+    # ligadas a ingresos cerrados siguen visibles en el historial, pero nunca se
+    # convierten automáticamente en medicación vigente tras un reingreso.
+    active_stay = _active_stay(session, minor)
+    if active_stay is None:
+        _audit(session, actor, "medication_daily_schedule_accessed", f"{minor.id}:{day.isoformat()}:sin-estancia-activa")
+        return []
     plans = session.scalars(select(MedicationPlan).where(
-        MedicationPlan.minor_id == minor.id, MedicationPlan.active.is_(True),
-        MedicationPlan.starts_on <= day
+        MedicationPlan.minor_id == minor.id, MedicationPlan.stay_id == active_stay.id,
+        MedicationPlan.active.is_(True), MedicationPlan.starts_on <= day
     ).order_by(MedicationPlan.medication_name)).all()
     results = []
     for plan in plans:
@@ -136,6 +143,8 @@ def record_medication_administration(session: Session, *, actor_account_id: str,
                                      scheduled_at: datetime, status: str, shift: str = "unspecified", note: str | None = None):
     actor=_actor(session,actor_account_id); plan=session.get(MedicationPlan,plan_id)
     if plan is None or not plan.active: raise ValueError("La pauta no existe o está inactiva")
+    if not plan.stay_id or _active_stay(session, session.get(Minor, plan.minor_id), plan.stay_id) is None:
+        raise ValueError("La pauta no pertenece a una estancia activa; consulta el historial y registra una pauta vigente para el ingreso actual")
     if status not in MEDICATION_RESULTS: raise ValueError("Resultado de administración no válido")
     if shift not in {"morning", "afternoon", "night", "unspecified"}: raise ValueError("Turno no válido")
     if status!="administered" and not (note and note.strip()):
