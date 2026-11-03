@@ -230,3 +230,23 @@ def test_vaccine_reviews_preserve_repeated_assessments_for_same_dose(health_case
  assert {review.id for review in history} >= {first.id,second.id}
  assert first.rationale=="Primera revisión documentada"
  assert second.rationale=="Nueva revisión tras recibir documentación"
+
+
+def test_full_accelerated_schedule_cannot_be_linked_as_one_dose_review(health_case):
+ s,actor,stay=health_case
+ minor_id=s.get(Stay,stay).minor_id
+ edition=create_vaccine_calendar_edition(
+  s,actor_account_id=actor,jurisdiction="Melilla",edition_code="2025-accelerated-test",
+  title="Calendario acelerado ficticio",effective_from=date(2025,1,1),
+  source_title="Fuente de prueba",source_reference="Tabla de prueba",
+  source_url="https://example.invalid/accelerated")
+ item=add_vaccine_calendar_item(
+  s,actor_account_id=actor,edition_id=edition.id,vaccine_code="ACC-TEST",
+  display_name="Vacuna ficticia",dose_label="Visitas 0, 2 y 8 meses",
+  target_age_text="Grupo ficticio",category="catch_up")
+ item.entry_kind="schedule"
+ with pytest.raises(ValueError,match="secuencia completa"):
+  record_vaccine_dose_review(
+   s,actor_account_id=actor,minor_id=minor_id,calendar_item_id=item.id,
+   category="catch_up",status="unverified",
+   rationale="Revisión ficticia de prueba")
