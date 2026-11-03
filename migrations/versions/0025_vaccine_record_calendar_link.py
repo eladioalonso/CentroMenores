@@ -9,17 +9,17 @@ depends_on = None
 
 
 def upgrade():
-    with op.batch_alter_table("vaccine_records") as batch_op:
-        batch_op.add_column(sa.Column("calendar_item_id", sa.String(length=36), nullable=True))
-        batch_op.create_foreign_key(
-            "fk_vaccine_records_calendar_item",
-            "vaccine_calendar_items",
-            ["calendar_item_id"],
-            ["id"],
-        )
+    # ADD COLUMN conserva la tabla que ya es referenciada por revisiones de dosis.
+    op.add_column(
+        "vaccine_records",
+        sa.Column(
+            "calendar_item_id",
+            sa.String(length=36),
+            sa.ForeignKey("vaccine_calendar_items.id", name="fk_vaccine_records_calendar_item"),
+            nullable=True,
+        ),
+    )
 
 
 def downgrade():
-    with op.batch_alter_table("vaccine_records") as batch_op:
-        batch_op.drop_constraint("fk_vaccine_records_calendar_item", type_="foreignkey")
-        batch_op.drop_column("calendar_item_id")
+    op.drop_column("vaccine_records", "calendar_item_id")
