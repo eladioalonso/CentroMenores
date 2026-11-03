@@ -538,6 +538,9 @@ class HealthDialog(StaySelectorDialog):
             calendar_items = {
                 item.id: item for item in session.scalars(select(VaccineCalendarItem)).all()
             }
+            calendar_editions = {
+                edition.id: edition for edition in session.scalars(select(VaccineCalendarEdition)).all()
+            }
             daily_rows = list_daily_medication_schedule(
                 session, actor_account_id=self.actor_id, minor_id=minor_id,
                 day=self.admin_day.date().toPython()
@@ -620,8 +623,14 @@ class HealthDialog(StaySelectorDialog):
         self.vaccine_reviews.setRowCount(len(vaccine_reviews))
         for i, review in enumerate(vaccine_reviews):
             item = calendar_items.get(review.calendar_item_id) if review.calendar_item_id else None
+            edition = calendar_editions.get(item.edition_id) if item else None
+            reference_label = (
+                f"{item.display_name} · {item.dose_label} · {item.target_age_text}"
+                + (f" · {edition.edition_code}" if edition else "")
+                if item else "Revisión individual sin dosis del catálogo"
+            )
             values = [
-                item.display_name if item else "Revisión individual",
+                reference_label,
                 {"systematic": "Sistemática", "catch_up": "Acelerada / rescate",
                  "risk": "Grupo de riesgo", "campaign": "Campaña", "passive_immunization": "Inmunización pasiva"}.get(review.category, review.category),
                 {"unverified": "Sin verificar", "pending_confirmed": "Pendiente confirmado",
