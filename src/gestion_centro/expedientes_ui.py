@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import (
     QDialog, QDialogButtonBox, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QInputDialog,
-    QLabel, QDateEdit, QTabWidget, QWidget, QTextEdit, QScrollArea,
+    QLabel, QDateEdit, QTabWidget, QWidget, QTextEdit, QScrollArea, QComboBox,
 )
 from sqlalchemy import select
 
@@ -399,16 +399,41 @@ class ExpedientesDialog(QDialog):
         self.setWindowTitle("Expedientes y estancias")
         self.resize(980, 620)
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("El expediente identifica al menor; cada ingreso se registra como una estancia independiente."))
+        intro = QLabel("Cada residente dispone de un expediente único. Los ingresos y reingresos se consultan como estancias independientes.")
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+
+        filters = QHBoxLayout()
         self.search = QLineEdit()
+        self.search.setClearButtonEnabled(True)
         self.search.setPlaceholderText("Buscar por código o nombre…")
         self.search.textChanged.connect(self.refresh)
-        layout.addWidget(self.search)
+        filters.addWidget(self.search, 2)
+        self.status_filter = QComboBox()
+        self.status_filter.addItem("Todos los expedientes", "all")
+        self.status_filter.addItem("Expedientes activos", "active")
+        self.status_filter.addItem("Expedientes inactivos", "inactive")
+        self.status_filter.currentIndexChanged.connect(self.refresh)
+        filters.addWidget(self.status_filter, 1)
+        self.stay_filter = QComboBox()
+        self.stay_filter.addItem("Todas las estancias", "all")
+        self.stay_filter.addItem("Ingresos activos", "active")
+        self.stay_filter.addItem("Ingresos cerrados", "closed")
+        self.stay_filter.addItem("Sin ingresos", "none")
+        self.stay_filter.currentIndexChanged.connect(self.refresh)
+        filters.addWidget(self.stay_filter, 1)
+        layout.addLayout(filters)
+        self.summary = QLabel()
+        self.summary.setStyleSheet("color: #53677D; padding: 2px 1px 6px 1px;")
+        layout.addWidget(self.summary)
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(["Código", "Nombre", "Estado expediente", "Estancia", "Ingreso"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setAlternatingRowColors(True)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setSortingEnabled(False)
         layout.addWidget(self.table)
         actions = QHBoxLayout()
         for label, callback in [
@@ -432,21 +457,36 @@ class ExpedientesDialog(QDialog):
 
     def refresh(self):
         term = self.search.text().strip().casefold()
+        minor_status = self.status_filter.currentData()
+        stay_status = self.stay_filter.currentData()
         with session_scope(self.factory) as session:
             minors = session.scalars(select(Minor).order_by(Minor.internal_code)).all()
             rows = []
             for minor in minors:
-                for stay in sorted(minor.stays, key=lambda x: x.sequence_number, reverse=True):
-                    rows.append((minor.id, stay.id, minor.internal_code,
-                        f"{minor.given_names} {minor.family_names}",
-                        "Activo" if minor.active else "Inactivo",
-                        "Activa" if stay.status == "active" else "Cerrada",
-                        stay.started_on.strftime("%d/%m/%Y")))
-                if not minor.stays:
-                    rows.append((minor.id, None, minor.internal_code,
-                        f"{minor.given_names} {minor.family_names}",
-                        "Activo" if minor.active else "Inactivo", "Sin ingresos", "—"))
-        rows = [r for r in rows if not term or term in r[2].casefold() or term in r[3].casefold()]
+                if minor_status == "active" and not minor.active:
+                    continue
+                if minor_status == "inactive" and minor.active:
+                    continue
+                name = f"{minor.given_names} {minor.family_names}"
+                if term and term not in minor.internal_code.casefold() and term not in name.casefold():
+                    continue
+                stays = sorted(minor.stays, key=lambda x: x.sequence_number, reverse=True)
+                if stay_status == "none":
+                    selected_stays = [] if stays else [None]
+                elif stay_status == "active":
+                    selected_stays = [stay for stay in stays if stay.status == "active"]
+                elif stay_status == "closed":
+                    selected_stays = [stay for stay in stays if stay.status != "active"]
+                else:
+                    selected_stays = stays if stays else [None]
+                for stay in selected_stays:
+                    rows.append((minor.id, stay.id if stay else None, minor.internal_code,
+                        name, "Activo" if minor.active else "Inactivo",
+                        ("Activa" if stay.status == "active" else "Cerrada") if stay else "Sin ingresos",
+                        stay.started_on.strftime("%d/%m/%Y") if stay else "—"))
+        self.summary.setText(
+            f"{len(rows)} resultado(s) · {len({row[0] for row in rows})} expediente(s)"
+        )
         self.table.setRowCount(len(rows))
         for i, row in enumerate(rows):
             minor_id, stay_id, *display = row
