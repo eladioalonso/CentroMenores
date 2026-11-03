@@ -39,6 +39,13 @@ def test_upgrade_creates_versioned_auth_schema(tmp_path):
             "SELECT DISTINCT entry_kind FROM vaccine_calendar_items "
             "WHERE vaccine_code LIKE 'ACC-%'"
         ).scalars().all()
+        risk_schedule_kinds = connection.exec_driver_sql(
+            "SELECT DISTINCT entry_kind FROM vaccine_calendar_items "
+            "WHERE vaccine_code IN ('RISK-A-HB', 'RISK-I-TV', 'VPH-AD')"
+        ).scalars().all()
+        risk_single_kind = connection.exec_driver_sql(
+            "SELECT entry_kind FROM vaccine_calendar_items WHERE vaccine_code = 'RISK-A-HIB'"
+        ).scalar_one()
     assert ("Melilla", "2026-infantil", "documentary") in editions
     assert ("Melilla", "2026-adulto", "documentary") in editions
     assert ("Melilla", "2025-acelerado", "documentary") in editions
@@ -53,6 +60,8 @@ def test_upgrade_creates_versioned_auth_schema(tmp_path):
     assert sum(category == "catch_up" for code, category in items) >= 20
     assert sum(category == "risk" for code, category in items) >= 20
     assert accelerated_kinds == ["schedule"]
+    assert risk_schedule_kinds == ["schedule"]
+    assert risk_single_kind == "dose"
     engine.dispose()
 
 
