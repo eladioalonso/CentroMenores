@@ -276,7 +276,11 @@ def add_vaccine_record(session: Session, *, actor_account_id: str, vaccine_name:
                        dose_reference: str | None = None):
     actor=_actor(session,actor_account_id); minor, stay = _resolve_minor(session,minor_id=minor_id,stay_id=stay_id)
     if not vaccine_name.strip(): raise ValueError("La vacuna es obligatoria")
-    record=VaccineRecord(minor_id=minor.id,stay_id=stay.id if stay else None,
+    if administered_on > date.today():
+        raise ValueError("La fecha de administración no puede ser futura")
+    # El registro vacunal pertenece al expediente permanente del menor.
+    # Solo se vincula a una estancia cuando se indica expresamente.
+    record=VaccineRecord(minor_id=minor.id,stay_id=stay_id,
         vaccine_name=vaccine_name.strip(),administered_on=administered_on,dose_reference=dose_reference,
         recorded_by_account_id=actor.id,recorded_by_name_snapshot=actor.professional.display_name)
     session.add(record); session.flush()
