@@ -285,6 +285,10 @@ class AgendaDialog(QDialog):
         self.setWindowTitle("Agenda común y tareas")
         self.resize(980, 640)
         layout = QVBoxLayout(self)
+        intro = QLabel("Planifica tareas, citas y actividades del centro. Puedes asignarlas a todo el equipo o a un profesional y mantener su estado actualizado.")
+        intro.setWordWrap(True)
+        intro.setObjectName("formIntro")
+        layout.addWidget(intro)
         form = QFormLayout()
         self.kind = QComboBox()
         for key, label in self.KIND_LABELS.items():
