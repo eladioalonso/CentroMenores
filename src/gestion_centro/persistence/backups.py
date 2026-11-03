@@ -249,20 +249,39 @@ def restore_backup(paths: DataPaths, archive: Path) -> Path:
             (paths.images, backup_hold / "images", staged_images),
         ]
         moved = []
+        installed = []
         try:
             for live, old, new in operations:
                 if live.exists():
                     os.replace(live, old)
                     moved.append((live, old))
                 os.replace(new, live)
+                installed.append(live)
             staged_live_db = stage / "database" / "restore.db"
             os.replace(staged_db, staged_live_db)
             os.replace(staged_live_db, paths.database)
-        except Exception:
+        except Exception as original_error:
+            rollback_errors = []
+            for live in reversed(installed):
+                try:
+                    if live.is_dir():
+                        shutil.rmtree(live)
+                    elif live.exists():
+                        live.unlink()
+                except OSError as rollback_error:
+                    rollback_errors.append(f"{live}: {rollback_error}")
             for live, old in reversed(moved):
-                if live.exists():
-                    shutil.rmtree(live, ignore_errors=True)
-                if old.exists():
-                    os.replace(old, live)
+                try:
+                    if old.exists():
+                        os.replace(old, live)
+                except OSError as rollback_error:
+                    rollback_errors.append(f"{live}: {rollback_error}")
+            if rollback_errors:
+                raise RuntimeError(
+                    "Falló la restauración y también parte de la reversión. "
+                    "No vuelvas a iniciar la aplicación; conserva la copia previa "
+                    f"{pre_restore.name} y solicita recuperación técnica. "
+                    + "; ".join(rollback_errors)
+                ) from original_error
             raise
     return pre_restore
