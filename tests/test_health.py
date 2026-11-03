@@ -6,7 +6,7 @@ from gestion_centro.persistence.base import Base
 from gestion_centro.auth.models import Professional, UserAccount, AccessAudit
 from gestion_centro.domain.models import Minor, Stay
 from gestion_centro.domain import health as health_models
-from gestion_centro.domain.health_service import save_health_profile, read_health_profile, add_medication_plan, record_medication_administration, set_medication_schedules, list_daily_medication_schedule, list_medication_plans, add_vaccine_record
+from gestion_centro.domain.health_service import save_health_profile, read_health_profile, list_health_profile_versions, add_medication_plan, record_medication_administration, set_medication_schedules, list_daily_medication_schedule, list_medication_plans, add_vaccine_record
 
 @pytest.fixture
 def health_case():
@@ -87,3 +87,26 @@ def test_health_records_can_be_assigned_to_resident_without_active_stay(health_c
  assert plan.minor_id==minor.id and plan.stay_id is None
  assert vaccine.minor_id==minor.id and vaccine.stay_id is None
  assert len(list_daily_medication_schedule(s,actor_account_id=actor,minor_id=minor.id,day=date(2026,1,2)))==0
+
+
+def test_health_profile_changes_keep_immutable_versions_with_actor_and_before_after(health_case):
+ s,actor,stay=health_case
+ profile=save_health_profile(s,actor_account_id=actor,stay_id=stay,
+  allergies="Alergia inicial",relevant_conditions="Dato inicial",emergency_instructions=None)
+ first=save_health_profile(s,actor_account_id=actor,minor_id=profile.minor_id,
+  allergies="Alergia actualizada",relevant_conditions="Dato inicial",emergency_instructions="Instrucción nueva")
+ assert first.id==profile.id
+ versions=list_health_profile_versions(s,actor_account_id=actor,minor_id=profile.minor_id)
+ assert len(versions)==2
+ latest=versions[0]
+ assert latest.changed_by_account_id==actor
+ assert latest.old_values["allergies"]=="Alergia inicial"
+ assert latest.new_values["allergies"]=="Alergia actualizada"
+ assert latest.new_values["emergency_instructions"]=="Instrucción nueva"
+ initial=versions[1]
+ assert initial.old_values=={"allergies":None,"relevant_conditions":None,"emergency_instructions":None}
+ assert initial.new_values["allergies"]=="Alergia inicial"
+ # Guardar exactamente los mismos datos no crea una versión artificial.
+ save_health_profile(s,actor_account_id=actor,minor_id=profile.minor_id,
+  allergies="Alergia actualizada",relevant_conditions="Dato inicial",emergency_instructions="Instrucción nueva")
+ assert len(list_health_profile_versions(s,actor_account_id=actor,minor_id=profile.minor_id))==2
