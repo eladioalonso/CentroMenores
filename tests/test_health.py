@@ -151,3 +151,18 @@ def test_new_medication_plan_starts_with_complete_initial_schedule_version(healt
  assert versions[0].old_values=={}
  assert versions[0].new_values["schedules"]==[
   {"time":"08:00","shift":"morning"},{"time":"20:00","shift":"night"}]
+
+
+def test_vaccine_record_belongs_to_minor_not_automatically_to_active_stay(health_case):
+ s,actor,stay=health_case
+ record=add_vaccine_record(s,actor_account_id=actor,minor_id=s.get(Stay,stay).minor_id,
+  vaccine_name="Vacuna ficticia",administered_on=date(2026,1,2),dose_reference="Dosis 1")
+ assert record.minor_id==s.get(Stay,stay).minor_id
+ assert record.stay_id is None
+
+def test_vaccine_record_rejects_future_administration_date(health_case):
+ s,actor,stay=health_case
+ from datetime import timedelta
+ with pytest.raises(ValueError,match="futura"):
+  add_vaccine_record(s,actor_account_id=actor,minor_id=s.get(Stay,stay).minor_id,
+   vaccine_name="Vacuna ficticia",administered_on=date.today()+timedelta(days=1))
