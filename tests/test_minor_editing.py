@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from gestion_centro.auth.models import AccessAudit
 from gestion_centro.auth.service import Role, create_professional_account
-from gestion_centro.domain.models import Minor
+from gestion_centro.domain.models import Minor, MinorPersonalDataVersion
 from gestion_centro.domain.service import create_minor, update_minor_personal_data
 from gestion_centro.persistence.base import Base
 
@@ -26,6 +26,13 @@ def test_personal_data_update_is_saved_and_audited():
         assert saved.given_names == 'Corrected'
         assert saved.nif_nie == 'X1234567A'
         assert saved.locality == 'Lorca'
+        version = session.scalar(select(MinorPersonalDataVersion).where(
+            MinorPersonalDataVersion.minor_id == minor.id))
+        assert version is not None
+        assert version.old_values['given_names'] == 'Original'
+        assert version.new_values['given_names'] == 'Corrected'
+        assert version.old_values['nif_nie'] is None
+        assert version.new_values['nif_nie'] == 'X1234567A'
         assert session.scalar(select(AccessAudit).where(
             AccessAudit.event == 'minor_personal_data_updated')) is not None
 
