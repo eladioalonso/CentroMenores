@@ -478,8 +478,8 @@ class HealthDialog(StaySelectorDialog):
 
         vaccine_tab = QWidget()
         vaccine_layout = QVBoxLayout(vaccine_tab)
-        self.vaccines = QTableWidget(0, 3)
-        self.vaccines.setHorizontalHeaderLabels(["Vacuna", "Fecha", "Dosis / referencia"])
+        self.vaccines = QTableWidget(0, 4)
+        self.vaccines.setHorizontalHeaderLabels(["Vacuna", "Fecha", "Dosis / referencia", "Dosis del calendario vinculada"])
         self.vaccines.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.vaccines.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.vaccines.setAlternatingRowColors(True)
@@ -614,9 +614,11 @@ class HealthDialog(StaySelectorDialog):
                 self.administrations.setItem(i, col, cell)
         self.vaccines.setRowCount(len(vaccine_rows))
         for i, record in enumerate(vaccine_rows):
+            catalog_item = calendar_items.get(record.calendar_item_id) if record.calendar_item_id else None
             values = [
                 record.vaccine_name, record.administered_on.strftime("%d/%m/%Y"),
                 record.dose_reference or "—",
+                f"{catalog_item.display_name} · {catalog_item.dose_label}" if catalog_item else "Sin vincular",
             ]
             for col, value in enumerate(values):
                 self.vaccines.setItem(i, col, QTableWidgetItem(value))
@@ -1004,9 +1006,18 @@ class HealthDialog(StaySelectorDialog):
         dose = QLineEdit()
         administered = QDateEdit()
         administered.setCalendarPopup(True)
+        catalog_item = QComboBox()
+        catalog_item.addItem("Sin vincular a una dosis del catálogo", None)
+        with session_scope(self.factory) as session:
+            editions = session.scalars(select(VaccineCalendarEdition).order_by(VaccineCalendarEdition.effective_from.desc())).all()
+            for edition in editions:
+                for item in list_vaccine_calendar_items(session, actor_account_id=self.actor_id, edition_id=edition.id):
+                    if item.entry_kind == "dose":
+                        catalog_item.addItem(f"{edition.title} · {item.display_name} · {item.dose_label} · {item.target_age_text}", item.id)
         administered.setDate(QDate.currentDate())
         form.addRow("Vacuna", name)
         form.addRow("Dosis / referencia", dose)
+        form.addRow("Dosis del calendario (opcional)", catalog_item)
         form.addRow("Fecha real de administración", administered)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
@@ -1022,6 +1033,7 @@ class HealthDialog(StaySelectorDialog):
                     session, actor_account_id=self.actor_id, minor_id=self.stay.currentData(),
                     vaccine_name=name.text().strip(), administered_on=administered.date().toPython(),
                     dose_reference=dose.text().strip() or None,
+                    calendar_item_id=catalog_item.currentData(),
                 )
             self.refresh()
             QMessageBox.information(self, "Vacunación", "Registro añadido.")
@@ -1075,6 +1087,7 @@ class HealthDialog(StaySelectorDialog):
                     f"{record.vaccine_name} · {record.administered_on:%d/%m/%Y} · {record.dose_reference or 'sin referencia'}",
                     record.id,
                 )
+                administration.setItemData(administration.count() - 1, record.calendar_item_id, Qt.ItemDataRole.UserRole + 1)
         status = QComboBox()
         for label, value in [
             ("Sin verificar", "unverified"), ("Pendiente confirmado", "pending_confirmed"),
@@ -1090,10 +1103,17 @@ class HealthDialog(StaySelectorDialog):
                     category.setCurrentIndex(category_index)
 
         def apply_linked_administration(index):
-            if administration.itemData(index):
+            record_id = administration.itemData(index)
+            linked_item_id = administration.itemData(index, Qt.ItemDataRole.UserRole + 1)
+            if record_id:
                 administered_index = status.findData("administered")
                 if administered_index >= 0:
                     status.setCurrentIndex(administered_index)
+                catalog_index = calendar_item.findData(linked_item_id) if linked_item_id else 0
+                calendar_item.setCurrentIndex(max(catalog_index, 0))
+                calendar_item.setEnabled(False)
+            else:
+                calendar_item.setEnabled(True)
 
         calendar_item.currentIndexChanged.connect(apply_catalog_category)
         administration.currentIndexChanged.connect(apply_linked_administration)
