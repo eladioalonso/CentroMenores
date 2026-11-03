@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from gestion_centro.auth.models import AccessAudit, UserAccount
 from gestion_centro.domain.models import Minor, Stay
-from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationSchedule, MedicationAdministration, VaccineRecord
+from gestion_centro.domain.health import HealthProfile, HealthProfileVersion, MedicationPlan, MedicationSchedule, MedicationAdministration, VaccineRecord
 
 MEDICATION_RESULTS={"administered","refused","not_available"}
 
@@ -53,16 +53,45 @@ def save_health_profile(session: Session, *, actor_account_id: str, allergies: s
                          minor_id: str | None = None, stay_id: str | None = None):
     actor=_actor(session,actor_account_id); minor, stay = _resolve_minor(session,minor_id=minor_id,stay_id=stay_id)
     profile=session.scalar(select(HealthProfile).where(HealthProfile.minor_id==minor.id))
+    old_values = {
+        "allergies": profile.allergies if profile else None,
+        "relevant_conditions": profile.relevant_conditions if profile else None,
+        "emergency_instructions": profile.emergency_instructions if profile else None,
+    }
+    new_values = {
+        "allergies": allergies.strip() if allergies else None,
+        "relevant_conditions": relevant_conditions.strip() if relevant_conditions else None,
+        "emergency_instructions": emergency_instructions.strip() if emergency_instructions else None,
+    }
     if profile is None:
         profile=HealthProfile(minor_id=minor.id,stay_id=stay.id if stay else None); session.add(profile)
-    profile.allergies=allergies.strip() if allergies else None
-    profile.relevant_conditions=relevant_conditions.strip() if relevant_conditions else None
-    profile.emergency_instructions=emergency_instructions.strip() if emergency_instructions else None
-    profile.updated_by_account_id=actor.id
-    profile.updated_by_name_snapshot=actor.professional.display_name
-    profile.updated_at=datetime.now(timezone.utc)
-    _audit(session,actor,"health_profile_updated",minor.id)
+        session.flush()
+    if old_values != new_values:
+        changed_at = datetime.now(timezone.utc)
+        profile.allergies = new_values["allergies"]
+        profile.relevant_conditions = new_values["relevant_conditions"]
+        profile.emergency_instructions = new_values["emergency_instructions"]
+        profile.updated_by_account_id=actor.id
+        profile.updated_by_name_snapshot=actor.professional.display_name
+        profile.updated_at=changed_at
+        session.add(HealthProfileVersion(
+            minor_id=minor.id, profile_id=profile.id,
+            changed_by_account_id=actor.id,
+            changed_by_name_snapshot=actor.professional.display_name,
+            changed_at=changed_at, old_values=old_values, new_values=new_values,
+        ))
+        _audit(session,actor,"health_profile_updated",minor.id)
     return profile
+
+
+def list_health_profile_versions(session: Session, *, actor_account_id: str, minor_id: str):
+    actor = _actor(session, actor_account_id)
+    minor, _ = _resolve_minor(session, minor_id=minor_id)
+    _audit(session, actor, "health_profile_history_accessed", minor.id)
+    return session.scalars(
+        select(HealthProfileVersion).where(HealthProfileVersion.minor_id == minor.id)
+        .order_by(HealthProfileVersion.changed_at.desc(), HealthProfileVersion.id.desc())
+    ).all()
 
 def add_medication_plan(session: Session, *, actor_account_id: str, medication_name: str,
                         prescribed_dose: str, schedule_text: str, prescriber_reference: str,
