@@ -26,7 +26,7 @@ from gestion_centro.domain.health_service import (
 
 
 class StaySelectorDialog(QDialog):
-    def __init__(self, factory, title):
+    def __init__(self, factory, title, stay_id=None):
         super().__init__()
         self.factory = factory
         self.setWindowTitle(title)
@@ -38,14 +38,18 @@ class StaySelectorDialog(QDialog):
                 .order_by(Stay.started_on.desc())).all()
             for s in stays:
                 self.stay.addItem(f"{s.minor.internal_code} · {s.minor.given_names} {s.minor.family_names}", s.id)
+        if stay_id is not None:
+            index = self.stay.findData(stay_id)
+            if index >= 0:
+                self.stay.setCurrentIndex(index)
         layout.addWidget(self.stay)
         self.body = QVBoxLayout()
         layout.addLayout(self.body)
 
 
 class EducationDialog(StaySelectorDialog):
-    def __init__(self, factory, actor_id):
-        super().__init__(factory, "Seguimiento educativo y escolaridad")
+    def __init__(self, factory, actor_id, stay_id=None):
+        super().__init__(factory, "Seguimiento educativo y escolaridad", stay_id=stay_id)
         self.actor_id = actor_id
         form = QFormLayout()
         self.goal_title = QLineEdit()
@@ -352,8 +356,8 @@ class EducationDialog(StaySelectorDialog):
 
 
 class HealthDialog(StaySelectorDialog):
-    def __init__(self, factory, actor_id):
-        super().__init__(factory, "Ficha sanitaria y medicación")
+    def __init__(self, factory, actor_id, stay_id=None):
+        super().__init__(factory, "Ficha sanitaria y medicación", stay_id=stay_id)
         self.actor_id = actor_id
         self.resize(1050, 720)
         self.tabs = QTabWidget()
