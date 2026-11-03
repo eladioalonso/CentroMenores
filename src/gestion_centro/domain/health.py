@@ -12,7 +12,9 @@ def utc_now() -> datetime:
 class HealthProfile(Base):
     __tablename__ = "health_profiles"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    stay_id: Mapped[str] = mapped_column(ForeignKey("stays.id"), nullable=False, unique=True)
+    minor_id: Mapped[str] = mapped_column(ForeignKey("minors.id"), nullable=False, unique=True)
+    # Estancia de procedencia del primer registro; no determina la identidad del perfil.
+    stay_id: Mapped[str | None] = mapped_column(ForeignKey("stays.id"), nullable=True)
     allergies: Mapped[str | None] = mapped_column(Text)
     relevant_conditions: Mapped[str | None] = mapped_column(Text)
     emergency_instructions: Mapped[str | None] = mapped_column(Text)
@@ -22,9 +24,11 @@ class HealthProfile(Base):
 
 class MedicationPlan(Base):
     __tablename__ = "medication_plans"
-    __table_args__ = (Index("ix_medication_plans_stay_active", "stay_id", "active"),)
+    __table_args__ = (Index("ix_medication_plans_minor_active", "minor_id", "active"),)
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    stay_id: Mapped[str] = mapped_column(ForeignKey("stays.id"), nullable=False)
+    minor_id: Mapped[str] = mapped_column(ForeignKey("minors.id"), nullable=False)
+    # Estancia en la que se registró la pauta, conservada como dato histórico opcional.
+    stay_id: Mapped[str | None] = mapped_column(ForeignKey("stays.id"), nullable=True)
     medication_name: Mapped[str] = mapped_column(String(180), nullable=False)
     prescribed_dose: Mapped[str] = mapped_column(String(120), nullable=False)
     schedule_text: Mapped[str] = mapped_column(String(240), nullable=False)
@@ -65,7 +69,8 @@ class MedicationAdministration(Base):
 class VaccineRecord(Base):
     __tablename__ = "vaccine_records"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    stay_id: Mapped[str] = mapped_column(ForeignKey("stays.id"), nullable=False)
+    minor_id: Mapped[str] = mapped_column(ForeignKey("minors.id"), nullable=False)
+    stay_id: Mapped[str | None] = mapped_column(ForeignKey("stays.id"), nullable=True)
     vaccine_name: Mapped[str] = mapped_column(String(180), nullable=False)
     administered_on: Mapped[date] = mapped_column(Date, nullable=False)
     dose_reference: Mapped[str | None] = mapped_column(String(80))
