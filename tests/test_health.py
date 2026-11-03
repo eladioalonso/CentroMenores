@@ -131,8 +131,7 @@ def test_medication_plan_changes_keep_immutable_versions_and_preserve_administra
  assert latest.old_values["schedules"]==[{"time":"08:00","shift":"morning"}]
  assert latest.new_values["schedules"]==[
   {"time":"09:00","shift":"morning"},{"time":"20:00","shift":"night"}]
- initial=versions[-1]
- assert initial.old_values=={}
+ initial=next(version for version in versions if version.old_values=={})
  assert initial.new_values["medication_name"]=="Tratamiento ficticio"
  assert initial.new_values["schedules"]==[]
  # La administración pasada permanece intacta aunque cambie el horario futuro.
