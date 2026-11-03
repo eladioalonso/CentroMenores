@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import (
-    Date, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, text,
+    Date, DateTime, ForeignKey, Index, JSON, String, Text, UniqueConstraint, text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -56,6 +56,20 @@ class Minor(Base):
         return today.year - self.birth_date.year - (
             (today.month, today.day) < (self.birth_date.month, self.birth_date.day)
         )
+
+
+class MinorPersonalDataVersion(Base):
+    """Versiones recuperables de cambios en datos identificativos del expediente."""
+
+    __tablename__ = "minor_personal_data_versions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    minor_id: Mapped[str] = mapped_column(ForeignKey("minors.id"), nullable=False, index=True)
+    changed_by_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
+    changed_by_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    old_values: Mapped[dict] = mapped_column(JSON, nullable=False)
+    new_values: Mapped[dict] = mapped_column(JSON, nullable=False)
 
 
 class Stay(Base):
