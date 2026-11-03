@@ -975,7 +975,7 @@ class HealthDialog(StaySelectorDialog):
                     f"Documento: {selected['source_url']}"
                 )
                 category = category_filter.currentData()
-                rows = [row for row in selected["items"] if category is None or row[3] == category]
+                rows = [row for row in selected["items"] if category is None or row[4] == category]
                 table.setRowCount(len(rows))
                 for row_index, row in enumerate(rows):
                     values = [row[0], "Secuencia completa" if row[1] == "schedule" else "Dosis individual", row[2], row[3], category_labels.get(row[4], row[4]), row[5]]
