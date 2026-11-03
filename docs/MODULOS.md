@@ -37,6 +37,19 @@ Módulo con control de acceso reforzado.
 
 Los datos de identidad se consultan desde la ficha personal; no se crea una segunda ficha del menor. El acceso a este módulo y a sus documentos se limitará expresamente a usuarios autorizados.
 
+### Vacunación individual
+
+La vacunación forma parte de la ficha sanitaria del expediente principal de cada menor, con independencia de sus ingresos y estancias.
+
+- Calendario oficial de Melilla vigente y sus versiones históricas, con referencia al calendario común del SNS.
+- Vista individual por menor con vacuna, enfermedad prevenible, dosis, edad/fecha recomendada, estado y próximas actuaciones orientativas.
+- Historial de administraciones con fecha real, número/identificación de dosis, profesional o centro sanitario, lote/fabricante cuando consten, documento justificativo y autor del asiento.
+- Registro de vacunas recibidas antes del ingreso o fuera del centro, sin exigir estancia activa.
+- Seguimiento diferenciado de calendario sistemático, campañas estacionales y recomendaciones para grupos de riesgo.
+- Dosis pendientes o atrasadas señaladas como avisos para revisión sanitaria, nunca como prescripción automática.
+- Historial y auditoría: no se borran administraciones; cualquier corrección queda vinculada al asiento original.
+- Las reglas de calendario se versionan por vigencia y cohorte. Un cambio del calendario no altera retrospectivamente las pautas históricas.
+
 ## 4. Diario profesional
 
 Registro cronológico de observaciones y acontecimientos cotidianos.
