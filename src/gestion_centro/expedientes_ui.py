@@ -287,10 +287,10 @@ class MinorWorkspaceDialog(QDialog):
             return stay
 
     def open_health(self):
+        # La ficha sanitaria pertenece al residente y puede consultarse aunque
+        # no tenga una estancia activa. Las actuaciones de medicación mantienen
+        # su vínculo con el ingreso en el que se registran.
         stay_id = self.active_stay_id()
-        if not stay_id:
-            QMessageBox.information(self, "Ficha sanitaria", "El expediente no tiene una estancia activa.")
-            return
         from gestion_centro.care_ui import HealthDialog
         HealthDialog(self.factory, self.actor_id, stay_id=stay_id).exec()
         self.refresh()
