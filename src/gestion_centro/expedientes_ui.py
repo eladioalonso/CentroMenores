@@ -137,6 +137,12 @@ class MinorWorkspaceDialog(QDialog):
         edit = QPushButton('Modificar datos')
         edit.clicked.connect(self.edit_personal)
         actions.addWidget(edit)
+        health = QPushButton('Ficha sanitaria y medicación')
+        health.clicked.connect(self.open_health)
+        actions.addWidget(health)
+        education = QPushButton('Seguimiento educativo')
+        education.clicked.connect(self.open_education)
+        actions.addWidget(education)
         close = QPushButton('Cerrar')
         close.clicked.connect(self.accept)
         actions.addWidget(close)
@@ -169,6 +175,15 @@ class MinorWorkspaceDialog(QDialog):
                 vals = [event.happened_at.astimezone().strftime('%d/%m/%Y %H:%M'), event.title, event.description, event.author_name_snapshot]
                 for col, value in enumerate(vals):
                     self.events.setItem(row, col, QTableWidgetItem(value))
+
+
+    def open_health(self):
+        from gestion_centro.care_ui import HealthDialog
+        HealthDialog(self.factory, self.actor_id).exec()
+
+    def open_education(self):
+        from gestion_centro.care_ui import EducationDialog
+        EducationDialog(self.factory, self.actor_id).exec()
 
     def edit_personal(self):
         with session_scope(self.factory) as session:
