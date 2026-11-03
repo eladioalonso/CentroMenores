@@ -236,13 +236,30 @@ class MinorWorkspaceDialog(QDialog):
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, 'No se pudo registrar', str(exc))
 
+    def active_stay_id(self):
+        with session_scope(self.factory) as session:
+            stay = session.scalar(select(Stay.id).where(
+                Stay.minor_id == self.minor_id, Stay.status == "active"
+            ))
+            return stay
+
     def open_health(self):
+        stay_id = self.active_stay_id()
+        if not stay_id:
+            QMessageBox.information(self, "Ficha sanitaria", "El expediente no tiene una estancia activa.")
+            return
         from gestion_centro.care_ui import HealthDialog
-        HealthDialog(self.factory, self.actor_id).exec()
+        HealthDialog(self.factory, self.actor_id, stay_id=stay_id).exec()
+        self.refresh()
 
     def open_education(self):
+        stay_id = self.active_stay_id()
+        if not stay_id:
+            QMessageBox.information(self, "Seguimiento educativo", "El expediente no tiene una estancia activa.")
+            return
         from gestion_centro.care_ui import EducationDialog
-        EducationDialog(self.factory, self.actor_id).exec()
+        EducationDialog(self.factory, self.actor_id, stay_id=stay_id).exec()
+        self.refresh()
 
     def edit_personal(self):
         with session_scope(self.factory) as session:
