@@ -976,7 +976,7 @@ class HealthDialog(StaySelectorDialog):
                 rows = [row for row in selected["items"] if category is None or row[3] == category]
                 table.setRowCount(len(rows))
                 for row_index, row in enumerate(rows):
-                    values = [row[0], row[1], row[2], category_labels.get(row[3], row[3]), row[4]]
+                    values = [row[0], "Secuencia completa" if row[1] == "schedule" else "Dosis individual", row[2], row[3], category_labels.get(row[4], row[4]), row[5]]
                     for column, value in enumerate(values):
                         cell = QTableWidgetItem(str(value))
                         if column == 4 and row[5] != "—":
