@@ -7,6 +7,7 @@ from gestion_centro.auth.models import Professional, UserAccount, AccessAudit
 from gestion_centro.domain.models import Minor, Stay
 from gestion_centro.domain import health as health_models
 from gestion_centro.domain.health_service import save_health_profile, read_health_profile, list_health_profile_versions, add_medication_plan, record_medication_administration, set_medication_schedules, list_daily_medication_schedule, list_medication_plans, list_medication_plan_versions, add_vaccine_record
+from gestion_centro.domain.health_service import create_vaccine_calendar_edition, add_vaccine_calendar_item, list_vaccine_calendar_items, record_vaccine_dose_review, list_vaccine_dose_reviews
 
 @pytest.fixture
 def health_case():
@@ -165,3 +166,43 @@ def test_vaccine_record_rejects_future_administration_date(health_case):
  with pytest.raises(ValueError,match="futura"):
   add_vaccine_record(s,actor_account_id=actor,minor_id=s.get(Stay,stay).minor_id,
    vaccine_name="Vacuna ficticia",administered_on=date.today()+timedelta(days=1))
+
+
+def test_vaccine_calendar_is_versioned_documentation_and_does_not_auto_create_doses(health_case):
+ s,actor,stay=health_case
+ minor_id=s.get(Stay,stay).minor_id
+ edition=create_vaccine_calendar_edition(
+  s,actor_account_id=actor,jurisdiction="Melilla",edition_code="2026",
+  title="Calendario infantil Melilla 2026",effective_from=date(2026,1,1),
+  source_title="BOME 6335",source_reference="Orden 3567/2025, artículo 1322",
+  source_url="https://example.invalid/calendario-oficial")
+ item=add_vaccine_calendar_item(
+  s,actor_account_id=actor,edition_id=edition.id,vaccine_code="MMR",
+  display_name="Triple vírica",dose_label="Dosis 1",target_age_text="12 meses")
+ assert len(list_vaccine_calendar_items(s,actor_account_id=actor,edition_id=edition.id))==1
+ # El catálogo documental no genera recomendaciones ni administraciones por sí mismo.
+ assert list_vaccine_dose_reviews(s,actor_account_id=actor,minor_id=minor_id)==[]
+ assert s.scalars(select(health_models.VaccineRecord)).all()==[]
+ review=record_vaccine_dose_review(
+  s,actor_account_id=actor,minor_id=minor_id,calendar_item_id=item.id,
+  rationale="Revisado individualmente por profesional sanitario; antecedente documental comprobado",
+  status="pending_confirmed",target_date=date(2027,1,1))
+ assert review.minor_id==minor_id
+ assert review.status=="pending_confirmed"
+ assert review.reviewed_by_account_id==actor
+ assert len(list_vaccine_dose_reviews(s,actor_account_id=actor,minor_id=minor_id))==1
+
+
+def test_vaccine_review_rejects_cross_minor_administration_and_unknown_status(health_case):
+ s,actor,stay=health_case
+ minor_id=s.get(Stay,stay).minor_id
+ record=add_vaccine_record(s,actor_account_id=actor,minor_id=minor_id,
+  vaccine_name="Vacuna ficticia",administered_on=date(2026,1,2))
+ with pytest.raises(ValueError,match="administrada"):
+  record_vaccine_dose_review(s,actor_account_id=actor,minor_id=minor_id,
+   vaccine_record_id=record.id,rationale="Comprobación",status="pending_confirmed")
+ with pytest.raises(ValueError,match="Estado"):
+  record_vaccine_dose_review(s,actor_account_id=actor,minor_id=minor_id,
+   rationale="Comprobación",status="automatic_due")
+ with pytest.raises(ValueError,match="fundamento"):
+  record_vaccine_dose_review(s,actor_account_id=actor,minor_id=minor_id,rationale=" ")
