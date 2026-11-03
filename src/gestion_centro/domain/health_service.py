@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from gestion_centro.auth.models import AccessAudit, UserAccount
 from gestion_centro.domain.models import Minor, Stay
-from gestion_centro.domain.health import HealthProfile, HealthProfileVersion, MedicationPlan, MedicationSchedule, MedicationAdministration, VaccineRecord
+from gestion_centro.domain.health import HealthProfile, HealthProfileVersion, MedicationPlan, MedicationPlanVersion, MedicationSchedule, MedicationAdministration, VaccineRecord
 
 MEDICATION_RESULTS={"administered","refused","not_available"}
 
@@ -104,6 +104,49 @@ def list_health_profile_versions(session: Session, *, actor_account_id: str, min
         .order_by(HealthProfileVersion.changed_at.desc(), HealthProfileVersion.id.desc())
     ).all()
 
+
+def _medication_plan_values(plan: MedicationPlan) -> dict:
+    return {
+        "medication_name": plan.medication_name,
+        "prescribed_dose": plan.prescribed_dose,
+        "schedule_text": plan.schedule_text,
+        "prescriber_reference": plan.prescriber_reference,
+        "starts_on": plan.starts_on.isoformat(),
+        "ends_on": plan.ends_on.isoformat() if plan.ends_on else None,
+        "instructions": plan.instructions,
+        "active": bool(plan.active),
+        "schedules": [
+            {"time": item.time_of_day, "shift": item.shift}
+            for item in sorted(plan.schedules, key=lambda item: (item.time_of_day, item.shift))
+        ],
+    }
+
+
+def _record_medication_plan_version(session: Session, plan: MedicationPlan, actor: UserAccount,
+                                    old_values: dict, new_values: dict) -> None:
+    if old_values == new_values:
+        return
+    session.add(MedicationPlanVersion(
+        plan_id=plan.id, minor_id=plan.minor_id,
+        changed_by_account_id=actor.id,
+        changed_by_name_snapshot=actor.professional.display_name,
+        changed_at=datetime.now(timezone.utc),
+        old_values=old_values, new_values=new_values,
+    ))
+
+
+def list_medication_plan_versions(session: Session, *, actor_account_id: str, plan_id: str):
+    actor = _actor(session, actor_account_id)
+    plan = session.get(MedicationPlan, plan_id)
+    if plan is None:
+        raise ValueError("La pauta no existe")
+    _audit(session, actor, "medication_plan_history_accessed", f"{plan.minor_id}:{plan.id}")
+    return session.scalars(
+        select(MedicationPlanVersion).where(MedicationPlanVersion.plan_id == plan.id)
+        .order_by(MedicationPlanVersion.changed_at.desc(), MedicationPlanVersion.id.desc())
+    ).all()
+
+
 def add_medication_plan(session: Session, *, actor_account_id: str, medication_name: str,
                         prescribed_dose: str, schedule_text: str, prescriber_reference: str,
                         starts_on: date, minor_id: str | None = None, stay_id: str | None = None,
@@ -118,6 +161,7 @@ def add_medication_plan(session: Session, *, actor_account_id: str, medication_n
         instructions=instructions.strip() if instructions else None,
         recorded_by_account_id=actor.id,recorded_by_name_snapshot=actor.professional.display_name)
     session.add(plan); session.flush()
+    _record_medication_plan_version(session, plan, actor, {}, _medication_plan_values(plan))
     _audit(session,actor,"medication_plan_recorded",f"{minor.id}:{plan.id}")
     return plan
 
@@ -138,10 +182,13 @@ def set_medication_schedules(session: Session, *, actor_account_id: str, plan_id
         if any(existing[0] == time_text for existing in normalized):
             raise ValueError("No repitas una hora dentro de la misma pauta")
         normalized.append((time_text, shift))
+    old_values = _medication_plan_values(plan)
     plan.schedules.clear()
     for time_text, shift in normalized:
         plan.schedules.append(MedicationSchedule(time_of_day=time_text, shift=shift))
     session.flush()
+    new_values = _medication_plan_values(plan)
+    _record_medication_plan_version(session, plan, actor, old_values, new_values)
     _audit(session, actor, "medication_schedule_set", f"{plan.id}:{normalized}")
     return plan.schedules
 
