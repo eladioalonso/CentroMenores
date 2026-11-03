@@ -14,6 +14,7 @@ from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import DiaryDay, DiaryEntry, Incident, Stay
 from gestion_centro.domain.service import (
     record_diary_entry, record_incident, close_diary_day, revise_diary_entry,
+    correct_diary_entry,
 )
 
 
@@ -143,15 +144,34 @@ class DiaryDialog(QDialog):
                 entry = session.get(DiaryEntry, metadata["id"])
                 if entry is None:
                     raise ValueError("La anotación ya no existe.")
-                new_content, ok = QInputDialog.getMultiLineText(
-                    self, "Corregir anotación propia",
-                    "Nueva versión del texto (se conservará la anterior):", entry.content)
-                if not ok:
-                    return
-                revise_diary_entry(session, actor_account_id=self.actor_id,
-                    original_entry_id=entry.id, content=new_content)
+                day = session.get(DiaryDay, entry.diary_day_id)
+                if day is not None and day.closed_at is not None:
+                    new_content, ok = QInputDialog.getMultiLineText(
+                        self, "Rectificar anotación cerrada",
+                        "Texto de la rectificación (el original se conserva):", "")
+                    if not ok or not new_content.strip():
+                        return
+                    reason, ok = QInputDialog.getText(
+                        self, "Motivo de rectificación", "Motivo:")
+                    if not ok or not reason.strip():
+                        return
+                    local = QDateTime.currentDateTime().toPython()
+                    moment = local.astimezone(timezone.utc) if local.tzinfo else local.astimezone().astimezone(timezone.utc)
+                    correct_diary_entry(session, actor_account_id=self.actor_id,
+                        original_entry_id=entry.id, content=new_content,
+                        happened_at=moment, reason=reason)
+                    message = "Se ha añadido una rectificación vinculada. El original permanece en el historial."
+                else:
+                    new_content, ok = QInputDialog.getMultiLineText(
+                        self, "Corregir anotación propia",
+                        "Nueva versión del texto (se conservará la anterior):", entry.content)
+                    if not ok:
+                        return
+                    revise_diary_entry(session, actor_account_id=self.actor_id,
+                        original_entry_id=entry.id, content=new_content)
+                    message = "Se ha guardado una nueva versión. La anterior permanece en el historial."
             self.refresh()
-            QMessageBox.information(self, "Corrección guardada", "Se ha guardado una nueva versión. La anterior permanece en el historial.")
+            QMessageBox.information(self, "Corrección guardada", message)
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo corregir", str(exc))
 
@@ -216,7 +236,7 @@ class DiaryDialog(QDialog):
         self.add_button.setEnabled(not is_closed)
         self.incident_button.setEnabled(not is_closed)
         self.close_button.setEnabled(not is_closed)
-        self.revise_button.setEnabled(not is_closed)
+        self.revise_button.setEnabled(bool(rows))
         self.day_state.setText("DIARIO CERRADO · Solo consulta" if is_closed else "DIARIO ABIERTO · Se pueden registrar anotaciones e incidencias")
         self.day_state.setProperty("closed", is_closed)
         self.day_state.style().unpolish(self.day_state)
