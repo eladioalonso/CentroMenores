@@ -136,6 +136,7 @@ class VaccineCalendarItem(Base):
     vaccine_code: Mapped[str] = mapped_column(String(40), nullable=False)
     display_name: Mapped[str] = mapped_column(String(180), nullable=False)
     dose_label: Mapped[str] = mapped_column(String(240), nullable=False)
+    entry_kind: Mapped[str] = mapped_column(String(16), nullable=False, default="dose")
     target_age_text: Mapped[str] = mapped_column(String(100), nullable=False)
     category: Mapped[str] = mapped_column(String(24), nullable=False, default="systematic")
     documentary_note: Mapped[str | None] = mapped_column(Text)
