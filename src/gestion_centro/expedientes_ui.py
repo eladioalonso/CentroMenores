@@ -134,6 +134,10 @@ class MinorWorkspaceDialog(QDialog):
         self.events.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.tabs.addTab(self.events, 'Acontecimientos')
         actions = QHBoxLayout()
+        for label, callback in [('Nuevo ingreso / reingreso', self.new_stay), ('Cerrar estancia', self.close_stay), ('Registrar acontecimiento', self.add_event), ('Historial completo', lambda: self.tabs.setCurrentWidget(self.events))]:
+            button = QPushButton(label)
+            button.clicked.connect(callback)
+            actions.addWidget(button)
         edit = QPushButton('Modificar datos')
         edit.clicked.connect(self.edit_personal)
         actions.addWidget(edit)
@@ -176,6 +180,61 @@ class MinorWorkspaceDialog(QDialog):
                 for col, value in enumerate(vals):
                     self.events.setItem(row, col, QTableWidgetItem(value))
 
+
+    def current_stay(self):
+        with session_scope(self.factory) as session:
+            minor = session.get(Minor, self.minor_id)
+            if minor is None:
+                return None
+            stays = sorted(minor.stays, key=lambda item: item.sequence_number, reverse=True)
+            active = next((item for item in stays if item.status == 'active'), None)
+            return active.id if active else (stays[0].id if stays else None)
+
+    def new_stay(self):
+        value, ok = QInputDialog.getText(self, 'Nuevo ingreso', 'Fecha de ingreso (DD/MM/AAAA):', text=date.today().strftime('%d/%m/%Y'))
+        if not ok:
+            return
+        try:
+            start = datetime.strptime(value, '%d/%m/%Y').date()
+            with session_scope(self.factory) as session:
+                open_stay(session, actor_account_id=self.actor_id, minor_id=self.minor_id, started_on=start)
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, 'No se pudo abrir la estancia', str(exc))
+
+    def close_stay(self):
+        stay_id = self.current_stay()
+        if not stay_id:
+            QMessageBox.information(self, 'Estancias', 'No hay ninguna estancia que cerrar.')
+            return
+        reason, ok = QInputDialog.getMultiLineText(self, 'Cerrar estancia', 'Motivo del cierre:')
+        if not ok or not reason.strip():
+            return
+        try:
+            with session_scope(self.factory) as session:
+                close_stay(session, actor_account_id=self.actor_id, stay_id=stay_id, ended_on=date.today(), reason=reason)
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, 'No se pudo cerrar', str(exc))
+
+    def add_event(self):
+        stay_id = self.current_stay()
+        if not stay_id:
+            QMessageBox.information(self, 'Acontecimientos', 'Registra primero un ingreso.')
+            return
+        title, ok = QInputDialog.getText(self, 'Acontecimiento', 'Título:')
+        if not ok or not title.strip():
+            return
+        description, ok = QInputDialog.getMultiLineText(self, 'Acontecimiento', 'Descripción objetiva:')
+        if not ok or not description.strip():
+            return
+        try:
+            with session_scope(self.factory) as session:
+                record_event(session, author_account_id=self.actor_id, title=title, description=description, happened_at=datetime.now(timezone.utc), stay_ids=[stay_id])
+            self.refresh()
+            self.tabs.setCurrentWidget(self.events)
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, 'No se pudo registrar', str(exc))
 
     def open_health(self):
         from gestion_centro.care_ui import HealthDialog
@@ -255,9 +314,8 @@ class ExpedientesDialog(QDialog):
         layout.addWidget(self.table)
         actions = QHBoxLayout()
         for label, callback in [
-            ("Abrir expediente", self.open_selected), ("Nuevo expediente", self.new_minor), ("Nuevo ingreso / reingreso", self.new_stay),
-            ("Cerrar estancia", self.close_selected_stay), ("Registrar acontecimiento", self.new_event),
-            ("Historial", self.show_history), ("Actualizar", self.refresh),
+            ("Abrir expediente", self.open_selected), ("Nuevo expediente", self.new_minor),
+            ("Actualizar", self.refresh),
         ]:
             button = QPushButton(label)
             button.clicked.connect(callback)
