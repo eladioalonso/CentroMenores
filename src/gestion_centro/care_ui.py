@@ -21,7 +21,7 @@ from gestion_centro.domain.education_service import (
 from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationAdministration, VaccineRecord
 from gestion_centro.domain.health_service import (
     read_health_profile, save_health_profile, list_health_profile_versions, add_medication_plan,
-    record_medication_administration, add_vaccine_record, list_medication_plans,
+    record_medication_administration, add_vaccine_record, list_medication_plans, list_medication_plan_versions,
     set_medication_schedules, list_daily_medication_schedule,
 )
 
@@ -442,7 +442,8 @@ class HealthDialog(StaySelectorDialog):
         medication_layout.addWidget(self.plans)
         plan_actions = QHBoxLayout()
         for label, callback in [("Registrar pauta prescrita", self.add_plan),
-                                ("Configurar horarios", self.configure_schedule)]:
+                                ("Configurar horarios", self.configure_schedule),
+                                ("Historial de cambios", self.show_plan_history)]:
             button = QPushButton(label); button.clicked.connect(callback); plan_actions.addWidget(button)
         medication_layout.addLayout(plan_actions)
         self.tabs.addTab(medication_tab, "Medicación y pautas")
@@ -715,6 +716,57 @@ class HealthDialog(StaySelectorDialog):
             QMessageBox.information(self, "Pauta registrada", "La pauta y sus horarios han quedado registrados.")
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo registrar", str(exc))
+
+    def show_plan_history(self):
+        row = self.plans.currentRow()
+        cell = self.plans.item(row, 0) if row >= 0 else None
+        if not cell:
+            QMessageBox.information(self, "Selecciona pauta", "Selecciona primero una pauta.")
+            return
+        plan_id = cell.data(Qt.ItemDataRole.UserRole)
+        with session_scope(self.factory) as session:
+            versions = list_medication_plan_versions(
+                session, actor_account_id=self.actor_id, plan_id=plan_id
+            )
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Historial de la pauta de medicación")
+        dialog.resize(980, 520)
+        layout = QVBoxLayout(dialog)
+        hint = QLabel(
+            "Historial de cambios de la pauta prescrita. Las administraciones ya registradas "
+            "se conservan como eventos independientes y no se modifican al cambiar horarios."
+        )
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        table = QTableWidget(len(versions), 4)
+        table.setHorizontalHeaderLabels(["Fecha y hora", "Profesional", "Datos anteriores", "Datos guardados"])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.setWordWrap(True)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        table.setAlternatingRowColors(True)
+        labels = {
+            "medication_name": "Medicamento", "prescribed_dose": "Dosis prescrita",
+            "schedule_text": "Pauta", "prescriber_reference": "Referencia",
+            "starts_on": "Inicio", "ends_on": "Fin", "instructions": "Instrucciones",
+            "active": "Activa", "schedules": "Horarios",
+        }
+        for row_index, version in enumerate(versions):
+            def display(values):
+                translated = {labels.get(key, key): value for key, value in values.items()}
+                return json.dumps(translated, ensure_ascii=False, indent=2)
+            values = [
+                version.changed_at.astimezone().strftime("%d/%m/%Y %H:%M"),
+                version.changed_by_name_snapshot,
+                display(version.old_values), display(version.new_values),
+            ]
+            for col, value in enumerate(values):
+                table.setItem(row_index, col, QTableWidgetItem(value))
+            table.setRowHeight(row_index, 110)
+        layout.addWidget(table)
+        close = QPushButton("Cerrar")
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close)
+        dialog.exec()
 
     def configure_schedule(self):
         row = self.plans.currentRow()
