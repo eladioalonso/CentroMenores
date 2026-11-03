@@ -11,9 +11,9 @@ def test_upgrade_creates_versioned_auth_schema(tmp_path):
     with engine.connect() as connection:
         editions = connection.exec_driver_sql("SELECT jurisdiction, edition_code, status FROM vaccine_calendar_editions").all()
         items = connection.exec_driver_sql("SELECT vaccine_code, category FROM vaccine_calendar_items").all()
-    assert ("Melilla", "2026-infantil", "documentary") in editions\n    assert ("Melilla", "2026-adulto", "documentary") in editions
+    assert ("Melilla", "2026-infantil", "documentary") in editions\n    assert ("Melilla", "2026-adulto", "documentary") in editions\n    assert ("Melilla", "2025-acelerado", "documentary") in editions
     assert len(items) >= 35
-    assert any(code == "VRS-MAB" and category == "passive_immunization" for code, category in items)\n    assert len([code for code, category in items if code in {"GRIPE-AD", "NEUMO-VNC20-65", "VRS-AD"}]) == 3
+    assert any(code == "VRS-MAB" and category == "passive_immunization" for code, category in items)\n    assert len([code for code, category in items if code in {"GRIPE-AD", "NEUMO-VNC20-65", "VRS-AD"}]) == 3\n    assert sum(category == "catch_up" for code, category in items) >= 20
     engine.dispose()
 
 
