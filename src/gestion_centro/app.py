@@ -432,24 +432,29 @@ class CommunicationsDialog(QDialog):
         self.setWindowTitle("Comunicaciones internas")
         self.resize(900, 600)
         layout = QVBoxLayout(self)
+        intro = QLabel("Bandeja compartida del equipo. Abre una comunicación para consultar sus aportaciones; las rectificaciones se añaden vinculadas y conservan el contenido original.")
+        intro.setWordWrap(True)
+        intro.setObjectName("formIntro")
+        layout.addWidget(intro)
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["Título", "Estado", "Última actualización", "Creada por"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.table)
-        actions = QHBoxLayout()
+        actions = QGridLayout()
         controls = [
-            ("Nueva", self.create_item), ("Ver aportaciones", self.view_notes),
+            ("Nueva comunicación", self.create_item), ("Ver aportaciones", self.view_notes),
             ("Añadir aportación", self.add_note), ("Rectificar mi aportación", self.revise_note), ("Cerrar", self.close_item),
             ("Enviar a papelera", self.trash_item), ("Reabrir", self.reopen_item),
             ("Papelera / bandeja", self.toggle_trash), ("Recuperar", self.restore_item),
             ("Actualizar", self.refresh),
         ]
-        for label, callback in controls:
+        for index, (label, callback) in enumerate(controls):
             button = QPushButton(label)
+            button.setMinimumHeight(38)
             button.clicked.connect(callback)
-            actions.addWidget(button)
+            actions.addWidget(button, index // 5, index % 5)
         layout.addLayout(actions)
         self.refresh()
 
