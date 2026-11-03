@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import Minor, Stay
-from gestion_centro.domain.education import EducationGoal, SchoolPlacement
+from gestion_centro.domain.education import EducationGoal, EducationUpdate, SchoolPlacement
 from gestion_centro.domain.education_service import (
     create_education_goal, add_education_update, set_education_goal_status,
     create_school_placement, add_school_record, list_school_placements,
@@ -68,8 +68,8 @@ class EducationDialog(StaySelectorDialog):
         self.goals.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.goals.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.body.addWidget(self.goals)
-        self.updates = QTableWidget(0, 6)
-        self.updates.setHorizontalHeaderLabels(["ID", "Fecha", "Área", "Observación", "Actuación", "Respuesta / seguimiento"])
+        self.updates = QTableWidget(0, 7)
+        self.updates.setHorizontalHeaderLabels(["ID", "Fecha", "Área", "Observación", "Actuación", "Respuesta / seguimiento", "Autor"])
         self.updates.setColumnHidden(0, True)
         self.updates.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.updates.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -112,7 +112,8 @@ class EducationDialog(StaySelectorDialog):
                 .order_by(EducationGoal.created_at.desc())).all() if stay_id else []
             data = [(g.id, g.title, g.status, g.target_date.isoformat() if g.target_date else "—") for g in rows]
             updates = [(u.id, u.created_at, u.category, u.objective_description, u.actions_taken,
-                u.response_observed + (" · Seguimiento: " + u.follow_up if u.follow_up else ""))
+                u.response_observed + (" · Seguimiento: " + u.follow_up if u.follow_up else ""),
+                u.author_name_snapshot)
                 for g in rows for u in g.updates]
             placements = list_school_placements(session, stay_id=stay_id) if stay_id else []
             school_data = [(p.id, p.school_name, p.course, p.started_on.strftime("%d/%m/%Y"),
@@ -126,8 +127,8 @@ class EducationDialog(StaySelectorDialog):
                 self.goals.setItem(i, col, cell)
         updates.sort(key=lambda row: row[0], reverse=True)
         self.updates.setRowCount(len(updates))
-        for i, (update_id, created, category, observation, actions, response) in enumerate(updates):
-            values = [update_id, created.astimezone().strftime("%d/%m/%Y %H:%M"), category, observation, actions, response]
+        for i, (update_id, created, category, observation, actions, response, author) in enumerate(updates):
+            values = [update_id, created.astimezone().strftime("%d/%m/%Y %H:%M"), category, observation, actions, response, author]
             for col, value in enumerate(values):
                 cell = QTableWidgetItem(str(value))
                 if col == 0: cell.setData(Qt.ItemDataRole.UserRole, update_id)
@@ -248,15 +249,33 @@ class EducationDialog(StaySelectorDialog):
         if not update_id:
             QMessageBox.information(self, "Selecciona", "Selecciona primero un seguimiento.")
             return
+        with session_scope(self.factory) as session:
+            selected_update = session.get(EducationUpdate, update_id)
+            if selected_update is None:
+                QMessageBox.warning(self, "No disponible", "El seguimiento seleccionado ya no existe.")
+                return
+            original_values = (
+                selected_update.objective_description,
+                selected_update.actions_taken,
+                selected_update.response_observed,
+                selected_update.follow_up or "",
+            )
         dialog = QDialog(self)
         dialog.setWindowTitle("Rectificar mi seguimiento")
         dialog.resize(560, 430)
         layout = QVBoxLayout(dialog)
+        hint = QLabel("Se muestran los datos actuales para que puedas corregir solo lo necesario. La rectificación quedará vinculada y no sustituirá el original.")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
         form = QFormLayout()
         observation = QTextEdit()
         actions = QTextEdit()
         response = QTextEdit()
         follow_up = QTextEdit()
+        observation.setPlainText(original_values[0])
+        actions.setPlainText(original_values[1])
+        response.setPlainText(original_values[2])
+        follow_up.setPlainText(original_values[3])
         observation.setMinimumHeight(65)
         actions.setMinimumHeight(65)
         response.setMinimumHeight(65)
