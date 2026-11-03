@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from gestion_centro.auth.models import AccessAudit, UserAccount
-from gestion_centro.domain.models import Event, EventStayLink, Minor, Stay
+from gestion_centro.domain.models import Event, EventStayLink, Minor, MinorPersonalDataVersion, Stay
 
 
 def create_minor(
@@ -87,11 +87,27 @@ def update_minor_personal_data(
     changed = [name for name, value in values.items() if getattr(minor, name) != value]
     if not changed:
         return minor
+
+    def json_value(value):
+        return value.isoformat() if isinstance(value, date) else value
+
+    old_values = {name: json_value(getattr(minor, name)) for name in changed}
+    new_values = {name: json_value(values[name]) for name in changed}
+    version = MinorPersonalDataVersion(
+        minor_id=minor.id,
+        changed_by_account_id=actor.id,
+        changed_by_name_snapshot=actor.professional.display_name,
+        changed_at=datetime.now(timezone.utc),
+        old_values=old_values,
+        new_values=new_values,
+    )
+    session.add(version)
+    session.flush()
     for name, value in values.items():
         setattr(minor, name, value)
     minor.updated_at = datetime.now(timezone.utc)
     _audit(session, actor, "minor_personal_data_updated",
-        f"Expediente: {minor.id}; campos modificados: {', '.join(changed)}")
+        f"Expediente: {minor.id}; versión: {version.id}; campos modificados: {', '.join(changed)}")
     return minor
 
 
