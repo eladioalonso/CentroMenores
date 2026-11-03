@@ -427,5 +427,5 @@ def list_vaccine_dose_reviews(session: Session, *, actor_account_id: str, minor_
     _audit(session, actor, "vaccine_dose_reviews_accessed", minor.id)
     return session.scalars(
         select(VaccineDoseReview).where(VaccineDoseReview.minor_id == minor.id)
-        .order_by(VaccineDoseReview.target_date, VaccineDoseReview.created_at)
+        .order_by(VaccineDoseReview.reviewed_at.desc(), VaccineDoseReview.created_at.desc(), VaccineDoseReview.id.desc())
     ).all()
