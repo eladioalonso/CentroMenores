@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 from sqlalchemy import select
 
 from gestion_centro.persistence.database import session_scope
-from gestion_centro.domain.models import Minor, Stay, Event, EventStayLink
+from gestion_centro.domain.models import Minor, Stay, Event, EventStayLink, MinorPersonalDataVersion
 from gestion_centro.domain.service import create_minor, open_stay, close_stay, record_event
 
 
@@ -141,6 +141,9 @@ class MinorWorkspaceDialog(QDialog):
         edit = QPushButton('Modificar datos')
         edit.clicked.connect(self.edit_personal)
         actions.addWidget(edit)
+        history = QPushButton('Historial de modificaciones')
+        history.clicked.connect(self.show_personal_history)
+        actions.addWidget(history)
         health = QPushButton('Ficha sanitaria y medicación')
         health.clicked.connect(self.open_health)
         actions.addWidget(health)
@@ -235,6 +238,31 @@ class MinorWorkspaceDialog(QDialog):
             self.tabs.setCurrentWidget(self.events)
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, 'No se pudo registrar', str(exc))
+
+    def show_personal_history(self):
+        with session_scope(self.factory) as session:
+            versions = session.scalars(
+                select(MinorPersonalDataVersion)
+                .where(MinorPersonalDataVersion.minor_id == self.minor_id)
+                .order_by(MinorPersonalDataVersion.changed_at.desc())
+            ).all()
+            rows = [
+                f"{version.changed_at.astimezone().strftime('%d/%m/%Y %H:%M')} · {version.changed_by_name_snapshot}\n" +
+                "\n".join(f"{field}: {version.old_values.get(field)!r} → {version.new_values.get(field)!r}" for field in version.new_values)
+                for version in versions
+            ]
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Historial de modificaciones')
+        dialog.resize(700, 500)
+        layout = QVBoxLayout(dialog)
+        details = QTextEdit()
+        details.setReadOnly(True)
+        details.setPlainText('\n\n'.join(rows) if rows else 'No hay modificaciones registradas.')
+        layout.addWidget(details)
+        close = QPushButton('Cerrar')
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close)
+        dialog.exec()
 
     def active_stay_id(self):
         with session_scope(self.factory) as session:
