@@ -21,11 +21,20 @@ def test_personal_data_update_is_saved_and_audited():
             given_names='Original', family_names='Name')
         update_minor_personal_data(session, actor_account_id=actor.id, minor_id=minor.id,
             given_names='Corrected', family_names='Name', locality='Lorca',
-            nif_nie='x1234567a', email='test@example.test')
+            nif_nie='x1234567a', email='test@example.test', cip='cip-123',
+            health_center='Centro ficticio', physician='Facultativo ficticio',
+            nurse='Enfermera ficticia', health_card_expires_on=date(2027, 5, 1),
+            clinical_history='Historial ficticio')
         saved = session.get(Minor, minor.id)
         assert saved.given_names == 'Corrected'
         assert saved.nif_nie == 'X1234567A'
         assert saved.locality == 'Lorca'
+        assert saved.cip == 'CIP-123'
+        assert saved.health_center == 'Centro ficticio'
+        assert saved.physician == 'Facultativo ficticio'
+        assert saved.nurse == 'Enfermera ficticia'
+        assert saved.health_card_expires_on == date(2027, 5, 1)
+        assert saved.clinical_history == 'Historial ficticio'
         version = session.scalar(select(MinorPersonalDataVersion).where(
             MinorPersonalDataVersion.minor_id == minor.id))
         assert version is not None
@@ -33,6 +42,8 @@ def test_personal_data_update_is_saved_and_audited():
         assert version.new_values['given_names'] == 'Corrected'
         assert version.old_values['nif_nie'] is None
         assert version.new_values['nif_nie'] == 'X1234567A'
+        assert version.new_values['clinical_history'] == 'Historial ficticio'
+        assert version.old_values['clinical_history'] is None
         assert session.scalar(select(AccessAudit).where(
             AccessAudit.event == 'minor_personal_data_updated')) is not None
 
