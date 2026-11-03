@@ -36,6 +36,20 @@ class HealthProfileVersion(Base):
     old_values: Mapped[dict] = mapped_column(JSON, nullable=False)
     new_values: Mapped[dict] = mapped_column(JSON, nullable=False)
 
+
+class MedicationPlanVersion(Base):
+    """Instantánea inmutable de una pauta y sus horarios prescritos."""
+    __tablename__ = "medication_plan_versions"
+    __table_args__ = (Index("ix_medication_plan_versions_plan_changed", "plan_id", "changed_at"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    plan_id: Mapped[str] = mapped_column(ForeignKey("medication_plans.id"), nullable=False)
+    minor_id: Mapped[str] = mapped_column(ForeignKey("minors.id"), nullable=False)
+    changed_by_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
+    changed_by_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    old_values: Mapped[dict] = mapped_column(JSON, nullable=False)
+    new_values: Mapped[dict] = mapped_column(JSON, nullable=False)
+
 class MedicationPlan(Base):
     __tablename__ = "medication_plans"
     __table_args__ = (Index("ix_medication_plans_minor_active", "minor_id", "active"),)
