@@ -14,6 +14,8 @@ def test_upgrade_creates_versioned_auth_schema(tmp_path):
     columns = {column["name"]: column for column in inspector.get_columns("vaccine_calendar_items")}
     assert columns["dose_label"]["type"].length == 240
     assert "entry_kind" in columns
+    vaccine_record_columns = {column["name"] for column in inspector.get_columns("vaccine_records")}
+    assert "calendar_item_id" in vaccine_record_columns
     assert {
         "professionals", "user_accounts", "access_audit", "alembic_version",
         "minors", "stays", "events", "event_stay_links", "diary_days",
