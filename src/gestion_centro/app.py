@@ -896,45 +896,69 @@ class MainWindow(QMainWindow):
             dashboard_layout.addStretch(1)
             refresh_dashboard()
 
-        def add_actions(tab: QWidget, actions: list[tuple[str, object]], columns: int = 2) -> None:
-            grid = QGridLayout(tab)
-            for index, (label, callback) in enumerate(actions):
-                button = QPushButton(label)
-                button.setMinimumHeight(48)
+        def add_actions(tab: QWidget, actions: list[tuple[str, str, object]], columns: int = 2) -> None:
+            layout = QVBoxLayout(tab)
+            intro = QLabel("Accede directamente a las herramientas de trabajo. Cada apartado conserva su historial y trazabilidad.")
+            intro.setObjectName("moduleIntro")
+            intro.setWordWrap(True)
+            layout.addWidget(intro)
+            grid = QGridLayout()
+            grid.setHorizontalSpacing(14)
+            grid.setVerticalSpacing(14)
+            layout.addLayout(grid)
+            for index, (label, description, callback) in enumerate(actions):
+                card = QFrame()
+                card.setObjectName("moduleActionCard")
+                card_layout = QVBoxLayout(card)
+                card_layout.setContentsMargins(15, 13, 15, 13)
+                card_layout.setSpacing(7)
+                title = QLabel(label)
+                title.setObjectName("moduleActionTitle")
+                title.setWordWrap(True)
+                detail = QLabel(description)
+                detail.setObjectName("moduleActionDescription")
+                detail.setWordWrap(True)
+                button = QPushButton("Abrir apartado")
+                button.setObjectName("moduleActionButton")
+                button.setMinimumHeight(38)
                 button.clicked.connect(callback)
-                grid.addWidget(button, index // columns, index % columns)
+                card_layout.addWidget(title)
+                card_layout.addWidget(detail, 1)
+                card_layout.addWidget(button)
+                grid.addWidget(card, index // columns, index % columns)
             grid.setRowStretch((len(actions) + columns - 1) // columns, 1)
+            layout.addStretch(1)
 
         if factory is not None and account_id is not None:
             daily = QWidget()
             tabs.addTab(daily, "Día a día")
             add_actions(daily, [
-                ("Expedientes y estancias", lambda: ExpedientesDialog(factory, account_id).exec()),
-                ("Diario e incidencias", lambda: DiaryDialog(factory, account_id).exec()),
-                ("Agenda común y tareas", lambda: AgendaDialog(factory, account_id).exec()),
-                ("Comunicaciones internas", lambda: CommunicationsDialog(factory, account_id).exec()),
+                ("Expedientes y estancias", "Consulta residentes, situación actual e historial de estancias.", lambda: ExpedientesDialog(factory, account_id).exec()),
+                ("Diario e incidencias", "Registra el trabajo del turno y realiza seguimiento de incidencias.", lambda: DiaryDialog(factory, account_id).exec()),
+                ("Agenda común y tareas", "Organiza tareas, citas, actividades y responsables.", lambda: AgendaDialog(factory, account_id).exec()),
+                ("Comunicaciones internas", "Comparte información entre profesionales con aportaciones trazables.", lambda: CommunicationsDialog(factory, account_id).exec()),
             ])
 
             management = QWidget()
             tabs.addTab(management, "Gestión y consultas")
             add_actions(management, [
-                ("Calendario", lambda: CalendarDialog(factory, account_id).exec()),
-                ("Documentación personal", lambda: DocumentsDialog(factory, account_id, paths).exec()),
-                ("Autorizaciones", lambda: AuthorizationsDialog(factory, account_id).exec()),
-                ("Salidas", lambda: OutingsDialog(factory, account_id).exec()),
-                ("Seguimiento educativo y escolaridad", lambda: EducationDialog(factory, account_id).exec()),
-                ("Ficha sanitaria y medicación", lambda: HealthDialog(factory, account_id).exec()),
-                ("Informes externos", lambda: ExternalReportsDialog(factory, account_id).exec()),
+                ("Calendario", "Consulta fechas relevantes y planificación del centro.", lambda: CalendarDialog(factory, account_id).exec()),
+                ("Documentación personal", "Gestiona documentos vinculados a los expedientes.", lambda: DocumentsDialog(factory, account_id, paths).exec()),
+                ("Autorizaciones", "Registra y consulta autorizaciones y consentimientos.", lambda: AuthorizationsDialog(factory, account_id).exec()),
+                ("Salidas", "Controla salidas, retornos y situaciones en curso.", lambda: OutingsDialog(factory, account_id).exec()),
+                ("Seguimiento educativo y escolaridad", "Registra objetivos, evolución y coordinación escolar.", lambda: EducationDialog(factory, account_id).exec()),
+                ("Ficha sanitaria y medicación", "Consulta información sanitaria y pautas de medicación.", lambda: HealthDialog(factory, account_id).exec()),
+                ("Informes externos", "Prepara y consulta documentación e informes externos.", lambda: ExternalReportsDialog(factory, account_id).exec()),
             ])
 
         if role is Role.ADMIN and factory is not None and account_id is not None:
             administration = QWidget()
             tabs.addTab(administration, "Administración")
             add_actions(administration, [
-                ("Administrar cuentas", lambda: AccountManagementDialog(factory, account_id).exec()),
-                ("Copias de seguridad", lambda: BackupDialog(paths, factory, account_id).exec()),
-                ("Mantenimiento y diagnóstico", lambda: MaintenanceDialog(paths, factory, account_id).exec()),
-                ("Estadísticas y memoria", lambda: ReportsDialog(factory, account_id).exec()),
+                ("Administrar cuentas", "Crea y administra cuentas, perfiles y estados de acceso.", lambda: AccountManagementDialog(factory, account_id).exec()),
+                ("Copias de seguridad", "Crea, verifica y restaura copias de la base de datos.", lambda: BackupDialog(paths, factory, account_id).exec()),
+                ("Mantenimiento y diagnóstico", "Consulta el estado técnico y las herramientas de diagnóstico.", lambda: MaintenanceDialog(paths, factory, account_id).exec()),
+                ("Estadísticas y memoria", "Genera consultas agregadas e informes de actividad.", lambda: ReportsDialog(factory, account_id).exec()),
             ])
 
         notice = QLabel(
@@ -990,6 +1014,34 @@ def main() -> int:
         QLabel#dashboardCardDescription {
             color: #65768A;
             font-size: 9pt;
+        }
+        QLabel#moduleIntro {
+            color: #65768A;
+            padding: 4px 2px 8px 2px;
+        }
+        QFrame#moduleActionCard {
+            background: #FFFFFF;
+            border: 1px solid #DCE4EE;
+            border-radius: 10px;
+        }
+        QLabel#moduleActionTitle {
+            color: #294E6B;
+            font-size: 11pt;
+            font-weight: 600;
+        }
+        QLabel#moduleActionDescription {
+            color: #65768A;
+            font-size: 9pt;
+        }
+        QPushButton#moduleActionButton {
+            background: #EAF2F8;
+            color: #175C8E;
+            border-color: #D4E2EE;
+            text-align: left;
+        }
+        QPushButton#moduleActionButton:hover {
+            background: #DCEAF5;
+            border-color: #AFC9DD;
         }
         QTabWidget::pane {
             border: 1px solid #DCE4EE;
