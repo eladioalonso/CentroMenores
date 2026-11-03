@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QApplication, QDialog, QDialogButtonBox, QFormLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QVBoxLayout, QWidget, QHBoxLayout, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QInputDialog, QComboBox,
-    QDateTimeEdit, QDateEdit, QTextEdit, QFileDialog, QCheckBox, QTabWidget, QGridLayout,
+    QDateTimeEdit, QDateEdit, QTextEdit, QFileDialog, QCheckBox, QTabWidget, QGridLayout, QFrame,
 )
 from sqlalchemy import func, select
 
@@ -856,17 +856,24 @@ class MainWindow(QMainWindow):
                     ) or 0))
 
             def dashboard_card(row, column, key, title, description, callback):
-                card = QWidget()
+                card = QFrame()
+                card.setObjectName("dashboardCard")
                 card_layout = QVBoxLayout(card)
+                card_layout.setContentsMargins(16, 14, 16, 14)
+                card_layout.setSpacing(8)
                 heading = QLabel(title)
-                heading.setStyleSheet("font-weight: 600;")
+                heading.setObjectName("dashboardCardTitle")
                 value = QLabel("—")
-                value.setStyleSheet("font-size: 28px; font-weight: 600;")
+                value.setObjectName("dashboardCardValue")
                 counters[key] = value
                 card_layout.addWidget(heading)
                 card_layout.addWidget(value)
-                card_layout.addWidget(QLabel(description))
-                action = QPushButton("Abrir módulo")
+                detail = QLabel(description)
+                detail.setObjectName("dashboardCardDescription")
+                detail.setWordWrap(True)
+                card_layout.addWidget(detail, 1)
+                action = QPushButton("Consultar")
+                action.setMinimumHeight(38)
                 action.clicked.connect(callback)
                 card_layout.addWidget(action)
                 dashboard_grid.addWidget(card, row, column)
@@ -963,6 +970,26 @@ def main() -> int:
         }
         QLabel {
             background: transparent;
+        }
+        QFrame#dashboardCard {
+            background: #FFFFFF;
+            border: 1px solid #DCE4EE;
+            border-radius: 10px;
+        }
+        QLabel#dashboardCardTitle {
+            color: #385B78;
+            font-size: 11pt;
+            font-weight: 600;
+        }
+        QLabel#dashboardCardValue {
+            color: #175C8E;
+            font-size: 30pt;
+            font-weight: 700;
+            padding: 1px 0;
+        }
+        QLabel#dashboardCardDescription {
+            color: #65768A;
+            font-size: 9pt;
         }
         QTabWidget::pane {
             border: 1px solid #DCE4EE;
