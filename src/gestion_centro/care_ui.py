@@ -934,6 +934,10 @@ class HealthDialog(StaySelectorDialog):
                 for catalog_item in items:
                     label = f"{edition.title} · {catalog_item.display_name} · {catalog_item.dose_label} · {catalog_item.target_age_text}"
                     calendar_item.addItem(label, catalog_item.id)
+                    calendar_item.setItemData(
+                        calendar_item.count() - 1, catalog_item.category,
+                        Qt.ItemDataRole.UserRole + 1,
+                    )
             records = session.scalars(
                 select(VaccineRecord).where(VaccineRecord.minor_id == minor_id)
                 .order_by(VaccineRecord.administered_on.desc())
@@ -950,6 +954,21 @@ class HealthDialog(StaySelectorDialog):
             ("No administrada", "not_administered"), ("No aplicable", "not_applicable"),
         ]:
             status.addItem(label, value)
+        def apply_catalog_category(index):
+            catalog_category = calendar_item.itemData(index, Qt.ItemDataRole.UserRole + 1)
+            if catalog_category:
+                category_index = category.findData(catalog_category)
+                if category_index >= 0:
+                    category.setCurrentIndex(category_index)
+
+        def apply_linked_administration(index):
+            if administration.itemData(index):
+                administered_index = status.findData("administered")
+                if administered_index >= 0:
+                    status.setCurrentIndex(administered_index)
+
+        calendar_item.currentIndexChanged.connect(apply_catalog_category)
+        administration.currentIndexChanged.connect(apply_linked_administration)
         target = QDateEdit()
         target.setCalendarPopup(True)
         target.setDate(QDate.currentDate())
