@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton,
+    QDialog, QDialogButtonBox, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QInputDialog,
     QLabel, QDateEdit, QTabWidget, QWidget, QTextEdit, QScrollArea,
 )
@@ -114,6 +114,104 @@ class NewMinorDialog(QDialog):
         }
 
 
+class MinorWorkspaceDialog(QDialog):
+    def __init__(self, factory, actor_id, minor_id, parent=None):
+        super().__init__(parent)
+        self.factory, self.actor_id, self.minor_id = factory, actor_id, minor_id
+        self.resize(850, 600)
+        layout = QVBoxLayout(self)
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
+        self.personal = QWidget()
+        self.personal_form = QFormLayout(self.personal)
+        self.tabs.addTab(self.personal, 'Datos personales')
+        self.stays = QTableWidget(0, 4)
+        self.stays.setHorizontalHeaderLabels(['Ingreso', 'Salida', 'Estado', 'Motivo'])
+        self.stays.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.tabs.addTab(self.stays, 'Estancias')
+        self.events = QTableWidget(0, 4)
+        self.events.setHorizontalHeaderLabels(['Fecha', 'Acontecimiento', 'Descripción', 'Autor'])
+        self.events.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.tabs.addTab(self.events, 'Acontecimientos')
+        actions = QHBoxLayout()
+        edit = QPushButton('Modificar datos')
+        edit.clicked.connect(self.edit_personal)
+        actions.addWidget(edit)
+        close = QPushButton('Cerrar')
+        close.clicked.connect(self.accept)
+        actions.addWidget(close)
+        layout.addLayout(actions)
+        self.refresh()
+
+    def refresh(self):
+        with session_scope(self.factory) as session:
+            minor = session.get(Minor, self.minor_id)
+            if minor is None:
+                self.reject()
+                return
+            self.setWindowTitle('Expediente · ' + minor.internal_code + ' · ' + minor.given_names + ' ' + minor.family_names)
+            while self.personal_form.rowCount():
+                self.personal_form.removeRow(0)
+            fields = [('Código', minor.internal_code), ('Nombre', minor.given_names), ('Apellidos', minor.family_names), ('País de nacimiento', minor.birth_country), ('Localidad', minor.locality), ('Nacionalidad', minor.nationality), ('Fecha nacimiento', str(minor.birth_date or '—')), ('Edad', str(minor.age or '—')), ('NIF/NIE', minor.nif_nie), ('Pasaporte', minor.passport_number), ('Dirección', minor.address), ('Email', minor.email)]
+            for label, value in fields:
+                self.personal_form.addRow(label, QLabel(value or '—'))
+            stays = sorted(minor.stays, key=lambda item: item.sequence_number, reverse=True)
+            self.stays.setRowCount(len(stays))
+            for row, stay in enumerate(stays):
+                vals = [str(stay.started_on), str(stay.ended_on or '—'), 'Activa' if stay.status == 'active' else 'Cerrada', stay.closure_reason or '—']
+                for col, value in enumerate(vals):
+                    self.stays.setItem(row, col, QTableWidgetItem(value))
+            links = session.scalars(select(EventStayLink).join(Stay).where(Stay.minor_id == minor.id)).all()
+            events = [session.get(Event, link.event_id) for link in links]
+            events.sort(key=lambda item: item.happened_at, reverse=True)
+            self.events.setRowCount(len(events))
+            for row, event in enumerate(events):
+                vals = [event.happened_at.astimezone().strftime('%d/%m/%Y %H:%M'), event.title, event.description, event.author_name_snapshot]
+                for col, value in enumerate(vals):
+                    self.events.setItem(row, col, QTableWidgetItem(value))
+
+    def edit_personal(self):
+        with session_scope(self.factory) as session:
+            minor = session.get(Minor, self.minor_id)
+            if minor is None:
+                return
+            given, ok = QInputDialog.getText(self, 'Modificar expediente', 'Nombre(s):', text=minor.given_names)
+            if not ok:
+                return
+            family, ok = QInputDialog.getText(self, 'Modificar expediente', 'Apellidos:', text=minor.family_names)
+            if not ok:
+                return
+            country, ok = QInputDialog.getText(self, 'Modificar expediente', 'País de nacimiento:', text=minor.birth_country or '')
+            if not ok:
+                return
+            locality, ok = QInputDialog.getText(self, 'Modificar expediente', 'Localidad:', text=minor.locality or '')
+            if not ok:
+                return
+            nationality, ok = QInputDialog.getText(self, 'Modificar expediente', 'Nacionalidad:', text=minor.nationality or '')
+            if not ok:
+                return
+            nif, ok = QInputDialog.getText(self, 'Modificar expediente', 'NIF / NIE:', text=minor.nif_nie or '')
+            if not ok:
+                return
+            passport, ok = QInputDialog.getText(self, 'Modificar expediente', 'Pasaporte:', text=minor.passport_number or '')
+            if not ok:
+                return
+            address, ok = QInputDialog.getMultiLineText(self, 'Modificar expediente', 'Dirección:', text=minor.address or '')
+            if not ok:
+                return
+            email, ok = QInputDialog.getText(self, 'Modificar expediente', 'Email:', text=minor.email or '')
+            if not ok:
+                return
+            values = dict(given_names=given, family_names=family, birth_country=country, locality=locality, nationality=nationality, nif_nie=nif, passport_number=passport, address=address, email=email, birth_date=minor.birth_date)
+        try:
+            from gestion_centro.domain.service import update_minor_personal_data
+            with session_scope(self.factory) as session:
+                update_minor_personal_data(session, actor_account_id=self.actor_id, minor_id=self.minor_id, **values)
+            self.refresh()
+            QMessageBox.information(self, 'Expediente', 'Datos modificados y cambio auditado.')
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, 'No se pudo modificar', str(exc))
+
 class ExpedientesDialog(QDialog):
     def __init__(self, factory, actor_id):
         super().__init__()
@@ -134,7 +232,7 @@ class ExpedientesDialog(QDialog):
         layout.addWidget(self.table)
         actions = QHBoxLayout()
         for label, callback in [
-            ("Nuevo expediente", self.new_minor), ("Nuevo ingreso / reingreso", self.new_stay),
+            ("Abrir expediente", self.open_selected), ("Nuevo expediente", self.new_minor), ("Nuevo ingreso / reingreso", self.new_stay),
             ("Cerrar estancia", self.close_selected_stay), ("Registrar acontecimiento", self.new_event),
             ("Historial", self.show_history), ("Actualizar", self.refresh),
         ]:
@@ -142,6 +240,15 @@ class ExpedientesDialog(QDialog):
             button.clicked.connect(callback)
             actions.addWidget(button)
         layout.addLayout(actions)
+        self.table.cellDoubleClicked.connect(lambda _row, _column: self.open_selected())
+        self.refresh()
+
+    def open_selected(self):
+        minor_id, _stay_id = self.selected()
+        if not minor_id:
+            QMessageBox.information(self, 'Selecciona expediente', 'Selecciona primero un expediente.')
+            return
+        MinorWorkspaceDialog(self.factory, self.actor_id, minor_id, self).exec()
         self.refresh()
 
     def refresh(self):
