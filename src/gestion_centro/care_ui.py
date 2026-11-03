@@ -18,7 +18,7 @@ from gestion_centro.domain.education_service import (
     create_school_placement, add_school_record, list_school_placements,
     revise_education_update,
 )
-from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationAdministration, VaccineRecord, VaccineDoseReview, VaccineCalendarItem
+from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationAdministration, VaccineRecord, VaccineDoseReview, VaccineCalendarItem, VaccineCalendarEdition
 from gestion_centro.domain.health_service import (
     read_health_profile, save_health_profile, list_health_profile_versions, add_medication_plan,
     record_medication_administration, add_vaccine_record, list_medication_plans, list_medication_plan_versions,
@@ -918,6 +918,31 @@ class HealthDialog(StaySelectorDialog):
             ("Inmunización pasiva (VRS, por ejemplo)", "passive_immunization"),
         ]:
             category.addItem(label, value)
+        calendar_item = QComboBox()
+        calendar_item.addItem("Sin vincular a una dosis del catálogo", None)
+        administration = QComboBox()
+        administration.addItem("Sin enlazar administración", None)
+        with session_scope(self.factory) as session:
+            editions = session.scalars(
+                select(VaccineCalendarEdition).order_by(VaccineCalendarEdition.effective_from.desc())
+            ).all()
+            for edition in editions:
+                items = session.scalars(
+                    select(VaccineCalendarItem).where(VaccineCalendarItem.edition_id == edition.id)
+                    .order_by(VaccineCalendarItem.target_age_text, VaccineCalendarItem.display_name)
+                ).all()
+                for catalog_item in items:
+                    label = f"{edition.title} · {catalog_item.display_name} · {catalog_item.dose_label} · {catalog_item.target_age_text}"
+                    calendar_item.addItem(label, catalog_item.id)
+            records = session.scalars(
+                select(VaccineRecord).where(VaccineRecord.minor_id == minor_id)
+                .order_by(VaccineRecord.administered_on.desc())
+            ).all()
+            for record in records:
+                administration.addItem(
+                    f"{record.vaccine_name} · {record.administered_on:%d/%m/%Y} · {record.dose_reference or 'sin referencia'}",
+                    record.id,
+                )
         status = QComboBox()
         for label, value in [
             ("Sin verificar", "unverified"), ("Pendiente confirmado", "pending_confirmed"),
@@ -936,6 +961,8 @@ class HealthDialog(StaySelectorDialog):
         rationale.setMaximumHeight(100)
         notes = QLineEdit()
         form.addRow("Categoría", category)
+        form.addRow("Dosis del catálogo (opcional)", calendar_item)
+        form.addRow("Administración existente (opcional)", administration)
         form.addRow("Estado", status)
         form.addRow("Fecha orientativa", target_check)
         form.addRow("Fecha", target)
@@ -952,6 +979,8 @@ class HealthDialog(StaySelectorDialog):
                 record_vaccine_dose_review(
                     session, actor_account_id=self.actor_id, minor_id=minor_id,
                     category=category.currentData(), status=status.currentData(),
+                    calendar_item_id=calendar_item.currentData(),
+                    vaccine_record_id=administration.currentData(),
                     target_date=target.date().toPython() if target_check.currentData() else None,
                     rationale=rationale.toPlainText(), notes=notes.text().strip() or None,
                 )
