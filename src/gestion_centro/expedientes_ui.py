@@ -175,34 +175,42 @@ class MinorWorkspaceDialog(QDialog):
             minor = session.get(Minor, self.minor_id)
             if minor is None:
                 return
-            given, ok = QInputDialog.getText(self, 'Modificar expediente', 'Nombre(s):', text=minor.given_names)
-            if not ok:
+            dialog = QDialog(self)
+            dialog.setWindowTitle('Modificar datos personales')
+            dialog.resize(520, 560)
+            layout = QVBoxLayout(dialog)
+            form = QFormLayout()
+            controls = {}
+            for key, label, value in [
+                ('given_names', 'Nombre(s) *', minor.given_names),
+                ('family_names', 'Apellidos *', minor.family_names),
+                ('birth_country', 'País de nacimiento', minor.birth_country or ''),
+                ('locality', 'Localidad', minor.locality or ''),
+                ('nationality', 'Nacionalidad', minor.nationality or ''),
+                ('nif_nie', 'NIF / NIE', minor.nif_nie or ''),
+                ('passport_number', 'Pasaporte', minor.passport_number or ''),
+                ('address', 'Dirección', minor.address or ''),
+                ('email', 'Email', minor.email or ''),
+            ]:
+                field = QLineEdit(value)
+                controls[key] = field
+                form.addRow(label, field)
+            birth = QDateEdit()
+            birth.setCalendarPopup(True)
+            birth.setDisplayFormat('dd/MM/yyyy')
+            birth.setMinimumDate(QDate(1900, 1, 1))
+            birth.setSpecialValueText('No indicada')
+            birth.setDate(QDate(minor.birth_date.year, minor.birth_date.month, minor.birth_date.day) if minor.birth_date else birth.minimumDate())
+            form.addRow('Fecha de nacimiento', birth)
+            layout.addLayout(form)
+            buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
                 return
-            family, ok = QInputDialog.getText(self, 'Modificar expediente', 'Apellidos:', text=minor.family_names)
-            if not ok:
-                return
-            country, ok = QInputDialog.getText(self, 'Modificar expediente', 'País de nacimiento:', text=minor.birth_country or '')
-            if not ok:
-                return
-            locality, ok = QInputDialog.getText(self, 'Modificar expediente', 'Localidad:', text=minor.locality or '')
-            if not ok:
-                return
-            nationality, ok = QInputDialog.getText(self, 'Modificar expediente', 'Nacionalidad:', text=minor.nationality or '')
-            if not ok:
-                return
-            nif, ok = QInputDialog.getText(self, 'Modificar expediente', 'NIF / NIE:', text=minor.nif_nie or '')
-            if not ok:
-                return
-            passport, ok = QInputDialog.getText(self, 'Modificar expediente', 'Pasaporte:', text=minor.passport_number or '')
-            if not ok:
-                return
-            address, ok = QInputDialog.getMultiLineText(self, 'Modificar expediente', 'Dirección:', text=minor.address or '')
-            if not ok:
-                return
-            email, ok = QInputDialog.getText(self, 'Modificar expediente', 'Email:', text=minor.email or '')
-            if not ok:
-                return
-            values = dict(given_names=given, family_names=family, birth_country=country, locality=locality, nationality=nationality, nif_nie=nif, passport_number=passport, address=address, email=email, birth_date=minor.birth_date)
+            values = {key: field.text() for key, field in controls.items()}
+            values['birth_date'] = birth.date().toPython() if birth.date() > birth.minimumDate() else None
         try:
             from gestion_centro.domain.service import update_minor_personal_data
             with session_scope(self.factory) as session:
