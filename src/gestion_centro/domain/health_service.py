@@ -386,6 +386,8 @@ def record_vaccine_dose_review(session: Session, *, actor_account_id: str, minor
             raise ValueError("La referencia del calendario no existe")
         if item.category != category:
             raise ValueError("La categoría no coincide con la referencia del calendario")
+        if item.entry_kind != "dose":
+            raise ValueError("La referencia seleccionada describe una secuencia completa, no una dosis individual; registra la revisión sin enlazarla como dosis.")
     if vaccine_record_id:
         record = session.get(VaccineRecord, vaccine_record_id)
         if record is None or record.minor_id != minor.id:
