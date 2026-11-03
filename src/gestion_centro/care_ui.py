@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 from sqlalchemy import select
 
 from gestion_centro.persistence.database import session_scope
-from gestion_centro.domain.models import Stay
+from gestion_centro.domain.models import Minor, Stay
 from gestion_centro.domain.education import EducationGoal, SchoolPlacement
 from gestion_centro.domain.education_service import (
     create_education_goal, add_education_update, set_education_goal_status,
@@ -42,6 +42,7 @@ class StaySelectorDialog(QDialog):
             index = self.stay.findData(stay_id)
             if index >= 0:
                 self.stay.setCurrentIndex(index)
+        layout.addWidget(QLabel("Residente:"))
         layout.addWidget(self.stay)
         self.body = QVBoxLayout()
         layout.addLayout(self.body)
@@ -357,8 +358,27 @@ class EducationDialog(StaySelectorDialog):
 
 class HealthDialog(StaySelectorDialog):
     def __init__(self, factory, actor_id, stay_id=None):
-        super().__init__(factory, "Ficha sanitaria y medicación", stay_id=stay_id)
+        super().__init__(factory, "Ficha sanitaria y medicación", stay_id=None)
         self.actor_id = actor_id
+        # La ficha sanitaria se selecciona por expediente permanente, no por ingreso.
+        preferred_minor_id = None
+        with session_scope(factory) as session:
+            if stay_id:
+                selected_stay = session.get(Stay, stay_id)
+                preferred_minor_id = selected_stay.minor_id if selected_stay else None
+            minors = session.scalars(select(Minor).order_by(Minor.active.desc(), Minor.internal_code)).all()
+            self.stay.clear()
+            self.stay.addItem("Selecciona un residente…", None)
+            for minor in minors:
+                status = "" if minor.active else " · Inactivo"
+                self.stay.addItem(
+                    f"{minor.internal_code} · {minor.given_names} {minor.family_names}{status}",
+                    minor.id,
+                )
+        if preferred_minor_id:
+            index = self.stay.findData(preferred_minor_id)
+            if index >= 0:
+                self.stay.setCurrentIndex(index)
         self.resize(1050, 720)
         self.tabs = QTabWidget()
         self.body.addWidget(self.tabs)
@@ -438,18 +458,20 @@ class HealthDialog(StaySelectorDialog):
         self.refresh()
 
     def refresh(self):
-        stay_id = self.stay.currentData()
-        if not stay_id:
+        minor_id = self.stay.currentData()
+        if not minor_id:
+            self.allergies.clear(); self.conditions.clear(); self.emergency.clear()
+            self.plans.setRowCount(0); self.administrations.setRowCount(0); self.vaccines.setRowCount(0)
             return
         with session_scope(self.factory) as session:
-            profile = read_health_profile(session, actor_account_id=self.actor_id, stay_id=stay_id)
-            plans = list_medication_plans(session, actor_account_id=self.actor_id, stay_id=stay_id)
+            profile = read_health_profile(session, actor_account_id=self.actor_id, minor_id=minor_id)
+            plans = list_medication_plans(session, actor_account_id=self.actor_id, minor_id=minor_id)
             vaccine_rows = session.scalars(
-                select(VaccineRecord).where(VaccineRecord.stay_id == stay_id)
+                select(VaccineRecord).where(VaccineRecord.minor_id == minor_id)
                 .order_by(VaccineRecord.administered_on.desc())
             ).all()
             daily_rows = list_daily_medication_schedule(
-                session, actor_account_id=self.actor_id, stay_id=stay_id,
+                session, actor_account_id=self.actor_id, minor_id=minor_id,
                 day=self.admin_day.date().toPython()
             )
             administration_rows = [
@@ -506,10 +528,13 @@ class HealthDialog(StaySelectorDialog):
                 self.vaccines.setItem(i, col, QTableWidgetItem(value))
 
     def save_profile(self):
+        if not self.stay.currentData():
+            QMessageBox.information(self, "Selecciona residente", "Selecciona un residente antes de guardar.")
+            return
         try:
             with session_scope(self.factory) as session:
                 save_health_profile(
-                    session, actor_account_id=self.actor_id, stay_id=self.stay.currentData(),
+                    session, actor_account_id=self.actor_id, minor_id=self.stay.currentData(),
                     allergies=self.allergies.toPlainText(),
                     relevant_conditions=self.conditions.toPlainText(),
                     emergency_instructions=self.emergency.toPlainText(),
@@ -562,13 +587,16 @@ class HealthDialog(StaySelectorDialog):
         layout.addLayout(buttons)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
+        if not self.stay.currentData():
+            QMessageBox.information(self, "Selecciona residente", "Selecciona un residente antes de registrar una pauta.")
+            return
         try:
             parsed_schedules = self._read_schedules(schedules.toPlainText())
             if not medication.text().strip() or not dose.text().strip() or not reference.text().strip():
                 raise ValueError("Medicamento, dosis y referencia de prescripción son obligatorios.")
             with session_scope(self.factory) as session:
                 plan = add_medication_plan(
-                    session, actor_account_id=self.actor_id, stay_id=self.stay.currentData(),
+                    session, actor_account_id=self.actor_id, minor_id=self.stay.currentData(),
                     medication_name=medication.text().strip(), prescribed_dose=dose.text().strip(),
                     schedule_text=instructions.toPlainText().strip(),
                     prescriber_reference=reference.text().strip(), starts_on=date.today(),
@@ -643,13 +671,16 @@ class HealthDialog(StaySelectorDialog):
             QMessageBox.warning(self, "No se pudo registrar", str(exc))
 
     def add_vaccine(self):
+        if not self.stay.currentData():
+            QMessageBox.information(self, "Selecciona residente", "Selecciona un residente antes de registrar una vacuna.")
+            return
         name, ok = QInputDialog.getText(self, "Vacunación", "Vacuna administrada:")
         if not ok or not name.strip():
             return
         try:
             with session_scope(self.factory) as session:
                 add_vaccine_record(
-                    session, actor_account_id=self.actor_id, stay_id=self.stay.currentData(),
+                    session, actor_account_id=self.actor_id, minor_id=self.stay.currentData(),
                     vaccine_name=name, administered_on=date.today(),
                 )
             self.refresh()
