@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 import pytest
+from datetime import date, datetime, timezone
 
 from gestion_centro.auth.service import (
     Role, admin_reset_password, admin_set_account_active, authenticate,
