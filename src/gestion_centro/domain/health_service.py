@@ -1,5 +1,5 @@
 """Servicios sanitarios de registro; nunca sustituyen indicación clínica."""
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 import re
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -406,12 +406,26 @@ def record_vaccine_dose_review(session: Session, *, actor_account_id: str, minor
             if linked_item is None or linked_item.category != category:
                 raise ValueError("La categoría no coincide con la dosis vinculada a la administración")
             calendar_item_id = linked_item.id
+    # Mantiene un orden temporal estricto incluso si dos revisiones se guardan
+    # dentro del mismo microsegundo o SQLite devuelve timestamps sin zona horaria.
+    latest_review = session.scalar(
+        select(VaccineDoseReview).where(VaccineDoseReview.minor_id == minor.id)
+        .order_by(VaccineDoseReview.reviewed_at.desc(), VaccineDoseReview.created_at.desc(), VaccineDoseReview.id.desc())
+        .limit(1)
+    )
+    reviewed_at = datetime.now(timezone.utc)
+    if latest_review is not None:
+        latest_at = latest_review.reviewed_at
+        if latest_at.tzinfo is None:
+            latest_at = latest_at.replace(tzinfo=timezone.utc)
+        if reviewed_at <= latest_at:
+            reviewed_at = latest_at + timedelta(microseconds=1)
     review = VaccineDoseReview(
         minor_id=minor.id, calendar_item_id=calendar_item_id,
         vaccine_record_id=vaccine_record_id, category=category, status=status,
         target_date=target_date, reviewed_by_account_id=actor.id,
         reviewed_by_name_snapshot=actor.professional.display_name,
-        reviewed_at=datetime.now(timezone.utc), rationale=rationale.strip(),
+        reviewed_at=reviewed_at, rationale=rationale.strip(),
         notes=notes.strip() if notes else None,
     )
     session.add(review)
