@@ -8,7 +8,7 @@ HELP_HTML = """
 funcional, técnica, jurídica y de protección de datos por la entidad responsable.</p>
 <h3>Primer inicio</h3>
 <ol><li>Crear la cuenta administradora inicial.</li><li>El administrador crea cuentas individuales.</li>
-<li>Asignar permisos y mantener las cuentas personales.</li><li>Crear el expediente y abrir una estancia antes de asociar actuaciones.</li></ol>
+<li>Asignar permisos y mantener las cuentas personales.</li><li>Cada profesional puede cambiar su propia contraseña desde el botón superior; el administrador puede restablecerla si se pierde.</li><li>Crear el expediente y abrir una estancia antes de asociar actuaciones.</li></ol>
 <h3>Diario e incidencias</h3>
 <p>Registrar hechos objetivos, diferenciando la hora del hecho y la fecha de registro.
 Seleccionar el turno correcto. Vincular únicamente las estancias implicadas.
