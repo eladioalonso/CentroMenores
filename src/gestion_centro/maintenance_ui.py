@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 from gestion_centro.persistence.diagnostics import run_diagnostics
 from gestion_centro.persistence.database import session_scope
-from gestion_centro.auth.models import AccessAudit, UserAccount
+from gestion_centro.auth.models import AccessAudit
 from gestion_centro.auth.service import list_audit_events
 
 
