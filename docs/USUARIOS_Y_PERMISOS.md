@@ -31,7 +31,7 @@ Entre las funciones adicionales previstas:
 
 Los permisos de administración son aditivos: no sustituyen ni eliminan las funciones ordinarias de educador.
 
-La administración técnica no debe conceder automáticamente acceso al contenido sanitario. Ese acceso requiere una autorización específica. No obstante, al tratarse de una aplicación local, habrá que analizar las limitaciones de separación frente a quien tenga control administrativo del ordenador y de los archivos.
+La administración técnica no concede automáticamente acceso al contenido sanitario. El administrador puede asignar o retirar expresamente el permiso sanitario a una cuenta; cada cambio queda auditado. Al tratarse de una aplicación local, habrá que analizar las limitaciones de separación frente a quien tenga control administrativo del ordenador y de los archivos.
 
 ## 3. Permisos por operación
 
@@ -75,19 +75,19 @@ Como regla general, el profesional que crea un registro podrá corregirlo direct
 ## 5. Protección reforzada del área sanitaria
 
 - El acceso estará limitado a usuarios expresamente autorizados mediante el permiso independiente «Acceso sanitario» de cada cuenta. El permiso está desactivado por defecto, también para administradores técnicos.
-- Consultar, modificar, adjuntar, exportar e imprimir información sanitaria podrán ser permisos distintos.
+- En esta versión, el permiso sanitario habilita conjuntamente la ficha sanitaria y la gestión de documentos sanitarios. La separación de consulta, modificación, adjuntos, exportación e impresión en permisos distintos queda pendiente.
 - Los documentos sanitarios heredarán restricciones equivalentes o más estrictas.
 - Los paneles, búsquedas e informes no mostrarán datos sanitarios a usuarios sin autorización.
 - Los accesos y operaciones relevantes quedarán registrados.
 - No se incluirán datos sanitarios en notificaciones generales, mensajes de error ni registros técnicos.
 
-La asignación concreta de autorizaciones sanitarias queda pendiente de validación por el centro.
+La función técnica de concesión y retirada del permiso está implementada y auditada. La designación de las cuentas autorizadas y la validación de su alcance corresponde al centro y sigue pendiente de aprobación institucional.
 
 ## 6. Identificación y sesión
 
 - Cada profesional tendrá una cuenta individual.
 - Las contraseñas se almacenarán mediante hash seguro, nunca en texto claro.
-- Se contemplará el cambio y restablecimiento controlado de contraseña.
+- Cada profesional puede cambiar su propia contraseña verificando la actual; el administrador puede realizar un restablecimiento controlado.
 - La sesión se bloqueará tras un periodo configurable de inactividad.
 - El usuario podrá cerrar sesión al terminar su turno.
 - La aplicación ofrecerá un cambio de usuario que cierre la sesión anterior antes de iniciar otra.
@@ -105,7 +105,7 @@ Se registrarán, según la política que se defina:
 
 Cada evento incluirá como mínimo usuario, fecha/hora, tipo de operación y referencia al registro afectado cuando corresponda. Se evitará copiar el contenido sensible completo dentro del registro de auditoría.
 
-La auditoría no deberá poder alterarse desde las pantallas ordinarias de trabajo. Se definirán permisos y plazos de conservación para estos registros.
+La consulta de auditoría está disponible solo para administradores, con filtro por fechas; cada consulta también queda registrada. La interfaz es de solo lectura. Se definirán los permisos institucionales y plazos de conservación definitivos.
 
 ## 8. Principios de administración
 
