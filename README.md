@@ -48,7 +48,7 @@ En desarrollo, la carpeta de datos se puede indicar con `CENTRO_DATOS_DIR`; por 
 - Restauración integral con copia previa obligatoria, validación de integridad y versión del esquema, y reconciliación de la auditoría existente.
 - Exportación de estadísticas agregadas a CSV, PDF y Word.
 - Ayuda integrada con guía operativa y preguntas frecuentes.
-- Modo de demostración aislado: ejecutar `GestionCentro.exe --demo`. En desarrollo puede ejecutarse `python -m gestion_centro --demo`. Usa una carpeta `.centro_demo` independiente; no abre la carpeta de datos reales.
+- Modo de demostración aislado: ejecutar `GestionCentro.exe --demo`. En desarrollo puede ejecutarse `python -m gestion_centro --demo`. Usa una carpeta de demostración independiente (`demo_data` junto al EXE portable o `.centro_demo` en desarrollo); no abre la carpeta de datos normales.
 
 El modo de demostración arranca con una base separada y solicita crear un administrador de prueba. No copiar datos reales a esa carpeta.
 
