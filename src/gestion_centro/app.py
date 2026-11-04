@@ -953,7 +953,7 @@ class MainWindow(QMainWindow):
                     return
             HealthDialog(factory, account_id).exec()
 
-        def add_actions(tab: QWidget, actions: list[tuple[str, str, object]], columns: int = 2) -> None
+        def add_actions(tab: QWidget, actions: list[tuple[str, str, object]], columns: int = 2) -> None:
             layout = QVBoxLayout(tab)
             intro = QLabel("Accede directamente a las herramientas de trabajo. Cada apartado conserva su historial y trazabilidad.")
             intro.setObjectName("moduleIntro")
