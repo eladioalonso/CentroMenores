@@ -14,6 +14,13 @@ def test_upgrade_creates_versioned_auth_schema(tmp_path):
     columns = {column["name"]: column for column in inspector.get_columns("vaccine_calendar_items")}
     assert columns["dose_label"]["type"].length == 80  # SQLite no aplica límites VARCHAR; el servicio valida 240.
     assert "entry_kind" in columns
+    user_account_columns = {column["name"] for column in inspector.get_columns("user_accounts")}
+    assert "health_access" in user_account_columns
+    with engine.connect() as connection:
+        health_default = connection.exec_driver_sql(
+            "SELECT dflt_value FROM pragma_table_info('user_accounts') WHERE name='health_access'"
+        ).scalar_one()
+    assert health_default in ("0", "false", "FALSE")
     vaccine_record_columns = {column["name"] for column in inspector.get_columns("vaccine_records")}
     assert {
         "calendar_item_id", "manufacturer", "product_name", "batch_number",
