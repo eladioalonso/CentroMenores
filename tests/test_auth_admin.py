@@ -142,3 +142,48 @@ def test_professional_cannot_change_password_with_wrong_current_password():
                 new_password="contraseña nueva segura 2026",
             )
         assert verify_password("contraseña anterior segura", account.password_hash)
+
+
+def test_admin_audit_query_filters_dates_orders_and_records_access():
+    from gestion_centro.auth.models import AccessAudit
+    from gestion_centro.auth.service import list_audit_events
+    with session_for_test() as session:
+        admin = create_professional_account(
+            session, display_name="Admin", username="admin",
+            password="contraseña inicial segura", role=Role.ADMIN,
+        )
+        educator = create_professional_account(
+            session, display_name="Educador", username="educador",
+            password="contraseña educador segura", role=Role.EDUCATOR,
+        )
+        session.flush()
+        first = AccessAudit(
+            account_id=educator.id, username_snapshot="educador",
+            event="login_success", occurred_at=datetime(2026, 4, 1, 10, tzinfo=timezone.utc),
+        )
+        second = AccessAudit(
+            account_id=educator.id, username_snapshot="educador",
+            event="profile_updated", occurred_at=datetime(2026, 4, 2, 10, tzinfo=timezone.utc),
+        )
+        session.add_all([first, second])
+        session.flush()
+        rows = list_audit_events(
+            session, actor_account_id=admin.id,
+            start_date=date(2026, 4, 2), end_date=date(2026, 4, 2),
+        )
+        assert [row.id for row in rows] == [second.id]
+        assert session.query(AccessAudit).filter_by(
+            event="audit_log_accessed"
+        ).count() == 1
+
+
+def test_non_admin_cannot_query_audit_log():
+    from gestion_centro.auth.service import list_audit_events
+    with session_for_test() as session:
+        educator = create_professional_account(
+            session, display_name="Educador", username="educador",
+            password="contraseña educador segura", role=Role.EDUCATOR,
+        )
+        session.flush()
+        with pytest.raises(PermissionError):
+            list_audit_events(session, actor_account_id=educator.id)
