@@ -131,3 +131,21 @@ def test_revocation_is_audited_and_prevents_future_use():
             authorization_type="general", on_date=date(2026, 5, 4),
         ) == []
 
+
+
+def test_health_documents_are_hidden_and_cannot_be_added_without_permission():
+    with make_session() as session:
+        actor, stay = setup_stay(session)
+        values = dict(actor_account_id=actor.id, stay_id=stay.id, category="health",
+            title="Informe sanitario ficticio", original_filename="salud.pdf",
+            relative_path="documentos/salud.pdf", mime_type="application/pdf",
+            size_bytes=100, sha256="b" * 64)
+        with pytest.raises(PermissionError, match="autorización"):
+            register_document(session, **values)
+        # Un profesional sin autorización no ve documentos sanitarios ya existentes.
+        actor.health_access = True
+        document = register_document(session, **values)
+        actor.health_access = False
+        from gestion_centro.domain.documents_service import list_documents
+        visible = list_documents(session, actor_account_id=actor.id, stay_id=stay.id)
+        assert document.id not in {item.id for item in visible}
