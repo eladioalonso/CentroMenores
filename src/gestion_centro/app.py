@@ -35,7 +35,7 @@ from gestion_centro.domain.service import (
 )
 from gestion_centro.domain.models import Stay
 from gestion_centro.domain.models import AgendaItem, Incident
-from gestion_centro.domain.documents import Outing
+from gestion_centro.domain.documents import Outing, OutingStay
 from gestion_centro.domain.documents import PersonalDocument
 from gestion_centro.domain.documents_service import register_document, list_documents
 from gestion_centro.operations_ui import AuthorizationsDialog, OutingsDialog
@@ -881,8 +881,20 @@ class MainWindow(QMainWindow):
             def refresh_dashboard():
                 now = datetime.now(timezone.utc)
                 with session_scope(factory) as session:
-                    counters["outings"].setText(str(session.scalar(
-                        select(func.count()).select_from(Outing).where(Outing.status == "in_progress")
+                    active_stays = session.scalar(
+                        select(func.count()).select_from(Stay).where(Stay.status == "active")
+                    ) or 0
+                    outside_stays = session.scalar(
+                        select(func.count(func.distinct(OutingStay.stay_id)))
+                        .select_from(OutingStay).join(Outing, Outing.id == OutingStay.outing_id)
+                        .where(Outing.status == "in_progress")
+                    ) or 0
+                    counters["present"].setText(str(max(active_stays - outside_stays, 0)))
+                    counters["outside"].setText(str(outside_stays))
+                    counters["returns"].setText(str(session.scalar(
+                        select(func.count()).select_from(Outing).where(
+                            Outing.status == "in_progress", Outing.planned_return < now,
+                        )
                     ) or 0))
                     counters["incidents"].setText(str(session.scalar(
                         select(func.count()).select_from(Incident).where(Incident.status == "open")
@@ -923,16 +935,22 @@ class MainWindow(QMainWindow):
                 card_layout.addWidget(action)
                 dashboard_grid.addWidget(card, row, column)
 
-            dashboard_card(0, 0, "outings", "Salidas en curso",
-                "Salidas con salida registrada y sin regreso registrado.",
+            dashboard_card(0, 0, "present", "Menores presentes",
+                "Estancias activas que no figuran en una salida en curso.",
+                lambda: ExpedientesDialog(factory, account_id).exec())
+            dashboard_card(0, 1, "outside", "Menores fuera del centro",
+                "Menores vinculados a salidas que todavía no constan como finalizadas.",
                 lambda: OutingsDialog(factory, account_id).exec())
-            dashboard_card(0, 1, "incidents", "Incidencias abiertas",
+            dashboard_card(1, 0, "returns", "Retornos atrasados",
+                "Salidas en curso cuya hora prevista de regreso ya ha pasado.",
+                lambda: OutingsDialog(factory, account_id).exec())
+            dashboard_card(1, 1, "incidents", "Incidencias abiertas",
                 "Incidencias formales pendientes de cierre.",
                 lambda: DiaryDialog(factory, account_id).exec())
-            dashboard_card(1, 0, "tasks", "Tareas vencidas",
+            dashboard_card(2, 0, "tasks", "Tareas vencidas",
                 "Tareas pendientes o en curso cuya fecha ya ha pasado.",
                 lambda: AgendaDialog(factory, account_id).exec())
-            dashboard_card(1, 1, "agenda", "Agenda próxima",
+            dashboard_card(2, 1, "agenda", "Agenda próxima",
                 "Elementos pendientes o en curso con fecha futura.",
                 lambda: AgendaDialog(factory, account_id).exec())
             refresh_button = QPushButton("Actualizar contadores")
