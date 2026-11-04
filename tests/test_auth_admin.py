@@ -4,7 +4,7 @@ import pytest
 
 from gestion_centro.auth.service import (
     Role, admin_reset_password, admin_set_account_active, authenticate,
-    create_professional_account, verify_password,
+    create_professional_account, verify_password, admin_set_health_access,
 )
 from gestion_centro.auth.models import UserAccount
 from gestion_centro.persistence.base import Base
@@ -71,3 +71,37 @@ def test_non_admin_cannot_create_account_or_reset_password():
         with pytest.raises(PermissionError):
             admin_reset_password(session, actor_account_id=educator.id,
                 target_account_id=educator.id, new_password="contraseña restablecida")
+
+
+def test_health_access_is_explicit_audited_and_independent_of_admin_role():
+    from gestion_centro.auth.models import AccessAudit
+    with session_for_test() as session:
+        admin = create_professional_account(session, display_name="Admin", username="admin",
+            password="contraseña inicial segura", role=Role.ADMIN)
+        educator = create_professional_account(session, display_name="Educador", username="educador",
+            password="contraseña educador segura", role=Role.EDUCATOR)
+        session.flush()
+        assert admin.health_access is False
+        assert educator.health_access is False
+        admin_set_health_access(session, actor_account_id=admin.id,
+            target_account_id=educator.id, allowed=True)
+        assert educator.health_access is True
+        admin_set_health_access(session, actor_account_id=admin.id,
+            target_account_id=educator.id, allowed=False)
+        assert educator.health_access is False
+        events = [item.event for item in session.query(AccessAudit).all()]
+        assert "health_access_granted" in events
+        assert "health_access_revoked" in events
+
+
+def test_non_admin_cannot_grant_health_access():
+    with session_for_test() as session:
+        educator = create_professional_account(session, display_name="Educador", username="educador",
+            password="contraseña educador segura", role=Role.EDUCATOR)
+        target = create_professional_account(session, display_name="Otro", username="otro",
+            password="contraseña otro segura", role=Role.EDUCATOR)
+        session.flush()
+        with pytest.raises(PermissionError):
+            admin_set_health_access(session, actor_account_id=educator.id,
+                target_account_id=target.id, allowed=True)
+        assert target.health_access is False
