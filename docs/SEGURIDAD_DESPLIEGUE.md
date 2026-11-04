@@ -6,6 +6,8 @@ La aplicación es una versión de desarrollo local para Windows. No debe utiliza
 
 ## Límites de seguridad conocidos
 
+Las compilaciones actuales son artefactos de desarrollo y no están firmadas digitalmente. Windows puede mostrar avisos de SmartScreen o de editor desconocido. No desactives antivirus ni protecciones del sistema para ejecutar una compilación. La entidad deberá definir firma de código y distribución controlada antes de una puesta en servicio.
+
 - La base SQLite y los archivos adjuntos se almacenan en la carpeta local de datos en formato legible por el sistema operativo.
 - Los ZIP de copia de seguridad no tienen cifrado propio. La comprobación de integridad no equivale a cifrado.
 - Una persona con permisos de administrador local o acceso físico al disco puede acceder a los archivos y potencialmente modificar la base de datos y los registros locales de auditoría.
