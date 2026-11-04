@@ -19,7 +19,7 @@ El artefacto de GitHub Actions tiene caducidad. Si ya no aparece, utiliza la eje
 ## Primera ejecución: modo demostración
 
 1. Ejecuta GestionCentro.exe --demo.
-2. La demostración utiliza una carpeta .centro_demo independiente y solicita crear un administrador de prueba.
+2. La demostración utiliza una carpeta independiente: demo_data junto al EXE portable (o .centro_demo en desarrollo) y solicita crear un administrador de prueba.
 3. Usa una contraseña de prueba robusta que no utilices en ningún otro servicio.
 4. Crea una o dos cuentas ficticias adicionales para probar los perfiles.
 5. No cambies a la ejecución normal para probar con expedientes reales.
