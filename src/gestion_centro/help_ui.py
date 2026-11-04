@@ -18,7 +18,7 @@ con motivo y autor, nunca sobrescribir el original.</p>
 <p>Las tareas de equipo se comparten entre turnos. Revisar diariamente pendientes,
 citas, actividades y estados. La vista anual muestra los elementos existentes; no crea
 automáticamente calendarios oficiales ni sustituye su revisión.</p>
-<h3>Sanidad y medicación</h3>
+<h3>Sanidad y medicación</h3><p>El acceso sanitario está desactivado por defecto para todas las cuentas, incluido el administrador técnico. Solo las cuentas a las que se conceda expresamente el permiso sanitario pueden abrir la ficha y los documentos sanitarios. La concesión y retirada del permiso se administra en Administración de cuentas y queda auditada.</p>
 <p>La aplicación registra información aportada por profesionales autorizados.
 No diagnostica ni prescribe. La medicación debe basarse en una prescripción válida.
 Registrar administración, rechazo o falta de disponibilidad con sus observaciones.</p>
