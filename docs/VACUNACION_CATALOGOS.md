@@ -43,7 +43,7 @@ Las administraciones pueden vincularse a una referencia `dose`. Una revisión qu
 1. Revisión de transcripción, notas, edades, intervalos y vigencias por profesional sanitario designado.
 2. Confirmación de que las ediciones SNS 2026 son las referencias adecuadas para las situaciones de riesgo atendidas en Melilla y de si existe documentación local complementaria más reciente.
 3. Revisión de la edición acelerada de Melilla y búsqueda periódica de una versión posterior.
-4. Confirmación de los metadatos que deben recogerse al registrar una administración (producto comercial, lote, fabricante, centro y profesional, documento de origen).
+4. Validación de la captura de trazabilidad de cada administración (producto comercial, lote, fabricante, centro y profesional, documento sanitario de origen), incluidos los criterios de obligatoriedad y los casos en que el dato no consta.
 5. Pruebas funcionales en una instalación Windows limpia y con datos ficticios.
 
 Hasta completar estos puntos, los catálogos son material de consulta documental y no deben utilizarse para decidir tratamientos ni para gestionar automáticamente calendarios individuales.
