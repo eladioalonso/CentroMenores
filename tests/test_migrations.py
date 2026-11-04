@@ -16,11 +16,17 @@ def test_upgrade_creates_versioned_auth_schema(tmp_path):
     assert "entry_kind" in columns
     vaccine_record_columns = {column["name"] for column in inspector.get_columns("vaccine_records")}
     assert "calendar_item_id" in vaccine_record_columns
-    assert any(
-        "calendar_item_id" in foreign_key["constrained_columns"]
-        and foreign_key["referred_table"] == "vaccine_calendar_items"
-        for foreign_key in inspector.get_foreign_keys("vaccine_records")
-    )
+    with engine.connect() as connection:
+        triggers = {
+            row[0] for row in connection.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='trigger'"
+            ).all()
+        }
+    assert {
+        "trg_vaccine_record_calendar_insert",
+        "trg_vaccine_record_calendar_update",
+        "trg_vaccine_calendar_item_delete",
+    } <= triggers
     assert {
         "professionals", "user_accounts", "access_audit", "alembic_version",
         "minors", "stays", "events", "event_stay_links", "diary_days",
