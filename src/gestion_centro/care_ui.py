@@ -548,6 +548,12 @@ class HealthDialog(StaySelectorDialog):
             calendar_editions = {
                 edition.id: edition for edition in session.scalars(select(VaccineCalendarEdition)).all()
             }
+            health_documents = {
+                document.id: document for document in session.scalars(
+                    select(PersonalDocument).join(Stay, PersonalDocument.stay_id == Stay.id)
+                    .where(Stay.minor_id == minor_id, PersonalDocument.category == "health")
+                ).all()
+            }
             daily_rows = list_daily_medication_schedule(
                 session, actor_account_id=self.actor_id, minor_id=minor_id,
                 day=self.admin_day.date().toPython()
@@ -622,7 +628,7 @@ class HealthDialog(StaySelectorDialog):
         self.vaccines.setRowCount(len(vaccine_rows))
         for i, record in enumerate(vaccine_rows):
             catalog_item = calendar_items.get(record.calendar_item_id) if record.calendar_item_id else None
-            source_doc = session.get(PersonalDocument, record.source_document_id) if record.source_document_id else None
+            source_doc = health_documents.get(record.source_document_id) if record.source_document_id else None
             values = [
                 record.vaccine_name, record.administered_on.strftime("%d/%m/%Y"),
                 record.dose_reference or "—", record.manufacturer or "—",
