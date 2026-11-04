@@ -41,6 +41,7 @@ En desarrollo, la carpeta de datos se puede indicar con `CENTRO_DATOS_DIR`; por 
 - [Decisiones consolidadas](docs/DECISIONES_CONSOLIDADAS.md)
 - [Catálogos vacunales y trazabilidad documental](docs/VACUNACION_CATALOGOS.md)
 - [Guía de prueba funcional en Windows](docs/PRUEBAS_MANUALES.md)
+- [Seguridad y requisitos de despliegue](docs/SEGURIDAD_DESPLIEGUE.md)
 
 ## Funciones recientes de desarrollo
 
