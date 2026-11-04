@@ -59,7 +59,7 @@ El acceso móvil por Wi-Fi no está habilitado todavía. No abrir puertos ni exp
 Rama activa: `desarrollo/nucleo-aplicacion`. No fusionar ni desplegar desde `main`.
 
 Incluye actualmente modelos, servicios y primeras interfaces para:
-- Cuentas individuales, perfiles, bloqueo por inactividad y auditoría.
+- Cuentas individuales, perfiles, bloqueo por inactividad, auditoría y permiso sanitario explícito denegado por defecto.
 - Menores, estancias, acontecimientos, diario e incidencias.
 - Agenda compartida y tareas.
 - Comunicaciones internas con aportaciones trazables.
