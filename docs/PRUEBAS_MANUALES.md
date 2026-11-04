@@ -95,6 +95,8 @@ No uses datos clínicos verdaderos ni tomes decisiones sanitarias a partir de la
 - [ ] Verificar la copia.
 - [ ] Restaurar únicamente una copia de demostración en una carpeta de demostración separada.
 - [ ] Ejecutar el diagnóstico y revisar los avisos.
+- [ ] Consultar la auditoría con una cuenta administradora y filtrar por fechas.
+- [ ] Comprobar que una cuenta educadora no puede consultar la auditoría.
 - [ ] Comprobar que los documentos y las imágenes de prueba se incluyen en la copia.
 
 ## Cómo comunicar un fallo
