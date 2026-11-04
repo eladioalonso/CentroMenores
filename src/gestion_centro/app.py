@@ -25,6 +25,7 @@ from gestion_centro.auth.service import (
     AuthStatus, Role, authenticate, create_professional_account,
     admin_create_professional_account, admin_reset_password,
     admin_set_account_active, admin_change_role, admin_set_health_access,
+    change_own_password,
 )
 from gestion_centro.paths import data_paths, ensure_data_directories
 from gestion_centro.persistence.database import build_engine, build_session_factory, session_scope
@@ -853,6 +854,44 @@ class MainWindow(QMainWindow):
         ))
 
         top_actions = QHBoxLayout()
+        if callable(factory) and account_id is not None:
+            change_password_button = QPushButton("Cambiar contraseña")
+            def change_password():
+                dialog = QDialog(self)
+                dialog.setWindowTitle("Cambiar mi contraseña")
+                form = QFormLayout(dialog)
+                current_password = QLineEdit()
+                current_password.setEchoMode(QLineEdit.EchoMode.Password)
+                new_password = QLineEdit()
+                new_password.setEchoMode(QLineEdit.EchoMode.Password)
+                confirm_password = QLineEdit()
+                confirm_password.setEchoMode(QLineEdit.EchoMode.Password)
+                form.addRow("Contraseña actual", current_password)
+                form.addRow("Nueva contraseña (mínimo 12 caracteres)", new_password)
+                form.addRow("Repetir nueva contraseña", confirm_password)
+                buttons = QDialogButtonBox(
+                    QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+                )
+                buttons.accepted.connect(dialog.accept)
+                buttons.rejected.connect(dialog.reject)
+                form.addRow(buttons)
+                if dialog.exec() != QDialog.DialogCode.Accepted:
+                    return
+                if new_password.text() != confirm_password.text():
+                    QMessageBox.warning(self, "No coincide", "Las dos contraseñas nuevas no coinciden.")
+                    return
+                try:
+                    with session_scope(factory) as session:
+                        change_own_password(
+                            session, account_id=account_id,
+                            current_password=current_password.text(),
+                            new_password=new_password.text(),
+                        )
+                    QMessageBox.information(self, "Contraseña cambiada", "La nueva contraseña se ha guardado.")
+                except (ValueError, PermissionError) as exc:
+                    QMessageBox.warning(self, "No se pudo cambiar", str(exc))
+            change_password_button.clicked.connect(change_password)
+            top_actions.addWidget(change_password_button)
         help_button = QPushButton("Ayuda y preguntas frecuentes")
         help_button.clicked.connect(lambda: HelpDialog(self).exec())
         logout_button = QPushButton("Cerrar sesión")
