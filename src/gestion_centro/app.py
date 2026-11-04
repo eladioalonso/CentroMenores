@@ -24,7 +24,7 @@ from gestion_centro.auth.models import UserAccount, AccessAudit
 from gestion_centro.auth.service import (
     AuthStatus, Role, authenticate, create_professional_account,
     admin_create_professional_account, admin_reset_password,
-    admin_set_account_active, admin_change_role,
+    admin_set_account_active, admin_change_role, admin_set_health_access,
 )
 from gestion_centro.paths import data_paths, ensure_data_directories
 from gestion_centro.persistence.database import build_engine, build_session_factory, session_scope
@@ -159,8 +159,8 @@ class AccountManagementDialog(QDialog):
         self.setWindowTitle("Administración de cuentas")
         self.resize(760, 420)
         layout = QVBoxLayout(self)
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Profesional", "Usuario", "Perfil", "Estado"])
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(["Profesional", "Usuario", "Perfil", "Acceso sanitario", "Estado"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -169,6 +169,7 @@ class AccountManagementDialog(QDialog):
         for label, callback in [("Crear cuenta", self.create_account),
             ("Restablecer contraseña", self.reset_password),
             ("Cambiar perfil", self.change_role),
+            ("Conceder / retirar acceso sanitario", self.toggle_health_access),
             ("Activar / desactivar", self.toggle_active)]:
             button = QPushButton(label)
             button.clicked.connect(callback)
@@ -181,6 +182,7 @@ class AccountManagementDialog(QDialog):
             accounts = session.scalars(select(UserAccount).order_by(UserAccount.username)).all()
             rows = [(a.id, a.professional.display_name, a.username,
                 "Administrador" if a.role == Role.ADMIN.value else "Educador",
+                "Autorizado" if a.health_access else "No autorizado",
                 "Activa" if a.active and a.professional.active else "Inactiva") for a in accounts]
         self.table.setRowCount(len(rows))
         for row, values in enumerate(rows):
@@ -247,13 +249,40 @@ class AccountManagementDialog(QDialog):
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo cambiar el perfil", str(exc))
 
+    def toggle_health_access(self) -> None:
+        target_id = self.selected_account_id()
+        if not target_id:
+            QMessageBox.information(self, "Selecciona una cuenta", "Selecciona primero una cuenta.")
+            return
+        row = self.table.currentRow()
+        allowed = self.table.item(row, 3).text() == "Autorizado"
+        action = "retirar" if allowed else "conceder"
+        answer = QMessageBox.warning(
+            self, "Autorización sanitaria",
+            f"¿Quieres {action} el acceso a información sanitaria de esta cuenta? "
+            "Este permiso es independiente del perfil administrador y quedará auditado.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            with session_scope(self.factory) as session:
+                admin_set_health_access(
+                    session, actor_account_id=self.actor_id,
+                    target_account_id=target_id, allowed=not allowed,
+                )
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo cambiar el permiso", str(exc))
+
     def toggle_active(self) -> None:
         target_id = self.selected_account_id()
         if not target_id:
             QMessageBox.information(self, "Selecciona una cuenta", "Selecciona primero una cuenta.")
             return
         row = self.table.currentRow()
-        active = self.table.item(row, 3).text() == "Activa"
+        active = self.table.item(row, 4).text() == "Activa"
         action = "desactivar" if active else "activar"
         if QMessageBox.question(self, "Confirmar operación", f"¿Quieres {action} esta cuenta?") != QMessageBox.StandardButton.Yes:
             return
@@ -905,7 +934,19 @@ class MainWindow(QMainWindow):
             dashboard_layout.addStretch(1)
             refresh_dashboard()
 
-        def add_actions(tab: QWidget, actions: list[tuple[str, str, object]], columns: int = 2) -> None:
+        def open_health_dialog():
+            with session_scope(factory) as session:
+                account = session.get(UserAccount, account_id)
+                if account is None or not account.active or not account.health_access:
+                    QMessageBox.warning(
+                        self, "Acceso sanitario restringido",
+                        "Esta cuenta no tiene autorización sanitaria expresa. "
+                        "El administrador debe asignar el permiso correspondiente.",
+                    )
+                    return
+            HealthDialog(factory, account_id).exec()
+
+        def add_actions(tab: QWidget, actions: list[tuple[str, str, object]], columns: int = 2) -> None
             layout = QVBoxLayout(tab)
             intro = QLabel("Accede directamente a las herramientas de trabajo. Cada apartado conserva su historial y trazabilidad.")
             intro.setObjectName("moduleIntro")
@@ -952,7 +993,7 @@ class MainWindow(QMainWindow):
                 ("Autorizaciones", "Registra y consulta autorizaciones y consentimientos.", lambda: AuthorizationsDialog(factory, account_id).exec()),
                 ("Salidas", "Controla salidas, retornos y situaciones en curso.", lambda: OutingsDialog(factory, account_id).exec()),
                 ("Seguimiento educativo y escolaridad", "Registra objetivos, evolución y coordinación escolar.", lambda: EducationDialog(factory, account_id).exec()),
-                ("Ficha sanitaria y medicación", "Consulta información sanitaria y pautas de medicación.", lambda: HealthDialog(factory, account_id).exec()),
+                ("Ficha sanitaria y medicación", "Consulta información sanitaria y pautas de medicación.", lambda: open_health_dialog()),
                 ("Informes externos", "Prepara y consulta documentación e informes externos.", lambda: ExternalReportsDialog(factory, account_id).exec()),
             ])
 
