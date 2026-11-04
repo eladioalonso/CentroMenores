@@ -74,7 +74,7 @@ Como regla general, el profesional que crea un registro podrá corregirlo direct
 
 ## 5. Protección reforzada del área sanitaria
 
-- El acceso estará limitado a usuarios expresamente autorizados.
+- El acceso estará limitado a usuarios expresamente autorizados mediante el permiso independiente «Acceso sanitario» de cada cuenta. El permiso está desactivado por defecto, también para administradores técnicos.
 - Consultar, modificar, adjuntar, exportar e imprimir información sanitaria podrán ser permisos distintos.
 - Los documentos sanitarios heredarán restricciones equivalentes o más estrictas.
 - Los paneles, búsquedas e informes no mostrarán datos sanitarios a usuarios sin autorización.
