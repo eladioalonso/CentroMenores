@@ -273,8 +273,13 @@ def record_medication_administration(session: Session, *, actor_account_id: str,
 
 def add_vaccine_record(session: Session, *, actor_account_id: str, vaccine_name: str,
                        administered_on: date, minor_id: str | None = None, stay_id: str | None = None,
-                       dose_reference: str | None = None, calendar_item_id: str | None = None):
+                       dose_reference: str | None = None, calendar_item_id: str | None = None,
+                       manufacturer: str | None = None, product_name: str | None = None,
+                       batch_number: str | None = None, administration_center: str | None = None,
+                       administering_professional: str | None = None,
+                       source_document_id: str | None = None):
     from gestion_centro.domain.health import VaccineCalendarItem
+    from gestion_centro.domain.documents import PersonalDocument
     actor=_actor(session,actor_account_id); minor, stay = _resolve_minor(session,minor_id=minor_id,stay_id=stay_id)
     if not vaccine_name.strip(): raise ValueError("La vacuna es obligatoria")
     if administered_on > date.today():
@@ -283,10 +288,29 @@ def add_vaccine_record(session: Session, *, actor_account_id: str, vaccine_name:
         item = session.get(VaccineCalendarItem, calendar_item_id)
         if item is None or item.entry_kind != "dose":
             raise ValueError("La referencia del calendario no es una dosis individual válida")
+    metadata = {
+        "manufacturer": (manufacturer or "").strip() or None,
+        "product_name": (product_name or "").strip() or None,
+        "batch_number": (batch_number or "").strip() or None,
+        "administration_center": (administration_center or "").strip() or None,
+        "administering_professional": (administering_professional or "").strip() or None,
+    }
+    limits = {"manufacturer": 160, "product_name": 180, "batch_number": 100,
+              "administration_center": 180, "administering_professional": 160}
+    if any(metadata[key] is not None and len(metadata[key]) > limit for key, limit in limits.items()):
+        raise ValueError("Uno de los datos de trazabilidad supera la longitud permitida")
+    if source_document_id:
+        document = session.get(PersonalDocument, source_document_id)
+        if document is None or document.category != "health":
+            raise ValueError("El justificante debe ser un documento sanitario del expediente")
+        document_stay = session.get(Stay, document.stay_id)
+        if document_stay is None or document_stay.minor_id != minor.id:
+            raise ValueError("El justificante no pertenece al expediente seleccionado")
     # El registro vacunal pertenece al expediente permanente del menor.
     # Solo se vincula a una estancia cuando se indica expresamente.
     record=VaccineRecord(minor_id=minor.id,stay_id=stay_id, calendar_item_id=calendar_item_id,
         vaccine_name=vaccine_name.strip(),administered_on=administered_on,dose_reference=dose_reference,
+        source_document_id=source_document_id, **metadata,
         recorded_by_account_id=actor.id,recorded_by_name_snapshot=actor.professional.display_name)
     session.add(record); session.flush()
     _audit(session,actor,"vaccine_recorded",f"{minor.id}:{record.id}")
