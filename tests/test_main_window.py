@@ -197,6 +197,7 @@ def test_dashboard_counts_residents_outside_and_overdue_returns():
         session.add(OutingStay(outing_id=outing.id, stay_id=stays[0].id))
         session.flush()
         account_id = account.id
+        session.commit()
 
     window = MainWindow(
         "Educador ficticio", Role.EDUCATOR,
