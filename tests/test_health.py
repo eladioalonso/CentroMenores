@@ -226,7 +226,8 @@ def test_vaccine_reviews_preserve_repeated_assessments_for_same_dose(health_case
   s,actor_account_id=actor,minor_id=minor_id,calendar_item_id=item.id,
   rationale="Nueva revisión tras recibir documentación",status="pending_confirmed")
  history=list_vaccine_dose_reviews(s,actor_account_id=actor,minor_id=minor_id)
- assert len([review for review in history if review.calendar_item_id==item.id])==2\n assert history[0].id==second.id
+ assert len([review for review in history if review.calendar_item_id==item.id])==2
+ assert history[0].id==second.id
  assert {review.id for review in history} >= {first.id,second.id}
  assert first.rationale=="Primera revisión documentada"
  assert second.rationale=="Nueva revisión tras recibir documentación"
