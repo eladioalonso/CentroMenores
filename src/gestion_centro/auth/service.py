@@ -218,3 +218,23 @@ def admin_set_health_access(
         event="health_access_granted" if allowed else "health_access_revoked",
         details=f"Cuenta afectada: {target.id}",
     ))
+
+
+def change_own_password(
+    session: Session, *, account_id: str, current_password: str, new_password: str
+) -> None:
+    """Permite cambiar la contraseña propia sin intervención administrativa."""
+    account = session.get(UserAccount, account_id)
+    if account is None or not account.active or not account.professional.active:
+        raise PermissionError("La cuenta no está activa")
+    if not verify_password(current_password, account.password_hash):
+        raise ValueError("La contraseña actual no es correcta")
+    if verify_password(new_password, account.password_hash):
+        raise ValueError("La nueva contraseña debe ser distinta de la actual")
+    account.password_hash = hash_password(new_password)
+    account.failed_attempts = 0
+    account.updated_at = datetime.now(timezone.utc)
+    session.add(AccessAudit(
+        account_id=account.id, username_snapshot=account.username,
+        event="password_changed_by_user",
+    ))
