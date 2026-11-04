@@ -7,7 +7,7 @@ import hashlib
 import hmac
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from enum import StrEnum
 
 from sqlalchemy import func, select
@@ -238,3 +238,30 @@ def change_own_password(
         account_id=account.id, username_snapshot=account.username,
         event="password_changed_by_user",
     ))
+
+
+def list_audit_events(
+    session: Session, *, actor_account_id: str,
+    start_date: date | None = None, end_date: date | None = None,
+    limit: int = 500,
+) -> list[AccessAudit]:
+    """Consulta auditada de eventos recientes; solo para administradores activos."""
+    actor = _require_admin(session, actor_account_id)
+    if start_date and end_date and start_date > end_date:
+        raise ValueError("La fecha inicial no puede ser posterior a la fecha final")
+    query = select(AccessAudit)
+    if start_date:
+        start_at = datetime.combine(start_date, time.min).astimezone(timezone.utc)
+        query = query.where(AccessAudit.occurred_at >= start_at)
+    if end_date:
+        end_at = datetime.combine(end_date + timedelta(days=1), time.min).astimezone(timezone.utc)
+        query = query.where(AccessAudit.occurred_at < end_at)
+    rows = session.scalars(
+        query.order_by(AccessAudit.occurred_at.desc(), AccessAudit.id.desc())
+        .limit(max(1, min(int(limit), 1000)))
+    ).all()
+    session.add(AccessAudit(
+        account_id=actor.id, username_snapshot=actor.username,
+        event="audit_log_accessed", details=f"events_returned={len(rows)}",
+    ))
+    return rows
