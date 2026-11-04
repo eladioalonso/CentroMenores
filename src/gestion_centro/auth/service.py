@@ -119,8 +119,8 @@ def admin_reset_password(
     """Permite al administrador restablecer, pero nunca consultar, una contraseña."""
     actor = session.get(UserAccount, actor_account_id)
     target = session.get(UserAccount, target_account_id)
-    if actor is None or not actor.active or actor.role != Role.ADMIN.value:
-        raise PermissionError("Se requiere una cuenta administradora activa")
+    if actor is None or not actor.active or not actor.professional.active or actor.role != Role.ADMIN.value:
+        raise PermissionError("Se requiere una cuenta administradora y un profesional activos")
     if target is None:
         raise ValueError("La cuenta indicada no existe")
     target.password_hash = hash_password(new_password)
