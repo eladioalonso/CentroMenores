@@ -106,6 +106,8 @@ def record_authorization(session: Session, *, actor_account_id: str, stay_id: st
         doc = session.get(PersonalDocument, document_id)
         if doc is None or doc.stay_id != stay_id:
             raise ValueError("El documento justificativo no corresponde a esta estancia")
+        if doc.category == "health" and not actor.health_access:
+            raise PermissionError("La cuenta no tiene autorización para consultar documentos sanitarios")
     item = Authorization(stay_id=stay_id, authorization_type=authorization_type,
         scope=scope.strip(), issuer=issuer.strip(), valid_from=valid_from, valid_until=valid_until,
         conditions=conditions.strip() if conditions else None, status="valid",
