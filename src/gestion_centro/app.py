@@ -887,7 +887,8 @@ class MainWindow(QMainWindow):
                     outside_stays = session.scalar(
                         select(func.count(func.distinct(OutingStay.stay_id)))
                         .select_from(OutingStay).join(Outing, Outing.id == OutingStay.outing_id)
-                        .where(Outing.status == "in_progress")
+                        .join(Stay, Stay.id == OutingStay.stay_id)
+                        .where(Stay.status == "active", Outing.status == "in_progress")
                     ) or 0
                     counters["present"].setText(str(max(active_stays - outside_stays, 0)))
                     counters["outside"].setText(str(outside_stays))
