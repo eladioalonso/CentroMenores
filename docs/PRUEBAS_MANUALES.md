@@ -22,7 +22,9 @@ El artefacto de GitHub Actions tiene caducidad. Si ya no aparece, utiliza la eje
 2. La demostración utiliza una carpeta independiente: demo_data junto al EXE portable (o .centro_demo en desarrollo) y solicita crear un administrador de prueba.
 3. Usa una contraseña de prueba robusta que no utilices en ningún otro servicio.
 4. Crea una o dos cuentas ficticias adicionales para probar los perfiles.
-5. No cambies a la ejecución normal para probar con expedientes reales.
+5. En Administración de cuentas, concede expresamente el permiso sanitario solo a la cuenta ficticia que usarás para probar el módulo de salud. El permiso está desactivado por defecto, también para el administrador.
+6. Mantén otra cuenta sin ese permiso para comprobar que no puede abrir la ficha ni los documentos sanitarios.
+7. No cambies a la ejecución normal para probar con expedientes reales.
 
 La carpeta de demostración y la carpeta normal son distintas. No copies datos entre ellas.
 
@@ -35,6 +37,8 @@ Marca cada punto como correcto, incorrecto o no probado. Anota el texto del erro
 - [ ] La aplicación abre con --demo y solicita crear el administrador inicial.
 - [ ] Se puede crear una cuenta profesional y entrar con ella.
 - [ ] Un usuario educador no ve las herramientas exclusivas de administración.
+- [ ] Una cuenta sin permiso sanitario no puede abrir la ficha ni consultar documentos sanitarios.
+- [ ] El administrador puede conceder y retirar el permiso sanitario, y la operación queda auditada.
 - [ ] Cerrar sesión devuelve a la pantalla de acceso.
 - [ ] El bloqueo por inactividad vuelve a pedir credenciales.
 - [ ] Cinco intentos fallidos aplican el control de reintentos previsto.
