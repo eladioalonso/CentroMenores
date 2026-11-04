@@ -14,7 +14,7 @@ def health_case():
  engine=create_engine("sqlite://"); Base.metadata.create_all(engine); factory=sessionmaker(engine,expire_on_commit=False)
  with factory() as s:
   p=Professional(display_name="Educador"); s.add(p); s.flush()
-  a=UserAccount(professional_id=p.id,username="health-edu",password_hash="x",role="educator"); s.add(a)
+  a=UserAccount(professional_id=p.id,username="health-edu",password_hash="x",role="educator",health_access=True); s.add(a)
   m=Minor(internal_code="MC-HEALTH-TEST",given_names="Caso",family_names="Ficticio"); s.add(m); s.flush()
   stay=Stay(minor_id=m.id,sequence_number=1,started_on=date(2026,1,1),status="active"); s.add(stay); s.flush()
   yield s,a.id,stay.id
@@ -302,3 +302,11 @@ def test_vaccine_administration_and_review_must_share_the_same_catalog_dose(heal
   s,actor_account_id=actor,minor_id=minor_id,vaccine_record_id=record.id,
   category="systematic",status="administered",rationale="Correspondencia confirmada")
  assert review.calendar_item_id==first_item.id
+
+
+def test_health_services_deny_accounts_without_explicit_health_access(health_case):
+ s,actor,stay=health_case
+ account=s.get(UserAccount,actor)
+ account.health_access=False
+ with pytest.raises(PermissionError,match="autorización sanitaria"):
+  read_health_profile(s,actor_account_id=actor,minor_id=s.get(Stay,stay).minor_id)
