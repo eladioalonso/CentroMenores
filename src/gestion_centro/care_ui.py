@@ -631,7 +631,9 @@ class HealthDialog(StaySelectorDialog):
             source_doc = health_documents.get(record.source_document_id) if record.source_document_id else None
             values = [
                 record.vaccine_name, record.administered_on.strftime("%d/%m/%Y"),
-                record.dose_reference or "—", record.manufacturer or "—",
+                (record.dose_reference or "—") + (
+                    f" · {catalog_item.display_name} · {catalog_item.dose_label}" if catalog_item else ""
+                ), record.manufacturer or "—",
                 record.product_name or "—", record.batch_number or "—",
                 " · ".join(x for x in [record.administration_center, record.administering_professional] if x) or "—",
                 source_doc.title if source_doc else "Sin justificante",
