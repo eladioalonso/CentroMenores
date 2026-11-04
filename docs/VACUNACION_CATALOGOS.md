@@ -38,6 +38,18 @@ Fuentes oficiales:
 
 Las administraciones pueden vincularse a una referencia `dose`. Una revisión que enlaza una administración debe conservar la misma referencia. Las secuencias completas de rescate no pueden vincularse como si fueran una dosis individual.
 
+## Datos de trazabilidad de una administración
+
+Cada administración puede conservar, además de la vacuna, fecha y referencia de dosis:
+- Fabricante.
+- Nombre comercial o producto.
+- Número de lote.
+- Centro sanitario.
+- Profesional que administró.
+- Documento justificativo sanitario del mismo expediente.
+
+Estos campos son opcionales porque puede que un antecedente histórico no disponga de todos los datos. La aplicación no debe inventar ni completar datos ausentes. El justificante se vincula a un documento sanitario ya incorporado al expediente y no se duplica como archivo independiente.
+
 ## Pendientes de validación antes del uso operativo
 
 1. Revisión de transcripción, notas, edades, intervalos y vigencias por profesional sanitario designado.
