@@ -3,6 +3,14 @@
 from PySide6.QtWidgets import QApplication, QPushButton, QTabWidget
 
 from gestion_centro.app import MainWindow, CredentialsDialog
+from datetime import date, datetime, timedelta, timezone
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from PySide6.QtWidgets import QFrame, QLabel
+from gestion_centro.persistence.base import Base
+from gestion_centro.auth.models import Professional, UserAccount
+from gestion_centro.domain.models import Minor, Stay
+from gestion_centro.domain.documents import Outing, OutingStay
 from gestion_centro.auth.service import Role
 
 
@@ -142,3 +150,70 @@ def test_main_window_exposes_logout_action():
         assert window.logout_requested is True
     finally:
         window.close()
+
+
+def test_dashboard_counts_residents_outside_and_overdue_returns():
+    _application()
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    now = datetime.now(timezone.utc)
+    with factory() as session:
+        professional = Professional(display_name="Educador ficticio")
+        session.add(professional)
+        session.flush()
+        account = UserAccount(
+            professional_id=professional.id, username="dashboard-test",
+            password_hash="hash-ficticio", role="educator",
+        )
+        session.add(account)
+        session.flush()
+        stays = []
+        for index in range(2):
+            minor = Minor(
+                internal_code=f"MC-DASH-{index}",
+                given_names=f"Caso {index}", family_names="Ficticio",
+            )
+            session.add(minor)
+            session.flush()
+            stay = Stay(
+                minor_id=minor.id, sequence_number=1,
+                started_on=date.today(), status="active",
+            )
+            session.add(stay)
+            session.flush()
+            stays.append(stay)
+        outing = Outing(
+            kind="family", destination="Destino ficticio", purpose="Prueba",
+            planned_departure=now - timedelta(hours=2),
+            planned_return=now - timedelta(hours=1),
+            actual_departure=now - timedelta(hours=2),
+            responsible_account_id=account.id, status="in_progress",
+            restrictions_checked=True, created_by_account_id=account.id,
+            created_by_name_snapshot="Educador ficticio",
+        )
+        session.add(outing)
+        session.flush()
+        session.add(OutingStay(outing_id=outing.id, stay_id=stays[0].id))
+        session.flush()
+        account_id = account.id
+
+    window = MainWindow(
+        "Educador ficticio", Role.EDUCATOR,
+        factory=factory, account_id=account_id, paths=object(),
+    )
+    try:
+        cards = {}
+        for frame in window.findChildren(QFrame):
+            if frame.objectName() != "dashboardCard":
+                continue
+            title = frame.findChild(QLabel, "dashboardCardTitle")
+            value = frame.findChild(QLabel, "dashboardCardValue")
+            if title is not None and value is not None:
+                cards[title.text()] = value.text()
+        assert cards["Menores presentes"] == "1"
+        assert cards["Menores fuera del centro"] == "1"
+        assert cards["Retornos atrasados"] == "1"
+    finally:
+        window.close()
+        engine.dispose()
