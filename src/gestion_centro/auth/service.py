@@ -200,3 +200,21 @@ def admin_change_role(
         account_id=actor.id, username_snapshot=actor.username,
         event="admin_role_changed", details=f"Cuenta: {target.id}; nuevo perfil: {role.value}",
     ))
+
+
+
+def admin_set_health_access(
+    session: Session, *, actor_account_id: str, target_account_id: str, allowed: bool
+) -> None:
+    """Asigna autorización sanitaria explícita; el rol administrador no la concede por defecto."""
+    actor = _require_admin(session, actor_account_id)
+    target = session.get(UserAccount, target_account_id)
+    if target is None:
+        raise ValueError("La cuenta indicada no existe")
+    target.health_access = bool(allowed)
+    target.updated_at = datetime.now(timezone.utc)
+    session.add(AccessAudit(
+        account_id=actor.id, username_snapshot=actor.username,
+        event="health_access_granted" if allowed else "health_access_revoked",
+        details=f"Cuenta afectada: {target.id}",
+    ))
