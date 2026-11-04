@@ -13,10 +13,12 @@ OUTING_KINDS = {"family", "activity", "school", "health", "administrative", "oth
 OUTING_STATUSES = {"planned", "in_progress", "returned", "cancelled"}
 
 
-def _actor(session: Session, account_id: str) -> UserAccount:
+def _actor(session: Session, account_id: str, *, health: bool = False) -> UserAccount:
     actor = session.get(UserAccount, account_id)
     if actor is None or not actor.active or not actor.professional.active:
         raise PermissionError("Se requiere una cuenta y un profesional activos")
+    if health and not actor.health_access:
+        raise PermissionError("La cuenta no tiene autorización para gestionar documentos sanitarios")
     return actor
 
 
@@ -38,7 +40,7 @@ def register_document(session: Session, *, actor_account_id: str, stay_id: str, 
                       size_bytes: int, sha256: str, document_date: date | None = None,
                       expires_on: date | None = None, notes: str | None = None,
                       supersedes_id: str | None = None):
-    actor = _actor(session, actor_account_id)
+    actor = _actor(session, actor_account_id, health=(category == "health"))
     stay = session.get(Stay, stay_id)
     if stay is None or stay.status != "active":
         raise ValueError("La estancia no existe o está cerrada")
@@ -82,8 +84,10 @@ def list_documents(session: Session, *, actor_account_id: str, stay_id: str):
     if session.get(Stay, stay_id) is None:
         raise ValueError("La estancia no existe")
     _audit(session, actor, "personal_documents_accessed", stay_id)
-    return session.scalars(select(PersonalDocument).where(PersonalDocument.stay_id == stay_id)
-        .order_by(PersonalDocument.created_at.desc())).all()
+    query = select(PersonalDocument).where(PersonalDocument.stay_id == stay_id)
+    if not actor.health_access:
+        query = query.where(PersonalDocument.category != "health")
+    return session.scalars(query.order_by(PersonalDocument.created_at.desc())).all()
 
 
 def record_authorization(session: Session, *, actor_account_id: str, stay_id: str,
