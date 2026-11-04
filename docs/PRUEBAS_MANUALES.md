@@ -39,6 +39,7 @@ Marca cada punto como correcto, incorrecto o no probado. Anota el texto del erro
 - [ ] Un usuario educador no ve las herramientas exclusivas de administración.
 - [ ] Una cuenta sin permiso sanitario no puede abrir la ficha ni consultar documentos sanitarios.
 - [ ] El administrador puede conceder y retirar el permiso sanitario, y la operación queda auditada.
+- [ ] Cambiar la contraseña propia exige la contraseña actual y guarda el cambio.
 - [ ] Cerrar sesión devuelve a la pantalla de acceso.
 - [ ] El bloqueo por inactividad vuelve a pedir credenciales.
 - [ ] Cinco intentos fallidos aplican el control de reintentos previsto.
