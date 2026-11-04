@@ -15,7 +15,10 @@ def test_upgrade_creates_versioned_auth_schema(tmp_path):
     assert columns["dose_label"]["type"].length == 80  # SQLite no aplica límites VARCHAR; el servicio valida 240.
     assert "entry_kind" in columns
     vaccine_record_columns = {column["name"] for column in inspector.get_columns("vaccine_records")}
-    assert "calendar_item_id" in vaccine_record_columns
+    assert {
+        "calendar_item_id", "manufacturer", "product_name", "batch_number",
+        "administration_center", "administering_professional", "source_document_id",
+    } <= vaccine_record_columns
     with engine.connect() as connection:
         triggers = {
             row[0] for row in connection.exec_driver_sql(
