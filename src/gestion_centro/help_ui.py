@@ -33,7 +33,7 @@ No apagar el equipo durante el proceso.</p>
 <h3>Seguridad y privacidad</h3>
 <ul><li>Bloquear Windows al abandonar el puesto.</li><li>No compartir usuarios ni contraseñas.</li>
 <li>No exportar expedientes completos salvo autorización y necesidad justificadas.</li>
-<li>Custodiar físicamente las unidades USB; las copias no están cifradas.</li>
+<li>Custodiar físicamente las unidades USB; las copias no están cifradas.</li><li>El administrador puede consultar el registro de auditoría desde Mantenimiento y diagnóstico; las consultas quedan registradas.</li>
 <li>Notificar incidentes de seguridad por el procedimiento del centro.</li></ul>
 <h3>Preguntas frecuentes</h3>
 <p><b>¿Puedo borrar una anotación cerrada?</b> No; debe rectificarse manteniendo el original.</p>
