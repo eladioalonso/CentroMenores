@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import Minor, Stay
+from gestion_centro.domain.documents import PersonalDocument
 from gestion_centro.domain.education import EducationGoal, EducationUpdate, SchoolPlacement
 from gestion_centro.domain.education_service import (
     create_education_goal, add_education_update, set_education_goal_status,
@@ -478,8 +479,11 @@ class HealthDialog(StaySelectorDialog):
 
         vaccine_tab = QWidget()
         vaccine_layout = QVBoxLayout(vaccine_tab)
-        self.vaccines = QTableWidget(0, 4)
-        self.vaccines.setHorizontalHeaderLabels(["Vacuna", "Fecha", "Dosis / referencia", "Dosis del calendario vinculada"])
+        self.vaccines = QTableWidget(0, 8)
+        self.vaccines.setHorizontalHeaderLabels([
+            "Vacuna", "Fecha", "Dosis", "Fabricante", "Producto", "Lote",
+            "Centro / profesional", "Justificante",
+        ])
         self.vaccines.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.vaccines.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.vaccines.setAlternatingRowColors(True)
@@ -618,10 +622,13 @@ class HealthDialog(StaySelectorDialog):
         self.vaccines.setRowCount(len(vaccine_rows))
         for i, record in enumerate(vaccine_rows):
             catalog_item = calendar_items.get(record.calendar_item_id) if record.calendar_item_id else None
+            source_doc = session.get(PersonalDocument, record.source_document_id) if record.source_document_id else None
             values = [
                 record.vaccine_name, record.administered_on.strftime("%d/%m/%Y"),
-                record.dose_reference or "—",
-                f"{catalog_item.display_name} · {catalog_item.dose_label}" if catalog_item else "Sin vincular",
+                record.dose_reference or "—", record.manufacturer or "—",
+                record.product_name or "—", record.batch_number or "—",
+                " · ".join(x for x in [record.administration_center, record.administering_professional] if x) or "—",
+                source_doc.title if source_doc else "Sin justificante",
             ]
             for col, value in enumerate(values):
                 self.vaccines.setItem(i, col, QTableWidgetItem(value))
@@ -1012,16 +1019,36 @@ class HealthDialog(StaySelectorDialog):
         administered.setCalendarPopup(True)
         catalog_item = QComboBox()
         catalog_item.addItem("Sin vincular a una dosis del catálogo", None)
+        manufacturer = QLineEdit()
+        product = QLineEdit()
+        batch = QLineEdit()
+        center = QLineEdit()
+        professional = QLineEdit()
+        source_document = QComboBox()
+        source_document.addItem("Sin justificante adjunto", None)
         with session_scope(self.factory) as session:
             editions = session.scalars(select(VaccineCalendarEdition).order_by(VaccineCalendarEdition.effective_from.desc())).all()
             for edition in editions:
                 for item in list_vaccine_calendar_items(session, actor_account_id=self.actor_id, edition_id=edition.id):
                     if item.entry_kind == "dose":
                         catalog_item.addItem(f"{edition.title} · {item.display_name} · {item.dose_label} · {item.target_age_text}", item.id)
+            documents = session.scalars(
+                select(PersonalDocument).join(Stay, PersonalDocument.stay_id == Stay.id)
+                .where(Stay.minor_id == self.stay.currentData(), PersonalDocument.category == "health")
+                .order_by(PersonalDocument.created_at.desc())
+            ).all()
+            for document in documents:
+                source_document.addItem(f"{document.title} · {document.original_filename}", document.id)
         administered.setDate(QDate.currentDate())
         form.addRow("Vacuna", name)
         form.addRow("Dosis / referencia", dose)
         form.addRow("Dosis del calendario (opcional)", catalog_item)
+        form.addRow("Fabricante", manufacturer)
+        form.addRow("Nombre comercial / producto", product)
+        form.addRow("Número de lote", batch)
+        form.addRow("Centro sanitario", center)
+        form.addRow("Profesional que administra", professional)
+        form.addRow("Documento justificativo (opcional)", source_document)
         form.addRow("Fecha real de administración", administered)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
@@ -1038,6 +1065,10 @@ class HealthDialog(StaySelectorDialog):
                     vaccine_name=name.text().strip(), administered_on=administered.date().toPython(),
                     dose_reference=dose.text().strip() or None,
                     calendar_item_id=catalog_item.currentData(),
+                    manufacturer=manufacturer.text(), product_name=product.text(),
+                    batch_number=batch.text(), administration_center=center.text(),
+                    administering_professional=professional.text(),
+                    source_document_id=source_document.currentData(),
                 )
             self.refresh()
             QMessageBox.information(self, "Vacunación", "Registro añadido.")
