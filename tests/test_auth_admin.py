@@ -5,6 +5,7 @@ import pytest
 from gestion_centro.auth.service import (
     Role, admin_reset_password, admin_set_account_active, authenticate,
     create_professional_account, verify_password, admin_set_health_access,
+    change_own_password,
 )
 from gestion_centro.auth.models import UserAccount
 from gestion_centro.persistence.base import Base
@@ -105,3 +106,39 @@ def test_non_admin_cannot_grant_health_access():
             admin_set_health_access(session, actor_account_id=educator.id,
                 target_account_id=target.id, allowed=True)
         assert target.health_access is False
+
+
+def test_professional_can_change_own_password_and_audit_it():
+    from gestion_centro.auth.models import AccessAudit
+    with session_for_test() as session:
+        account = create_professional_account(
+            session, display_name="Profesional", username="profesional",
+            password="contraseña anterior segura", role=Role.EDUCATOR,
+        )
+        session.flush()
+        change_own_password(
+            session, account_id=account.id,
+            current_password="contraseña anterior segura",
+            new_password="contraseña nueva segura 2026",
+        )
+        assert verify_password("contraseña nueva segura 2026", account.password_hash)
+        assert not verify_password("contraseña anterior segura", account.password_hash)
+        assert session.query(AccessAudit).filter_by(
+            event="password_changed_by_user"
+        ).count() == 1
+
+
+def test_professional_cannot_change_password_with_wrong_current_password():
+    with session_for_test() as session:
+        account = create_professional_account(
+            session, display_name="Profesional", username="profesional",
+            password="contraseña anterior segura", role=Role.EDUCATOR,
+        )
+        session.flush()
+        with pytest.raises(ValueError, match="actual"):
+            change_own_password(
+                session, account_id=account.id,
+                current_password="incorrecta",
+                new_password="contraseña nueva segura 2026",
+            )
+        assert verify_password("contraseña anterior segura", account.password_hash)
