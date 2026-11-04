@@ -1,14 +1,78 @@
 """Pantalla de mantenimiento y diagnóstico técnico para administradores."""
 import json
 from pathlib import Path
+from datetime import timezone
 
+from PySide6.QtCore import QDate
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
-    QHeaderView, QMessageBox, QFileDialog, QLabel,
+    QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
+    QHeaderView, QMessageBox, QFileDialog, QLabel, QDateEdit,
 )
 from gestion_centro.persistence.diagnostics import run_diagnostics
 from gestion_centro.persistence.database import session_scope
-from gestion_centro.auth.models import AccessAudit
+from gestion_centro.auth.models import AccessAudit, UserAccount
+from gestion_centro.auth.service import list_audit_events
+
+
+class AuditDialog(QDialog):
+    """Consulta de auditoría restringida a administradores activos."""
+
+    def __init__(self, factory, actor_id):
+        super().__init__()
+        self.factory, self.actor_id = factory, actor_id
+        self.setWindowTitle("Registro de auditoría")
+        self.resize(1050, 620)
+        layout = QVBoxLayout(self)
+        filters = QHBoxLayout()
+        self.start_date = QDateEdit(QDate.currentDate().addDays(-30))
+        self.start_date.setCalendarPopup(True)
+        self.end_date = QDateEdit(QDate.currentDate())
+        self.end_date.setCalendarPopup(True)
+        refresh = QPushButton("Consultar")
+        refresh.clicked.connect(self.refresh)
+        filters.addWidget(QLabel("Desde"))
+        filters.addWidget(self.start_date)
+        filters.addWidget(QLabel("Hasta"))
+        filters.addWidget(self.end_date)
+        filters.addWidget(refresh)
+        filters.addStretch(1)
+        layout.addLayout(filters)
+        hint = QLabel("Se muestran eventos de acceso y cambios administrativos. La consulta también queda registrada.")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        self.table = QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(["Fecha y hora", "Cuenta", "Evento", "Detalle técnico"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setAlternatingRowColors(True)
+        layout.addWidget(self.table)
+        close = QPushButton("Cerrar")
+        close.clicked.connect(self.accept)
+        layout.addWidget(close)
+        self.refresh()
+
+    def refresh(self):
+        try:
+            with session_scope(self.factory) as session:
+                rows = list_audit_events(
+                    session, actor_account_id=self.actor_id,
+                    start_date=self.start_date.date().toPython(),
+                    end_date=self.end_date.date().toPython(),
+                    limit=500,
+                )
+            self.table.setRowCount(len(rows))
+            for row_index, event in enumerate(rows):
+                occurred_at = event.occurred_at
+                if occurred_at.tzinfo is None:
+                    occurred_at = occurred_at.replace(tzinfo=timezone.utc)
+                values = [
+                    occurred_at.astimezone().strftime("%d/%m/%Y %H:%M:%S"),
+                    event.username_snapshot, event.event, event.details or "—",
+                ]
+                for column, value in enumerate(values):
+                    self.table.setItem(row_index, column, QTableWidgetItem(value))
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo consultar la auditoría", str(exc))
 
 
 class MaintenanceDialog(QDialog):
@@ -26,6 +90,9 @@ class MaintenanceDialog(QDialog):
         run = QPushButton("Ejecutar diagnóstico")
         run.clicked.connect(self.run)
         layout.addWidget(run)
+        audit = QPushButton("Consultar registro de auditoría")
+        audit.clicked.connect(lambda: AuditDialog(factory, actor_id).exec())
+        layout.addWidget(audit)
         self.table = QTableWidget(0, 3)
         self.table.setHorizontalHeaderLabels(["Comprobación", "Estado", "Detalle técnico"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
