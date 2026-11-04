@@ -160,6 +160,29 @@ def test_vaccine_record_belongs_to_minor_not_automatically_to_active_stay(health
  assert record.minor_id==s.get(Stay,stay).minor_id
  assert record.stay_id is None
 
+def test_vaccine_administration_preserves_traceability_and_validates_health_document(health_case):
+ s,actor,stay=health_case
+ from gestion_centro.domain.documents import PersonalDocument
+ from gestion_centro.domain.health_service import add_vaccine_record
+ minor_id=s.get(Stay,stay).minor_id
+ doc=PersonalDocument(stay_id=stay,category="health",title="Justificante ficticio",
+  original_filename="justificante.pdf",relative_path="test/justificante.pdf",
+  mime_type="application/pdf",size_bytes=100,sha256="a"*64,
+  uploaded_by_account_id=actor,uploaded_by_name_snapshot="Educador")
+ s.add(doc); s.flush()
+ record=add_vaccine_record(s,actor_account_id=actor,minor_id=minor_id,
+  vaccine_name="Vacuna ficticia",administered_on=date(2026,1,2),
+  manufacturer="Fabricante de prueba",product_name="Producto ficticio",
+  batch_number="LOTE-TEST-001",administration_center="Centro sanitario ficticio",
+  administering_professional="Profesional de prueba",source_document_id=doc.id)
+ assert record.manufacturer=="Fabricante de prueba"
+ assert record.product_name=="Producto ficticio"
+ assert record.batch_number=="LOTE-TEST-001"
+ assert record.administration_center=="Centro sanitario ficticio"
+ assert record.administering_professional=="Profesional de prueba"
+ assert record.source_document_id==doc.id
+
+
 def test_vaccine_record_rejects_future_administration_date(health_case):
  s,actor,stay=health_case
  from datetime import timedelta
