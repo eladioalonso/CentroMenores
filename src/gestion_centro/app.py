@@ -657,7 +657,12 @@ class DocumentsDialog(QDialog):
         for stay_id, label in values:
             self.stay.addItem(label, stay_id)
         self.category = QComboBox()
+        with session_scope(factory) as session:
+            account = session.get(UserAccount, actor_id)
+            self.health_access = bool(account and account.active and account.health_access)
         for label, key in self.CATEGORIES.items():
+            if key == "health" and not self.health_access:
+                continue
             self.category.addItem(label, key)
         self.title = QLineEdit()
         self.title.setMaxLength(180)
@@ -771,12 +776,14 @@ class DocumentsDialog(QDialog):
                 actor = session.get(UserAccount, self.actor_id)
                 if actor is None or not actor.active:
                     raise PermissionError("La cuenta ya no está activa.")
+                if doc.category == "health" and not actor.health_access:
+                    raise PermissionError("La cuenta no tiene autorización sanitaria expresa.")
                 session.add(AccessAudit(account_id=actor.id,
                     username_snapshot=actor.username, event="personal_document_opened",
                     details=f"{doc.id}; estancia:{doc.stay_id}"))
             if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(target))):
                 raise OSError("Windows no ha podido abrir el documento.")
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo abrir", str(exc))
 
     def save_document(self):
