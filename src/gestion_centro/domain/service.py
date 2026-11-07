@@ -8,6 +8,12 @@ from sqlalchemy.orm import Session
 from gestion_centro.auth.models import AccessAudit, UserAccount
 from gestion_centro.domain.models import Event, EventStayLink, Minor, MinorPersonalDataVersion, Stay
 
+_UNSET = object()
+HEALTH_PERSONAL_FIELDS = {
+    "cip", "health_center", "physician", "nurse",
+    "health_card_expires_on", "clinical_history",
+}
+
 
 def create_minor(
     session: Session, *, actor_account_id: str, internal_code: str, given_names: str, family_names: str,
@@ -29,8 +35,8 @@ def create_minor(
         raise ValueError("La fecha de nacimiento no puede ser futura")
     if health_card_expires_on and health_card_expires_on < date(1900, 1, 1):
         raise ValueError("La fecha de caducidad de la tarjeta sanitaria no es válida")
-    if health_card_expires_on and health_card_expires_on < date(1900, 1, 1):
-        raise ValueError("La fecha de caducidad de la tarjeta sanitaria no es válida")
+    if not actor.health_access and any((cip, health_center, physician, nurse, health_card_expires_on, clinical_history)):
+        raise PermissionError("Se requiere autorización sanitaria para registrar datos sanitarios")
     if email and ("@" not in email or email.strip().startswith("@") or email.strip().endswith("@")):
         raise ValueError("El correo electrónico no tiene un formato válido")
     minor = Minor(
@@ -62,8 +68,8 @@ def update_minor_personal_data(
     passport_number: str | None = None, address: str | None = None,
     email: str | None = None, cip: str | None = None,
     health_center: str | None = None, physician: str | None = None,
-    nurse: str | None = None, health_card_expires_on: date | None = None,
-    clinical_history: str | None = None,
+    nurse: str | None | object = _UNSET, health_card_expires_on: date | None | object = _UNSET,
+    clinical_history: str | None | object = _UNSET,
 ) -> Minor:
     """Actualiza datos identificativos y deja constancia auditable del cambio."""
     actor = _active_author(session, actor_account_id)
@@ -88,13 +94,20 @@ def update_minor_personal_data(
         "passport_number": (passport_number or "").strip() or None,
         "address": (address or "").strip() or None,
         "email": clean_email,
-        "cip": (cip or "").strip().upper() or None,
-        "health_center": (health_center or "").strip() or None,
-        "physician": (physician or "").strip() or None,
-        "nurse": (nurse or "").strip() or None,
-        "health_card_expires_on": health_card_expires_on,
-        "clinical_history": (clinical_history or "").strip() or None,
     }
+    optional_health_values = {
+        "cip": (cip or "").strip().upper() or None if cip is not _UNSET else _UNSET,
+        "health_center": (health_center or "").strip() or None if health_center is not _UNSET else _UNSET,
+        "physician": (physician or "").strip() or None if physician is not _UNSET else _UNSET,
+        "nurse": (nurse or "").strip() or None if nurse is not _UNSET else _UNSET,
+        "health_card_expires_on": health_card_expires_on,
+        "clinical_history": (clinical_history or "").strip() or None if clinical_history is not _UNSET else _UNSET,
+    }
+    for name, value in optional_health_values.items():
+        if value is not _UNSET:
+            if not actor.health_access and getattr(minor, name) != value:
+                raise PermissionError("Se requiere autorización sanitaria para modificar datos sanitarios")
+            values[name] = value
     changed = [name for name, value in values.items() if getattr(minor, name) != value]
     if not changed:
         return minor
@@ -121,6 +134,21 @@ def update_minor_personal_data(
         f"Expediente: {minor.id}; versión: {version.id}; campos modificados: {', '.join(changed)}")
     return minor
 
+
+
+def has_health_access(session: Session, *, actor_account_id: str) -> bool:
+    """Indica si la cuenta activa tiene permiso sanitario, sin exponer datos clínicos."""
+    return bool(_active_author(session, actor_account_id).health_access)
+
+
+def audit_minor_health_access(session: Session, *, actor_account_id: str, minor_id: str) -> None:
+    """Autoriza y registra la consulta de la ficha sanitaria del expediente."""
+    actor = _active_author(session, actor_account_id)
+    if not actor.health_access:
+        raise PermissionError("La cuenta no tiene autorización para consultar datos sanitarios")
+    if session.get(Minor, minor_id) is None:
+        raise ValueError("El expediente no existe")
+    _audit(session, actor, "minor_health_data_accessed", f"Expediente: {minor_id}")
 
 def open_stay(session: Session, *, actor_account_id: str, minor_id: str, started_on: date) -> Stay:
     actor = _active_author(session, actor_account_id)
