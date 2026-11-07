@@ -532,10 +532,11 @@ def set_agenda_item_status(
 
 
 def list_agenda_items(
-    session: Session, *, start: datetime, end: datetime,
+    session: Session, *, actor_account_id: str, start: datetime, end: datetime,
     status: str | None = None, kind: str | None = None,
 ):
     from gestion_centro.domain.models import AgendaItem
+    actor = _active_author(session, actor_account_id)
     if end < start:
         raise ValueError("El final del intervalo no puede ser anterior al inicio")
     statement = select(AgendaItem).where(
@@ -549,4 +550,6 @@ def list_agenda_items(
         if kind not in AGENDA_KINDS:
             raise ValueError("Tipo de agenda no válido")
         statement = statement.where(AgendaItem.kind == kind)
+    _audit(session, actor, "agenda_accessed",
+        f"Desde: {start.isoformat()}; hasta: {end.isoformat()}; estado: {status}; tipo: {kind}")
     return session.scalars(statement).all()
