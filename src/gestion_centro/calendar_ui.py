@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import AgendaItem
-from gestion_centro.domain.service import list_agenda_items
+from gestion_centro.domain.service import list_agenda_items, has_health_access
 
 
 class CalendarDialog(QDialog):
@@ -19,6 +19,8 @@ class CalendarDialog(QDialog):
     def __init__(self, factory, actor_id):
         super().__init__()
         self.factory, self.actor_id = factory, actor_id
+        with session_scope(factory) as session:
+            self.health_access = has_health_access(session, actor_account_id=actor_id)
         self.setWindowTitle("Calendario del centro")
         self.resize(980, 620)
         layout = QVBoxLayout(self)
@@ -33,9 +35,11 @@ class CalendarDialog(QDialog):
         for label, value in [
             ("Citas", "appointment"), ("Actividades", "activity"), ("Tareas", "task"),
             ("Reuniones", "meeting"), ("Llamadas", "call"), ("Contactos", "contact"),
-            ("Vacunas", "vaccine"), ("Cumpleaños", "birthday"), ("Eventos", "event")
+            ("Cumpleaños", "birthday"), ("Eventos", "event")
         ]:
             self.kind.addItem(label, value)
+        if self.health_access:
+            self.kind.addItem("Vacunas", "vaccine")
         self.status = QComboBox()
         self.status.addItem("Todos los estados", "")
         for label, value in [("Pendiente","pending"),("En curso","in_progress"),
@@ -84,7 +88,8 @@ class CalendarDialog(QDialog):
         kind, status = self.kind.currentData(), self.status.currentData()
         try:
             with session_scope(self.factory) as session:
-                items = list_agenda_items(session, start=start_dt, end=end_dt - timedelta(microseconds=1),
+                items = list_agenda_items(session, actor_account_id=self.actor_id,
+                    start=start_dt, end=end_dt - timedelta(microseconds=1),
                     kind=kind or None, status=status or None)
                 rows = [(x.starts_at, x.kind, x.title, x.description or "", x.status,
                          "Equipo" if x.assignment_scope == "team" else "Individual") for x in items]
