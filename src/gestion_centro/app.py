@@ -52,7 +52,7 @@ from gestion_centro.calendar_ui import CalendarDialog
 from gestion_centro.help_ui import HelpDialog
 from gestion_centro.domain.communications_service import (
     create_communication, add_communication_contribution, close_communication,
-    list_communications, move_communication_to_trash, restore_communication,
+    list_communications, list_communication_contributions, move_communication_to_trash, restore_communication,
     reopen_communication, revise_communication_contribution,
 )
 from gestion_centro.domain.communications import CommunicationContribution
@@ -396,7 +396,7 @@ class AgendaDialog(QDialog):
         from datetime import datetime, timedelta, timezone
         now = datetime.now(timezone.utc)
         with session_scope(self.factory) as session:
-            items = list_agenda_items(session, start=now - timedelta(days=365),
+            items = list_agenda_items(session, actor_account_id=self.actor_id, start=now - timedelta(days=365),
                 end=now + timedelta(days=730), kind=self.kind_filter.currentData(),
                 status=self.status_filter.currentData())
             rows = []
@@ -494,7 +494,7 @@ class CommunicationsDialog(QDialog):
 
     def refresh(self) -> None:
         with session_scope(self.factory) as session:
-            items = list_communications(session, include_trash=self.show_trash)
+            items = list_communications(session, actor_account_id=self.actor_id, include_trash=self.show_trash)
             rows = [(x.id, x.title, "En papelera" if x.deleted_at else
                 ("Abierta" if x.status == "draft" else "Cerrada"),
                 x.updated_at.astimezone().strftime("%d/%m/%Y %H:%M"),
@@ -529,9 +529,8 @@ class CommunicationsDialog(QDialog):
         item_id = self.selected_id()
         if not item_id: return
         with session_scope(self.factory) as session:
-            notes = session.scalars(select(CommunicationContribution)
-                .where(CommunicationContribution.communication_id == item_id)
-                .order_by(CommunicationContribution.created_at)).all()
+            notes = list_communication_contributions(
+                session, actor_account_id=self.actor_id, communication_id=item_id)
             lines = [f"{n.created_at.astimezone().strftime('%d/%m/%Y %H:%M')} · {n.author_name_snapshot}\n{n.content}" for n in notes]
         QMessageBox.information(self, "Historial de aportaciones", "\n\n".join(lines) or "Sin aportaciones.")
 
@@ -556,9 +555,8 @@ class CommunicationsDialog(QDialog):
             QMessageBox.information(self, "Selecciona", "Selecciona una comunicación.")
             return
         with session_scope(self.factory) as session:
-            notes = session.scalars(select(CommunicationContribution)
-                .where(CommunicationContribution.communication_id == item_id)
-                .order_by(CommunicationContribution.created_at)).all()
+            notes = list_communication_contributions(
+                session, actor_account_id=self.actor_id, communication_id=item_id)
             choices = [(n.id, f"{n.created_at.astimezone().strftime('%d/%m/%Y %H:%M')} · {n.author_name_snapshot} · {n.content[:90]}") for n in notes]
             actor = session.get(UserAccount, self.actor_id)
             choices = [(note_id, label) for note_id, label in choices
