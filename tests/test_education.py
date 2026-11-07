@@ -74,11 +74,21 @@ def test_other_professional_cannot_rectify_education_update(edu):
 def test_education_and_school_read_services_require_actor_and_audit(edu):
  s,actor,stay=edu
  from gestion_centro.auth.models import AccessAudit
- from gestion_centro.domain.education_service import list_education_goals, list_school_placements
+ from gestion_centro.domain.education_service import (
+  list_education_goals, list_school_placements, list_school_records,
+ )
  assert list_education_goals(s,actor_account_id=actor,stay_id=stay)==[]
  assert list_school_placements(s,actor_account_id=actor,stay_id=stay)==[]
+ placement=create_school_placement(s,actor_account_id=actor,stay_id=stay,
+  school_name="Centro ficticio",course="2026/27",started_on=date(2026,9,1))
+ add_school_record(s,actor_account_id=actor,placement_id=placement.id,
+  record_type="meeting",occurred_on=date(2026,9,2),description="Registro ficticio")
+ assert len(list_school_records(s,actor_account_id=actor,placement_id=placement.id))==1
  events={e.event for e in s.scalars(select(AccessAudit)).all()}
  assert "education_goals_accessed" in events
  assert "school_history_accessed" in events
+ assert "school_records_accessed" in events
  with pytest.raises(PermissionError):
   list_education_goals(s,actor_account_id="cuenta-inexistente",stay_id=stay)
+ with pytest.raises(PermissionError):
+  list_school_records(s,actor_account_id="cuenta-inexistente",placement_id=placement.id)
