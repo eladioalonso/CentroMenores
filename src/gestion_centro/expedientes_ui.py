@@ -11,14 +11,18 @@ from sqlalchemy import select
 
 from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import Minor, Stay, Event, EventStayLink, MinorPersonalDataVersion
-from gestion_centro.domain.service import create_minor, open_stay, close_stay, record_event
+from gestion_centro.domain.service import (
+    create_minor, open_stay, close_stay, record_event,
+    has_health_access, audit_minor_health_access, HEALTH_PERSONAL_FIELDS,
+)
 
 
 class NewMinorDialog(QDialog):
     """Alta completa del expediente. Los campos complementarios son opcionales."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, health_access=True):
         super().__init__(parent)
+        self.health_access = health_access
         self.setWindowTitle("Nuevo expediente")
         self.resize(620, 720)
         root = QVBoxLayout(self)
@@ -78,7 +82,8 @@ class NewMinorDialog(QDialog):
             ("Historial clínico", self.clinical_history),
         ]:
             health_form.addRow(label, widget)
-        tabs.addTab(health, "Datos sanitarios")
+        if self.health_access:
+            tabs.addTab(health, "Datos sanitarios")
 
         buttons = QHBoxLayout()
         save = QPushButton("Crear expediente")
@@ -118,6 +123,8 @@ class MinorWorkspaceDialog(QDialog):
     def __init__(self, factory, actor_id, minor_id, parent=None):
         super().__init__(parent)
         self.factory, self.actor_id, self.minor_id = factory, actor_id, minor_id
+        with session_scope(factory) as session:
+            self.health_access = has_health_access(session, actor_account_id=actor_id)
         self.resize(850, 600)
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
@@ -127,7 +134,8 @@ class MinorWorkspaceDialog(QDialog):
         self.tabs.addTab(self.personal, 'Datos personales')
         self.health_data = QWidget()
         self.health_form = QFormLayout(self.health_data)
-        self.tabs.addTab(self.health_data, 'Datos sanitarios')
+        if self.health_access:
+            self.tabs.addTab(self.health_data, 'Datos sanitarios')
         self.stays = QTableWidget(0, 4)
         self.stays.setHorizontalHeaderLabels(['Ingreso', 'Salida', 'Estado', 'Motivo'])
         self.stays.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -173,16 +181,18 @@ class MinorWorkspaceDialog(QDialog):
                 self.personal_form.addRow(label, QLabel(value or '—'))
             while self.health_form.rowCount():
                 self.health_form.removeRow(0)
-            health_fields = [('CIP', minor.cip), ('Centro de salud', minor.health_center),
-                ('Facultativo', minor.physician), ('Enfermera', minor.nurse),
-                ('Caducidad tarjeta sanitaria', str(minor.health_card_expires_on or '—')),
-                ('Historial clínico', minor.clinical_history)]
-            for label, value in health_fields:
-                display = QTextEdit()
-                display.setReadOnly(True)
-                display.setMaximumHeight(90 if label == 'Historial clínico' else 42)
-                display.setPlainText(value or '—')
-                self.health_form.addRow(label, display)
+            if self.health_access:
+                audit_minor_health_access(session, actor_account_id=self.actor_id, minor_id=minor.id)
+                health_fields = [('CIP', minor.cip), ('Centro de salud', minor.health_center),
+                    ('Facultativo', minor.physician), ('Enfermera', minor.nurse),
+                    ('Caducidad tarjeta sanitaria', str(minor.health_card_expires_on or '—')),
+                    ('Historial clínico', minor.clinical_history)]
+                for label, value in health_fields:
+                    display = QTextEdit()
+                    display.setReadOnly(True)
+                    display.setMaximumHeight(90 if label == 'Historial clínico' else 42)
+                    display.setPlainText(value or '—')
+                    self.health_form.addRow(label, display)
             stays = sorted(minor.stays, key=lambda item: item.sequence_number, reverse=True)
             self.stays.setRowCount(len(stays))
             for row, stay in enumerate(stays):
@@ -261,11 +271,22 @@ class MinorWorkspaceDialog(QDialog):
                 .where(MinorPersonalDataVersion.minor_id == self.minor_id)
                 .order_by(MinorPersonalDataVersion.changed_at.desc())
             ).all()
-            rows = [
-                f"{version.changed_at.astimezone().strftime('%d/%m/%Y %H:%M')} · {version.changed_by_name_snapshot}\n" +
-                "\n".join(f"{field}: {version.old_values.get(field)!r} → {version.new_values.get(field)!r}" for field in version.new_values)
-                for version in versions
-            ]
+            if self.health_access:
+                audit_minor_health_access(session, actor_account_id=self.actor_id, minor_id=self.minor_id)
+            rows = []
+            for version in versions:
+                visible_fields = [
+                    field for field in version.new_values
+                    if self.health_access or field not in HEALTH_PERSONAL_FIELDS
+                ]
+                if visible_fields:
+                    rows.append(
+                        f"{version.changed_at.astimezone().strftime('%d/%m/%Y %H:%M')} · {version.changed_by_name_snapshot}\n" +
+                        "\n".join(
+                            f"{field}: {version.old_values.get(field)!r} → {version.new_values.get(field)!r}"
+                            for field in visible_fields
+                        )
+                    )
         dialog = QDialog(self)
         dialog.setWindowTitle('Historial de modificaciones')
         dialog.resize(700, 500)
@@ -359,19 +380,23 @@ class MinorWorkspaceDialog(QDialog):
             expiry.setMinimumDate(QDate(1900, 1, 1))
             expiry.setSpecialValueText('No indicada')
             expiry.setDate(QDate(minor.health_card_expires_on.year, minor.health_card_expires_on.month, minor.health_card_expires_on.day) if minor.health_card_expires_on else expiry.minimumDate())
-            for key, label, value in [
-                ('cip', 'CIP', minor.cip), ('health_center', 'Centro de salud', minor.health_center),
-                ('physician', 'Facultativo', minor.physician), ('nurse', 'Enfermera', minor.nurse),
-            ]:
-                field = QLineEdit(value or '')
-                controls[key] = field
-                health_form.addRow(label, field)
-            health_form.addRow('Caducidad tarjeta sanitaria', expiry)
-            clinical = QTextEdit()
-            clinical.setPlainText(minor.clinical_history or '')
-            health_form.addRow('Historial clínico', clinical)
+            clinical = None
+            if self.health_access:
+                audit_minor_health_access(session, actor_account_id=self.actor_id, minor_id=minor.id)
+                for key, label, value in [
+                    ('cip', 'CIP', minor.cip), ('health_center', 'Centro de salud', minor.health_center),
+                    ('physician', 'Facultativo', minor.physician), ('nurse', 'Enfermera', minor.nurse),
+                ]:
+                    field = QLineEdit(value or '')
+                    controls[key] = field
+                    health_form.addRow(label, field)
+                health_form.addRow('Caducidad tarjeta sanitaria', expiry)
+                clinical = QTextEdit()
+                clinical.setPlainText(minor.clinical_history or '')
+                health_form.addRow('Historial clínico', clinical)
             tabs.addTab(personal_tab, 'Datos personales')
-            tabs.addTab(health_tab, 'Datos sanitarios')
+            if self.health_access:
+                tabs.addTab(health_tab, 'Datos sanitarios')
             layout.addWidget(tabs)
             buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
             buttons.accepted.connect(dialog.accept)
@@ -381,8 +406,9 @@ class MinorWorkspaceDialog(QDialog):
                 return
             values = {key: field.text() for key, field in controls.items()}
             values['birth_date'] = birth.date().toPython() if birth.date() > birth.minimumDate() else None
-            values['health_card_expires_on'] = expiry.date().toPython() if expiry.date() > expiry.minimumDate() else None
-            values['clinical_history'] = clinical.toPlainText()
+            if self.health_access:
+                values['health_card_expires_on'] = expiry.date().toPython() if expiry.date() > expiry.minimumDate() else None
+                values['clinical_history'] = clinical.toPlainText()
         try:
             from gestion_centro.domain.service import update_minor_personal_data
             with session_scope(self.factory) as session:
@@ -396,6 +422,8 @@ class ExpedientesDialog(QDialog):
     def __init__(self, factory, actor_id):
         super().__init__()
         self.factory, self.actor_id = factory, actor_id
+        with session_scope(factory) as session:
+            self.health_access = has_health_access(session, actor_account_id=actor_id)
         self.setWindowTitle("Expedientes y estancias")
         self.resize(980, 620)
         layout = QVBoxLayout(self)
@@ -502,7 +530,7 @@ class ExpedientesDialog(QDialog):
         return item.data(Qt.ItemDataRole.UserRole) if item else (None, None)
 
     def new_minor(self):
-        dialog = NewMinorDialog(self)
+        dialog = NewMinorDialog(self, health_access=self.health_access)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         values = dialog.values()
