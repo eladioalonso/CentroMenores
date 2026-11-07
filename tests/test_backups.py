@@ -261,3 +261,13 @@ def test_pending_backup_manifest_write_is_atomic(tmp_path, monkeypatch):
     assert json.loads(pending.read_text(encoding="utf-8")) == ["previous.zip"]
     assert list(paths.backups.glob(".external-pending.json.*.tmp")) == []
 
+def test_backup_paths_reject_windows_drives_and_nonportable_segments():
+    from gestion_centro.persistence.backups import _safe_archive_name
+
+    assert not _safe_archive_name("C:/outside.txt")
+    assert not _safe_archive_name("documents//file.pdf")
+    assert not _safe_archive_name("documents/./file.pdf")
+    assert not _safe_archive_name("documents/../outside.pdf")
+    assert _safe_archive_name("documents/uuid/file.pdf")
+    assert _safe_archive_name("database/centro.db")
+
