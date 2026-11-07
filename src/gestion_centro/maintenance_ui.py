@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 )
 from gestion_centro.persistence.diagnostics import run_diagnostics
 from gestion_centro.persistence.database import session_scope
-from gestion_centro.auth.models import AccessAudit
+from gestion_centro.auth.models import AccessAudit, UserAccount
 from gestion_centro.auth.service import list_audit_events
 
 
@@ -103,8 +103,18 @@ class MaintenanceDialog(QDialog):
         layout.addWidget(export)
         self.run()
 
+    @staticmethod
+    def require_admin(session, actor_id):
+        account = session.get(UserAccount, actor_id)
+        if (account is None or not account.active or not account.professional.active
+                or account.role != "admin"):
+            raise PermissionError("Se requiere una cuenta administradora activa")
+        return account
+
     def run(self):
         try:
+            with session_scope(self.factory) as session:
+                self.require_admin(session, self.actor_id)
             self.report = run_diagnostics(self.paths)
             rows = [(x["name"], x["status"], x["detail"]) for x in self.report["checks"]]
             rows.extend([
@@ -117,10 +127,10 @@ class MaintenanceDialog(QDialog):
                 for j, value in enumerate(values):
                     self.table.setItem(i, j, QTableWidgetItem(value))
             with session_scope(self.factory) as session:
-                account = session.get(__import__("gestion_centro.auth.models", fromlist=["UserAccount"]).UserAccount, self.actor_id)
+                account = self.require_admin(session, self.actor_id)
                 session.add(AccessAudit(account_id=account.id, username_snapshot=account.username,
                     event="maintenance_diagnostics", details=f'checks={len(rows)}'))
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, PermissionError) as exc:
             QMessageBox.critical(self, "Diagnóstico interrumpido", str(exc))
 
     def export(self):
@@ -131,7 +141,9 @@ class MaintenanceDialog(QDialog):
         if not filename:
             return
         try:
+            with session_scope(self.factory) as session:
+                self.require_admin(session, self.actor_id)
             Path(filename).write_text(json.dumps(self.report, ensure_ascii=False, indent=2), encoding="utf-8")
             QMessageBox.information(self, "Informe guardado", "Se ha guardado el informe técnico.")
-        except OSError as exc:
+        except (OSError, PermissionError) as exc:
             QMessageBox.critical(self, "No se pudo guardar", str(exc))
