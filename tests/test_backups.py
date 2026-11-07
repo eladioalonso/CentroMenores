@@ -177,3 +177,21 @@ def test_backup_creation_does_not_leave_partial_archive_when_verification_fails(
             now=datetime(2026, 5, 8, tzinfo=timezone.utc))
     assert list(paths.backups.glob("manual-*.zip")) == []
     assert list(paths.backups.glob(".*.tmp")) == []
+
+
+
+def test_backup_refuses_symlinked_attachment_sources(tmp_path):
+    import pytest
+
+    paths = prepare_paths(tmp_path / "portable")
+    outside = tmp_path / "outside-secret.txt"
+    outside.write_text("must not be copied", encoding="utf-8")
+    link = paths.documents / "linked-secret.txt"
+    try:
+        link.symlink_to(outside)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"El entorno no permite crear enlaces simbólicos: {exc}")
+    with pytest.raises(ValueError, match="enlace simbólico"):
+        create_backup(paths, kind="manual",
+            now=datetime(2026, 5, 9, tzinfo=timezone.utc))
+    assert list(paths.backups.glob("manual-*.zip")) == []
