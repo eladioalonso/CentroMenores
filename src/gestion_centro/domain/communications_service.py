@@ -94,16 +94,36 @@ def restore_communication(session: Session, *, actor_account_id: str, communicat
     _audit(session, actor, "communication_restored", item.id)
     return item
 
-def list_communications(session: Session, *, include_trash: bool = False, include_closed: bool = True):
+def list_communications(session: Session, *, actor_account_id: str,
+                        include_trash: bool = False, include_closed: bool = True):
+    actor = _actor(session, actor_account_id)
     statement = select(Communication).order_by(Communication.updated_at.desc())
     if not include_trash:
         statement = statement.where(Communication.deleted_at.is_(None))
     if not include_closed:
         statement = statement.where(Communication.status == "draft")
+    _audit(session, actor, "communications_accessed",
+           f"papelera:{include_trash}; cerradas:{include_closed}")
     return session.scalars(statement).all()
 
-def stale_communications(session: Session, *, now: datetime | None = None):
+
+def list_communication_contributions(session: Session, *, actor_account_id: str,
+                                     communication_id: str):
+    actor = _actor(session, actor_account_id)
+    item = session.get(Communication, communication_id)
+    if item is None or item.deleted_at is not None:
+        raise ValueError("La comunicación no existe o está en papelera")
+    _audit(session, actor, "communication_history_accessed", communication_id)
+    return session.scalars(select(CommunicationContribution).where(
+        CommunicationContribution.communication_id == communication_id
+    ).order_by(CommunicationContribution.created_at)).all()
+
+
+def stale_communications(session: Session, *, actor_account_id: str,
+                         now: datetime | None = None):
+    actor = _actor(session, actor_account_id)
     moment = now or datetime.now(timezone.utc)
+    _audit(session, actor, "stale_communications_accessed", "borradores de más de 7 días")
     return session.scalars(select(Communication).where(
         Communication.status == "draft", Communication.deleted_at.is_(None),
         Communication.updated_at <= moment - timedelta(days=7)
