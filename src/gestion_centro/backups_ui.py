@@ -51,12 +51,17 @@ class BackupDialog(QDialog):
         return account
 
     def audit(self, event, details):
-        with session_scope(self.factory) as session:
-            account = self.require_admin(session, self.actor_id)
-            session.add(AccessAudit(
-                account_id=account.id, username_snapshot=account.username,
-                event=event, details=details,
-            ))
+        try:
+            with session_scope(self.factory) as session:
+                account = self.require_admin(session, self.actor_id)
+                session.add(AccessAudit(
+                    account_id=account.id, username_snapshot=account.username,
+                    event=event, details=details,
+                ))
+        except Exception as exc:
+            # No presentar como fallida una copia/restauración que ya se completó.
+            QMessageBox.warning(self, "Aviso de auditoría",
+                "La operación se completó, pero no se pudo registrar su evento de auditoría: " + str(exc))
 
     def create_manual(self):
         try:
