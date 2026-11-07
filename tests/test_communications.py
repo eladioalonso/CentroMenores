@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta, timezone
 import pytest
+from sqlalchemy import select
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from gestion_centro.persistence.base import Base
-from gestion_centro.auth.models import Professional, UserAccount
+from gestion_centro.auth.models import AccessAudit, Professional, UserAccount
 from gestion_centro.auth.service import hash_password, Role
 from gestion_centro.domain.communications import CommunicationContribution
 from gestion_centro.domain.communications_service import (
@@ -50,7 +51,7 @@ def test_stale_notice_after_seven_days(comm_session):
     s, edu, _=comm_session
     item=create_communication(s,actor_account_id=edu,title="Aviso",content="Texto")
     old=datetime.now(timezone.utc)+timedelta(days=8)
-    assert item in stale_communications(s,now=old)
+    assert item in stale_communications(s,actor_account_id=edu,now=old)
 
 
 def test_author_can_rectify_own_contribution_without_overwriting_original(comm_session):
@@ -70,3 +71,20 @@ def test_author_can_rectify_own_contribution_without_overwriting_original(comm_s
     with pytest.raises(ValueError):
         revise_communication_contribution(s, actor_account_id=edu,
             contribution_id=original.id, corrected_content="Demasiado tarde")
+
+
+
+def test_communication_read_services_require_active_actor_and_audit(comm_session):
+    from gestion_centro.domain.communications_service import (
+        list_communications, list_communication_contributions,
+    )
+    s, edu, admin = comm_session
+    item = create_communication(s, actor_account_id=edu, title="Aviso privado", content="Texto")
+    assert item in list_communications(s, actor_account_id=edu)
+    assert len(list_communication_contributions(
+        s, actor_account_id=admin, communication_id=item.id)) == 1
+    events = [event.event for event in s.scalars(select(AccessAudit)).all()]
+    assert "communications_accessed" in events
+    assert "communication_history_accessed" in events
+    with pytest.raises(PermissionError):
+        list_communications(s, actor_account_id="cuenta-inexistente")
