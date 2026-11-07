@@ -50,6 +50,9 @@ class ReportsDialog(QDialog):
         self.generate()
 
     def generate(self):
+        # Evita que una exportación posterior reutilice un informe de otro periodo.
+        self.report = None
+        self.table.setRowCount(0)
         start = self.start.date().toPython()
         end = self.end.date().toPython()
         try:
