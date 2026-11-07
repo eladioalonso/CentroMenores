@@ -66,8 +66,8 @@ def update_minor_personal_data(
     locality: str | None = None, nationality: str | None = None,
     birth_date: date | None = None, nif_nie: str | None = None,
     passport_number: str | None = None, address: str | None = None,
-    email: str | None = None, cip: str | None = None,
-    health_center: str | None = None, physician: str | None = None,
+    email: str | None = None, cip: str | None | object = _UNSET,
+    health_center: str | None | object = _UNSET, physician: str | None | object = _UNSET,
     nurse: str | None | object = _UNSET, health_card_expires_on: date | None | object = _UNSET,
     clinical_history: str | None | object = _UNSET,
 ) -> Minor:
