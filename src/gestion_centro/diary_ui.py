@@ -14,8 +14,9 @@ from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import DiaryDay, DiaryEntry, Incident, Stay
 from gestion_centro.domain.service import (
     record_diary_entry, record_incident, close_diary_day, revise_diary_entry,
-    correct_diary_entry,
+    correct_diary_entry, has_health_access, list_diary_records,
 )
+from gestion_centro.domain.documents_service import list_active_stays
 
 
 class DiaryDialog(QDialog):
@@ -34,6 +35,8 @@ class DiaryDialog(QDialog):
     def __init__(self, factory, actor_id):
         super().__init__()
         self.factory, self.actor_id = factory, actor_id
+        with session_scope(factory) as session:
+            self.health_access = has_health_access(session, actor_account_id=actor_id)
         self.setWindowTitle("Diario e incidencias")
         self.resize(980, 640)
         layout = QVBoxLayout(self)
@@ -51,7 +54,9 @@ class DiaryDialog(QDialog):
         self.shift = QComboBox()
         for label, key in self.SHIFTS.items(): self.shift.addItem(label, key)
         self.category = QComboBox()
-        for label, key in self.CATEGORIES.items(): self.category.addItem(label, key)
+        for label, key in self.CATEGORIES.items():
+            if key != "health" or self.health_access:
+                self.category.addItem(label, key)
         self.happened = QDateTimeEdit()
         self.happened.setCalendarPopup(True)
         self.happened.setDateTime(QDateTime.currentDateTime())
@@ -99,7 +104,7 @@ class DiaryDialog(QDialog):
         layout.addWidget(QLabel("Marca únicamente a los menores implicados. Para un hecho general, deja la selección vacía."))
         choices = QListWidget()
         with session_scope(self.factory) as session:
-            stays = session.scalars(select(Stay).where(Stay.status == "active").order_by(Stay.started_on.desc())).all()
+            stays = list_active_stays(session, actor_account_id=self.actor_id)
             rows = [(s.id, f"{s.minor.internal_code} · {s.minor.given_names} {s.minor.family_names}") for s in stays]
         for stay_id, label in rows:
             item = QListWidgetItem(label)
@@ -180,7 +185,9 @@ class DiaryDialog(QDialog):
         if not ok or not title.strip(): return
         description, ok = QInputDialog.getMultiLineText(self, "Incidencia", "Descripción objetiva:")
         if not ok or not description.strip(): return
-        type_label, ok = QInputDialog.getItem(self, "Incidencia", "Tipo:", list(self.INCIDENT_TYPES), 0, False)
+        incident_types = [label for label, key in self.INCIDENT_TYPES.items()
+            if key != "health" or self.health_access]
+        type_label, ok = QInputDialog.getItem(self, "Incidencia", "Tipo:", incident_types, 0, False)
         if not ok: return
         severity_label, ok = QInputDialog.getItem(self, "Incidencia", "Gravedad:", list(self.SEVERITIES), 0, False)
         if not ok: return
@@ -212,11 +219,8 @@ class DiaryDialog(QDialog):
     def refresh(self):
         selected = self.day.date().toPython()
         with session_scope(self.factory) as session:
-            day = session.scalar(select(DiaryDay).where(DiaryDay.diary_date == selected))
-            entries = session.scalars(select(DiaryEntry).where(
-                DiaryEntry.diary_day_id == day.id).order_by(DiaryEntry.happened_at)) .all() if day else []
-            incidents = session.scalars(select(Incident).where(
-                Incident.diary_day_id == day.id).order_by(Incident.happened_at)).all() if day else []
+            day, entries, incidents = list_diary_records(
+                session, actor_account_id=self.actor_id, diary_date=selected)
             rows = [(x.happened_at, x.shift, x.category, x.content, x.author_name_snapshot,
                 {"kind": "entry", "id": x.id}) for x in entries]
             rows += [(x.happened_at, "Incidencia", x.severity,
