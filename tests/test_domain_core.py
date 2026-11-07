@@ -227,6 +227,7 @@ def test_create_minor_persists_optional_personal_and_health_details():
     with make_session() as session:
         actor = create_professional_account(session, display_name="Prueba",
             username="complete-file", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        actor.health_access = True
         minor = create_minor(
             session, actor_account_id=actor.id, internal_code="MC-2026-0099",
             given_names="Caso", family_names="Ficticio",
