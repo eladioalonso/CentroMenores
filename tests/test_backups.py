@@ -241,3 +241,23 @@ def test_pending_backup_sync_removes_temporary_copy_when_verification_fails(
     pending = json.loads((paths.backups / "external-pending.json").read_text(encoding="utf-8"))
     assert archive.name in pending
 
+def test_pending_backup_manifest_write_is_atomic(tmp_path, monkeypatch):
+    import pytest
+    from gestion_centro.persistence import backups
+
+    paths = prepare_paths(tmp_path / "portable")
+    pending = paths.backups / "external-pending.json"
+    pending.write_text('["previous.zip"]', encoding="utf-8")
+    real_replace = backups.os.replace
+
+    def fail_pending_replace(source, destination):
+        if Path(destination) == pending:
+            raise OSError("fallo simulado al guardar cola")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(backups.os, "replace", fail_pending_replace)
+    with pytest.raises(OSError, match="guardar cola"):
+        backups._write_pending(paths, ["new.zip"])
+    assert json.loads(pending.read_text(encoding="utf-8")) == ["previous.zip"]
+    assert list(paths.backups.glob(".external-pending.json.*.tmp")) == []
+
