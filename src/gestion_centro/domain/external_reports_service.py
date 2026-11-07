@@ -1,10 +1,10 @@
 """Servicios para informes externos con mínimo de datos y doble revisión."""
 from datetime import datetime, timezone, date
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 from gestion_centro.auth.models import AccessAudit, UserAccount
 from gestion_centro.domain.models import Stay
-from gestion_centro.domain.documents import Authorization
+from gestion_centro.domain.documents import Authorization, PersonalDocument
 from gestion_centro.domain.external_reports import ExternalReport
 
 ALLOWED_REPORT_FIELDS = {"identity_basic", "stay_dates", "education", "schooling"}
@@ -35,6 +35,10 @@ def create_external_report(session: Session, *, actor_account_id: str, stay_id: 
         raise ValueError("Selecciona una autorización vigente de esta estancia")
     if authorization.authorization_type == "medical":
         raise ValueError("Este tipo de informe no admite autorizaciones médicas ni datos sanitarios")
+    linked_document = (session.get(PersonalDocument, authorization.document_id)
+        if authorization.document_id else None)
+    if linked_document is not None and linked_document.category == "health":
+        raise ValueError("Este circuito no admite autorizaciones vinculadas a documentos sanitarios")
     if authorization.valid_from > today or (authorization.valid_until and authorization.valid_until < today):
         raise ValueError("La autorización está fuera de vigencia")
     fields = set(included_fields)
@@ -61,7 +65,10 @@ def get_external_report_for_review(session: Session, *, actor_account_id: str, r
     if report is None:
         raise ValueError("El informe no existe")
     authorization = session.get(Authorization, report.authorization_id)
-    if authorization is None or authorization.authorization_type == "medical":
+    linked_document = (session.get(PersonalDocument, authorization.document_id)
+        if authorization is not None and authorization.document_id else None)
+    if (authorization is None or authorization.authorization_type == "medical"
+            or (linked_document is not None and linked_document.category == "health")):
         raise PermissionError("El informe no está disponible en el circuito de informes generales")
     _audit(session, actor, "external_report_previewed", report.id)
     return report
@@ -77,9 +84,13 @@ def review_external_report(session: Session, *, actor_account_id: str, report_id
         raise PermissionError("La revisión debe realizarla otro profesional")
     authorization = session.get(Authorization, report.authorization_id)
     today = date.today()
-    if authorization is None or authorization.authorization_type == "medical" or authorization.status != "valid" or authorization.valid_from > today or (
+    linked_document = (session.get(PersonalDocument, authorization.document_id)
+        if authorization is not None and authorization.document_id else None)
+    if (authorization is None or authorization.authorization_type == "medical"
+            or (linked_document is not None and linked_document.category == "health")
+            or authorization.status != "valid" or authorization.valid_from > today or (
         authorization.valid_until and authorization.valid_until < today
-    ):
+    )):
         raise ValueError("La autorización ya no está vigente; no se puede aprobar el informe")
     report.status = "reviewed"
     report.reviewed_by_account_id = actor.id
@@ -99,10 +110,14 @@ def mark_external_report_delivered(session: Session, *, actor_account_id: str,
         raise ValueError("Indica el justificante o referencia de entrega")
     authorization = session.get(Authorization, report.authorization_id)
     today = date.today()
-    if authorization is None or authorization.authorization_type == "medical" or authorization.status != "valid" or (
-        authorization.valid_from > today or
-        (authorization.valid_until is not None and authorization.valid_until < today)
-    ):
+    linked_document = (session.get(PersonalDocument, authorization.document_id)
+        if authorization is not None and authorization.document_id else None)
+    if (authorization is None or authorization.authorization_type == "medical"
+            or (linked_document is not None and linked_document.category == "health")
+            or authorization.status != "valid" or (
+                authorization.valid_from > today or
+                (authorization.valid_until is not None and authorization.valid_until < today)
+            )):
         raise ValueError("La autorización ya no está vigente; no se puede entregar el informe")
     report.status = "delivered"
     report.delivery_reference = delivery_reference.strip()
@@ -118,9 +133,11 @@ def list_external_reports(session: Session, *, actor_account_id: str, stay_id: s
     if session.get(Stay, stay_id) is None:
         raise ValueError("La estancia no existe")
     _audit(session, actor, "external_reports_accessed", stay_id)
+    health_document_ids = select(PersonalDocument.id).where(PersonalDocument.category == "health")
     return session.scalars(select(ExternalReport).join(
         Authorization, Authorization.id == ExternalReport.authorization_id
     ).where(
         ExternalReport.stay_id == stay_id,
         Authorization.authorization_type != "medical",
+        or_(Authorization.document_id.is_(None), Authorization.document_id.not_in(health_document_ids)),
     ).order_by(ExternalReport.created_at.desc())).all()
