@@ -764,6 +764,10 @@ class DocumentsDialog(QDialog):
                 doc = session.get(PersonalDocument, cell.data(Qt.ItemDataRole.UserRole))
                 if doc is None:
                     raise ValueError("El documento ya no existe.")
+                visible_documents = list_documents(
+                    session, actor_account_id=self.actor_id, stay_id=doc.stay_id)
+                if doc.id not in {item.id for item in visible_documents}:
+                    raise PermissionError("No tienes autorización para consultar este documento.")
                 relative = Path(doc.relative_path)
                 if relative.is_absolute() or ".." in relative.parts:
                     raise ValueError("La ruta del documento no es segura.")
@@ -775,8 +779,8 @@ class DocumentsDialog(QDialog):
                 if actual != doc.sha256:
                     raise ValueError("El hash no coincide. El archivo puede haber sido alterado.")
                 actor = session.get(UserAccount, self.actor_id)
-                if actor is None or not actor.active:
-                    raise PermissionError("La cuenta ya no está activa.")
+                if actor is None or not actor.active or not actor.professional.active:
+                    raise PermissionError("La cuenta o el profesional ya no están activos.")
                 if doc.category == "health" and not actor.health_access:
                     raise PermissionError("La cuenta no tiene autorización sanitaria expresa.")
                 session.add(AccessAudit(account_id=actor.id,
