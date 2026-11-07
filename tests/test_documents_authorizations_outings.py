@@ -188,3 +188,20 @@ def test_medical_authorizations_and_outings_require_health_access_and_are_filter
             set_outing_status(session, actor_account_id=actor.id, outing_id=outing.id,
                 status="in_progress", actual_at=starts)
 
+def test_medical_authorization_status_cannot_be_changed_without_health_access():
+    with make_session() as session:
+        actor, stay = setup_stay(session)
+        actor.health_access = True
+        authorization = record_authorization(
+            session, actor_account_id=actor.id, stay_id=stay.id,
+            authorization_type="medical", scope="Atención sanitaria ficticia",
+            issuer="Representante ficticio", valid_from=date(2026, 1, 1),
+        )
+        actor.health_access = False
+        with pytest.raises(PermissionError, match="autorización"):
+            set_authorization_status(
+                session, actor_account_id=actor.id, authorization_id=authorization.id,
+                status="revoked", reason="Motivo ficticio",
+            )
+        assert session.get(Authorization, authorization.id).status == "valid"
+
