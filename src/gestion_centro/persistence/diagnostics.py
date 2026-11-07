@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import shutil
 import sqlite3
+import zipfile
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -45,7 +47,7 @@ def run_diagnostics(paths) -> dict:
         try:
             verify_backup(archive)
             valid += 1
-        except (OSError, ValueError, KeyError):
+        except (OSError, ValueError, KeyError, zipfile.BadZipFile, RuntimeError, EOFError, zlib.error):
             invalid += 1
     checks.append({
         "name": "Copias verificables",
@@ -58,7 +60,14 @@ def run_diagnostics(paths) -> dict:
     if pending_file.exists():
         try:
             import json
-            pending = len(json.loads(pending_file.read_text(encoding="utf-8")))
+            entries = json.loads(pending_file.read_text(encoding="utf-8"))
+            if not isinstance(entries, list) or any(
+                not isinstance(name, str) or Path(name).name != name or not name.endswith(".zip")
+                for name in entries
+            ):
+                pending = -1
+            else:
+                pending = len(entries)
         except (OSError, ValueError):
             pending = -1
     checks.append({
@@ -73,8 +82,10 @@ def run_diagnostics(paths) -> dict:
     total_bytes = 0
     largest_bytes = 0
     for root in (paths.documents, paths.images):
-        if root.exists():
+        if root.exists() and not root.is_symlink():
             for item in root.rglob("*"):
+                if item.is_symlink():
+                    continue
                 if item.is_file():
                     try:
                         size = item.stat().st_size
