@@ -106,7 +106,8 @@ def add_school_record(session: Session, *, actor_account_id: str, placement_id: 
 
 def list_education_goals(session: Session, *, actor_account_id: str, stay_id: str):
     actor = _actor(session, actor_account_id)
-    _active_stay(session, stay_id)
+    if session.get(Stay, stay_id) is None:
+        raise ValueError("La estancia no existe")
     _audit(session, actor, "education_goals_accessed", stay_id)
     return session.scalars(select(EducationGoal).where(
         EducationGoal.stay_id == stay_id
@@ -115,11 +116,24 @@ def list_education_goals(session: Session, *, actor_account_id: str, stay_id: st
 
 def list_school_placements(session: Session, *, actor_account_id: str, stay_id: str):
     actor = _actor(session, actor_account_id)
-    _active_stay(session, stay_id)
+    if session.get(Stay, stay_id) is None:
+        raise ValueError("La estancia no existe")
     _audit(session, actor, "school_history_accessed", stay_id)
     return session.scalars(select(SchoolPlacement).where(
         SchoolPlacement.stay_id == stay_id
     ).order_by(SchoolPlacement.started_on.desc())).all()
+
+
+def list_school_records(session: Session, *, actor_account_id: str, placement_id: str):
+    actor = _actor(session, actor_account_id)
+    placement = session.get(SchoolPlacement, placement_id)
+    if placement is None:
+        raise ValueError("La escolarización no existe")
+    _audit(session, actor, "school_records_accessed", placement_id)
+    from gestion_centro.domain.education import SchoolRecord
+    return session.scalars(select(SchoolRecord).where(
+        SchoolRecord.placement_id == placement_id
+    ).order_by(SchoolRecord.occurred_on.desc(), SchoolRecord.created_at.desc())).all()
 
 
 def revise_education_update(session: Session, *, actor_account_id: str, update_id: str,
