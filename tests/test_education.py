@@ -1,5 +1,6 @@
 from datetime import date
 import pytest
+from sqlalchemy import select
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from gestion_centro.persistence.base import Base
@@ -67,3 +68,17 @@ def test_other_professional_cannot_rectify_education_update(edu):
   revise_education_update(s,actor_account_id=other_account.id,update_id=original.id,
    objective_description="Intento ajeno",actions_taken="Cambio",response_observed="Cambio")
  assert original.objective_description=="Observación original"
+
+
+
+def test_education_and_school_read_services_require_actor_and_audit(edu):
+ s,actor,stay=edu
+ from gestion_centro.auth.models import AccessAudit
+ from gestion_centro.domain.education_service import list_education_goals, list_school_placements
+ assert list_education_goals(s,actor_account_id=actor,stay_id=stay)==[]
+ assert list_school_placements(s,actor_account_id=actor,stay_id=stay)==[]
+ events={e.event for e in s.scalars(select(AccessAudit)).all()}
+ assert "education_goals_accessed" in events
+ assert "school_history_accessed" in events
+ with pytest.raises(PermissionError):
+  list_education_goals(s,actor_account_id="cuenta-inexistente",stay_id=stay)
