@@ -17,6 +17,7 @@ def test_personal_data_update_is_saved_and_audited():
     with Session(engine) as session:
         actor = create_professional_account(session, display_name='Test', username='edit-file',
             password='test password long enough', role=Role.EDUCATOR)
+        actor.health_access = True
         minor = create_minor(session, actor_account_id=actor.id, internal_code='TEST-EDIT-1',
             given_names='Original', family_names='Name')
         update_minor_personal_data(session, actor_account_id=actor.id, minor_id=minor.id,
@@ -60,3 +61,34 @@ def test_personal_data_update_rejects_future_birth_date():
             update_minor_personal_data(session, actor_account_id=actor.id, minor_id=minor.id,
                 given_names='Name', family_names='Test',
                 birth_date=date.today().replace(year=date.today().year + 1))
+
+def test_personal_data_update_without_health_access_cannot_read_or_change_health_fields():
+    engine = create_engine('sqlite:///:memory:')
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        actor = create_professional_account(session, display_name='Test', username='edit-no-health',
+            password='test password long enough', role=Role.EDUCATOR)
+        authorized = create_professional_account(session, display_name='Health', username='edit-health',
+            password='test password long enough', role=Role.EDUCATOR)
+        authorized.health_access = True
+        minor = create_minor(session, actor_account_id=authorized.id, internal_code='TEST-EDIT-3',
+            given_names='Name', family_names='Test', clinical_history='Dato clínico ficticio')
+        with pytest.raises(PermissionError, match='autorización sanitaria'):
+            update_minor_personal_data(session, actor_account_id=actor.id, minor_id=minor.id,
+                given_names='Name', family_names='Test', clinical_history=None)
+        # Omitir los campos sanitarios permite corregir los identificativos sin borrarlos.
+        update_minor_personal_data(session, actor_account_id=actor.id, minor_id=minor.id,
+            given_names='Corrected', family_names='Test')
+        assert session.get(Minor, minor.id).clinical_history == 'Dato clínico ficticio'
+
+
+def test_creating_minor_with_health_data_requires_health_access():
+    engine = create_engine('sqlite:///:memory:')
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        actor = create_professional_account(session, display_name='Test', username='create-no-health',
+            password='test password long enough', role=Role.EDUCATOR)
+        with pytest.raises(PermissionError, match='autorización sanitaria'):
+            create_minor(session, actor_account_id=actor.id, internal_code='TEST-EDIT-4',
+                given_names='Name', family_names='Test', clinical_history='Dato clínico ficticio')
+
