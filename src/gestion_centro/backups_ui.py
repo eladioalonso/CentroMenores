@@ -66,7 +66,7 @@ class BackupDialog(QDialog):
             self.audit("backup_created", archive.name)
             QMessageBox.information(self, "Copia creada", "Copia verificada: " + archive.name)
             self.refresh()
-        except (OSError, ValueError, PermissionError) as exc:
+        except Exception as exc:
             QMessageBox.critical(self, "Error de copia", str(exc))
 
     def verify_selected(self):
@@ -81,7 +81,7 @@ class BackupDialog(QDialog):
             self.audit("backup_verified", Path(item.text()).name)
             QMessageBox.information(self, "Verificación correcta",
                 "Integridad correcta. Archivos incluidos: " + str(len(manifest["files"])))
-        except (OSError, ValueError, KeyError, PermissionError) as exc:
+        except Exception as exc:
             QMessageBox.critical(self, "Copia no válida", str(exc))
 
     def restore_selected(self):
@@ -121,7 +121,7 @@ class BackupDialog(QDialog):
                 "La restauración ha finalizado. La copia previa se conserva en la carpeta de backups. "
                 "Reinicia la aplicación y comprueba los expedientes y documentos.")
             self.refresh()
-        except (OSError, ValueError, PermissionError, KeyError) as exc:
+        except Exception as exc:
             QMessageBox.critical(self, "Restauración cancelada", str(exc))
 
     def sync_usb(self):
@@ -136,5 +136,5 @@ class BackupDialog(QDialog):
             QMessageBox.information(self, "Sincronización",
                 "Copias verificadas en el USB: " + str(len(completed)))
             self.refresh()
-        except (OSError, ValueError, PermissionError) as exc:
+        except Exception as exc:
             QMessageBox.critical(self, "Error de sincronización", str(exc))
