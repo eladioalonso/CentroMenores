@@ -104,11 +104,22 @@ def add_school_record(session: Session, *, actor_account_id: str, placement_id: 
     _audit(session,actor,"school_record_added",f"{placement.id}:{record.id}")
     return record
 
-def list_education_goals(session: Session, *, stay_id: str):
-    return session.scalars(select(EducationGoal).where(EducationGoal.stay_id==stay_id).order_by(EducationGoal.created_at.desc())).all()
+def list_education_goals(session: Session, *, actor_account_id: str, stay_id: str):
+    actor = _actor(session, actor_account_id)
+    _active_stay(session, stay_id)
+    _audit(session, actor, "education_goals_accessed", stay_id)
+    return session.scalars(select(EducationGoal).where(
+        EducationGoal.stay_id == stay_id
+    ).order_by(EducationGoal.created_at.desc())).all()
 
-def list_school_placements(session: Session, *, stay_id: str):
-    return session.scalars(select(SchoolPlacement).where(SchoolPlacement.stay_id==stay_id).order_by(SchoolPlacement.started_on.desc())).all()
+
+def list_school_placements(session: Session, *, actor_account_id: str, stay_id: str):
+    actor = _actor(session, actor_account_id)
+    _active_stay(session, stay_id)
+    _audit(session, actor, "school_history_accessed", stay_id)
+    return session.scalars(select(SchoolPlacement).where(
+        SchoolPlacement.stay_id == stay_id
+    ).order_by(SchoolPlacement.started_on.desc())).all()
 
 
 def revise_education_update(session: Session, *, actor_account_id: str, update_id: str,
