@@ -205,3 +205,51 @@ def test_medical_authorization_status_cannot_be_changed_without_health_access():
             )
         assert session.get(Authorization, authorization.id).status == "valid"
 
+def test_general_authorization_linked_to_health_document_is_hidden_and_protected():
+    from gestion_centro.domain.documents_service import (
+        list_authorizations, list_valid_authorizations,
+    )
+    with make_session() as session:
+        actor, stay = setup_stay(session)
+        actor.health_access = True
+        document = register_document(
+            session, actor_account_id=actor.id, stay_id=stay.id, category="health",
+            title="Documento clínico ficticio", original_filename="clinico.pdf",
+            relative_path="documentos/clinico.pdf", mime_type="application/pdf",
+            size_bytes=100, sha256="c" * 64,
+        )
+        authorization = record_authorization(
+            session, actor_account_id=actor.id, stay_id=stay.id,
+            authorization_type="general", scope="Autorización general ficticia",
+            issuer="Representante ficticio", valid_from=date(2026, 1, 1),
+            document_id=document.id,
+        )
+        actor.health_access = False
+        assert authorization.id not in {
+            item.id for item in list_authorizations(
+                session, actor_account_id=actor.id, stay_id=stay.id)
+        }
+        assert authorization.id not in {
+            item.id for item in list_valid_authorizations(
+                session, actor_account_id=actor.id, stay_id=stay.id,
+                on_date=date(2026, 5, 4))
+        }
+        assert check_authorization(
+            session, actor_account_id=actor.id, stay_id=stay.id,
+            authorization_type="general", on_date=date(2026, 5, 4)
+        ) == []
+        with pytest.raises(PermissionError, match="autorización sanitaria"):
+            set_authorization_status(
+                session, actor_account_id=actor.id, authorization_id=authorization.id,
+                status="revoked", reason="Motivo ficticio",
+            )
+        with pytest.raises(PermissionError, match="autorización sanitaria"):
+            create_outing(
+                session, actor_account_id=actor.id, kind="activity",
+                destination="Actividad ficticia", purpose="Salida ficticia",
+                planned_departure=datetime(2026, 5, 4, 9, tzinfo=timezone.utc),
+                planned_return=datetime(2026, 5, 4, 12, tzinfo=timezone.utc),
+                responsible_account_id=actor.id, stay_ids=[stay.id],
+                authorization_ids=[authorization.id], restrictions_checked=True,
+            )
+
