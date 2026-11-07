@@ -938,21 +938,24 @@ class MainWindow(QMainWindow):
                             Outing.status == "in_progress", Outing.planned_return < now,
                         )
                     ) or 0))
-                    counters["incidents"].setText(str(session.scalar(
-                        select(func.count()).select_from(Incident).where(Incident.status == "open")
-                    ) or 0))
+                    incident_query = select(func.count()).select_from(Incident).where(
+                        Incident.status == "open")
+                    if not has_health_access(session, actor_account_id=account_id):
+                        incident_query = incident_query.where(Incident.incident_type != "health")
+                    counters["incidents"].setText(str(session.scalar(incident_query) or 0))
                     counters["tasks"].setText(str(session.scalar(
                         select(func.count()).select_from(AgendaItem).where(
                             AgendaItem.kind == "task", AgendaItem.status.in_(("pending", "in_progress")),
                             AgendaItem.starts_at < now,
                         )
                     ) or 0))
-                    counters["agenda"].setText(str(session.scalar(
-                        select(func.count()).select_from(AgendaItem).where(
-                            AgendaItem.status.in_(("pending", "in_progress")),
-                            AgendaItem.starts_at >= now,
-                        )
-                    ) or 0))
+                    agenda_query = select(func.count()).select_from(AgendaItem).where(
+                        AgendaItem.status.in_(("pending", "in_progress")),
+                        AgendaItem.starts_at >= now,
+                    )
+                    if not has_health_access(session, actor_account_id=account_id):
+                        agenda_query = agenda_query.where(AgendaItem.kind != "vaccine")
+                    counters["agenda"].setText(str(session.scalar(agenda_query) or 0))
 
             def dashboard_card(row, column, key, title, description, callback):
                 card = QFrame()
