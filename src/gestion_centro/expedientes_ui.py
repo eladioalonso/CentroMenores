@@ -20,7 +20,7 @@ from gestion_centro.domain.service import (
 class NewMinorDialog(QDialog):
     """Alta completa del expediente. Los campos complementarios son opcionales."""
 
-    def __init__(self, parent=None, *, health_access=True):
+    def __init__(self, parent=None, *, health_access=False):
         super().__init__(parent)
         self.health_access = health_access
         self.setWindowTitle("Nuevo expediente")
