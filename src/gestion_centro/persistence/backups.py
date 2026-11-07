@@ -17,6 +17,13 @@ from uuid import uuid4
 from gestion_centro.paths import DataPaths, ensure_data_directories
 
 
+# Límites defensivos para verificar/restaurar ZIP sin impedir copias locales grandes.
+MAX_BACKUP_ENTRIES = 50_000
+MAX_BACKUP_TOTAL_UNCOMPRESSED_BYTES = 8 * 1024**3
+MAX_BACKUP_MEMBER_UNCOMPRESSED_BYTES = 2 * 1024**3
+MAX_BACKUP_MANIFEST_BYTES = 8 * 1024**2
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -37,10 +44,27 @@ def verify_backup(archive: Path) -> dict:
     with zipfile.ZipFile(archive, "r") as bundle:
         infos = bundle.infolist()
         names = [info.filename for info in infos]
+        if len(infos) > MAX_BACKUP_ENTRIES:
+            raise ValueError("El backup supera el número máximo de archivos permitido")
         if len(names) != len(set(names)):
             raise ValueError("El backup contiene rutas duplicadas")
         if any(not _safe_archive_name(name) for name in names):
             raise ValueError("El backup contiene rutas no seguras")
+        total_size = sum(info.file_size for info in infos)
+        if total_size > MAX_BACKUP_TOTAL_UNCOMPRESSED_BYTES:
+            raise ValueError("El backup supera el tamaño total descomprimido permitido")
+        if any(info.file_size > MAX_BACKUP_MEMBER_UNCOMPRESSED_BYTES for info in infos):
+            raise ValueError("El backup contiene un archivo demasiado grande")
+        manifest_info = next((info for info in infos if info.filename == "manifest.json"), None)
+        if manifest_info is None or manifest_info.file_size > MAX_BACKUP_MANIFEST_BYTES:
+            raise ValueError("El manifiesto del backup falta o supera el tamaño permitido")
+        for info in infos:
+            mode = (info.external_attr >> 16) & 0o170000
+            if mode == stat.S_IFLNK:
+                raise ValueError("El backup contiene enlaces simbólicos")
+            if info.flag_bits & 0x1:
+                raise ValueError("El backup contiene archivos cifrados no compatibles")
+        # No descomprimir ni probar CRC hasta haber limitado y clasificado el contenido.
         if bundle.testzip() is not None:
             raise ValueError("El ZIP contiene un miembro dañado")
         if "manifest.json" not in names or "database/centro.db" not in names:
@@ -57,12 +81,6 @@ def verify_backup(archive: Path) -> dict:
         expected_names = set(files) | {"manifest.json"}
         if set(names) != expected_names:
             raise ValueError("El contenido del ZIP no coincide con el manifiesto")
-        for info in infos:
-            mode = (info.external_attr >> 16) & 0o170000
-            if mode == stat.S_IFLNK:
-                raise ValueError("El backup contiene enlaces simbólicos")
-            if info.flag_bits & 0x1:
-                raise ValueError("El backup contiene archivos cifrados no compatibles")
         for name, expected in files.items():
             if (not isinstance(name, str) or not _safe_archive_name(name)
                     or not isinstance(expected, str)):
