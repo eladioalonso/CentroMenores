@@ -222,3 +222,22 @@ def test_backup_verification_rejects_excessive_entry_count(tmp_path, monkeypatch
     with pytest.raises(ValueError, match="número máximo de archivos"):
         verify_backup(archive)
 
+def test_pending_backup_sync_removes_temporary_copy_when_verification_fails(
+    tmp_path, monkeypatch
+):
+    import pytest
+    from gestion_centro.persistence import backups
+
+    paths = prepare_paths(tmp_path / "portable")
+    archive = create_backup(paths, kind="manual",
+        now=datetime(2026, 5, 12, tzinfo=timezone.utc))
+    external = tmp_path / "usb"
+    monkeypatch.setattr(backups, "verify_backup",
+        lambda _path: (_ for _ in ()).throw(ValueError("verificación simulada")))
+    with pytest.raises(ValueError, match="verificación simulada"):
+        sync_pending_backups(paths, external)
+    assert not (external / archive.name).exists()
+    assert list(external.glob(".*.tmp")) == []
+    pending = json.loads((paths.backups / "external-pending.json").read_text(encoding="utf-8"))
+    assert archive.name in pending
+
