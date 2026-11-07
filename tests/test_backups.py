@@ -271,3 +271,13 @@ def test_backup_paths_reject_windows_drives_and_nonportable_segments():
     assert _safe_archive_name("documents/uuid/file.pdf")
     assert _safe_archive_name("database/centro.db")
 
+def test_pending_backup_sync_rejects_malformed_queue(tmp_path):
+    import pytest
+
+    paths = prepare_paths(tmp_path / "portable")
+    pending = paths.backups / "external-pending.json"
+    pending.write_text('{"unexpected": "shape"}', encoding="utf-8")
+    with pytest.raises(ValueError, match="cola de copias pendientes"):
+        sync_pending_backups(paths, tmp_path / "usb")
+    assert not (tmp_path / "usb").exists()
+
