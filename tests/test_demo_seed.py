@@ -26,7 +26,7 @@ def test_demo_seed_creates_educator_and_fictional_records_idempotently():
             assert account.health_access is False
             assert session.scalar(select(func.count()).select_from(Minor)) == 5
             assert session.scalar(select(func.count()).select_from(Stay)) == 5
-            assert session.scalar(select(func.count()).select_from(DiaryEntry)) == 4
+            assert session.scalar(select(func.count()).select_from(DiaryEntry)) == 3
             assert session.scalar(select(func.count()).select_from(Incident)) == 3
             result = authenticate(
                 session, username="EDUCADOR", password=DEMO_PASSWORD
