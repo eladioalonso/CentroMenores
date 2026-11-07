@@ -33,8 +33,12 @@ def _sha256(path: Path) -> str:
 
 
 def _safe_archive_name(name: str) -> bool:
+    if not isinstance(name, str) or not name or "\\x00" in name or "\\\\" in name or ":" in name:
+        return False
+    if any(part in {"", ".", ".."} for part in name.split("/")):
+        return False
     path = PurePosixPath(name)
-    return not path.is_absolute() and ".." not in path.parts and "\\" not in name
+    return not path.is_absolute()
 
 
 def verify_backup(archive: Path) -> dict:
@@ -82,7 +86,12 @@ def verify_backup(archive: Path) -> dict:
         if set(names) != expected_names:
             raise ValueError("El contenido del ZIP no coincide con el manifiesto")
         for name, expected in files.items():
-            if (not isinstance(name, str) or not _safe_archive_name(name)
+            allowed_root = (
+                name == "database/centro.db"
+                or name.startswith("documents/")
+                or name.startswith("images/")
+            ) if isinstance(name, str) else False
+            if (not allowed_root or not _safe_archive_name(name)
                     or not isinstance(expected, str)):
                 raise ValueError(f"Entrada no válida en el manifiesto: {name}")
             digest = hashlib.sha256()
