@@ -214,8 +214,14 @@ def sync_pending_backups(paths: DataPaths, external_root: Path) -> list[Path]:
             remaining.append(name)
             continue
         target = external_root / name
-        shutil.copy2(source, target)
-        verify_backup(target)
+        temporary = external_root / f".{name}.tmp"
+        try:
+            shutil.copy2(source, temporary)
+            verify_backup(temporary)
+            os.replace(temporary, target)
+        except Exception:
+            temporary.unlink(missing_ok=True)
+            raise
         completed.append(target)
     pending.write_text(json.dumps(remaining, ensure_ascii=False, indent=2), encoding="utf-8")
     return completed
