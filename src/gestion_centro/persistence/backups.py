@@ -172,7 +172,9 @@ def create_backup(paths: DataPaths, *, kind: str = "manual",
             shutil.copy2(target, external_temporary)
             verify_backup(external_temporary)
             os.replace(external_temporary, external_root / target.name)
-        except (OSError, ValueError):
+        except Exception:
+            # La copia interna ya está verificada: un fallo en el USB no debe
+            # invalidarla ni dejar un archivo externo parcial.
             external_temporary.unlink(missing_ok=True)
             _mark_pending(paths, target)
     else:
@@ -184,17 +186,32 @@ def create_backup(paths: DataPaths, *, kind: str = "manual",
     return target
 
 
+def _write_pending(paths: DataPaths, entries: list[str]) -> None:
+    """Guarda la cola de sincronización sin riesgo de truncarla al interrumpirse."""
+    pending = paths.backups / "external-pending.json"
+    temporary = paths.backups / f".{pending.name}.{uuid4().hex}.tmp"
+    try:
+        temporary.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.replace(temporary, pending)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
 def _mark_pending(paths: DataPaths, archive: Path) -> None:
     pending = paths.backups / "external-pending.json"
     entries = []
     if pending.exists():
         try:
-            entries = json.loads(pending.read_text(encoding="utf-8"))
+            loaded = json.loads(pending.read_text(encoding="utf-8"))
+            if isinstance(loaded, list):
+                entries = [name for name in loaded
+                    if isinstance(name, str) and Path(name).name == name and name.endswith(".zip")]
         except (OSError, json.JSONDecodeError):
             entries = []
     if archive.name not in entries:
         entries.append(archive.name)
-    pending.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_pending(paths, entries)
 
 
 def sync_pending_backups(paths: DataPaths, external_root: Path) -> list[Path]:
@@ -223,7 +240,7 @@ def sync_pending_backups(paths: DataPaths, external_root: Path) -> list[Path]:
             temporary.unlink(missing_ok=True)
             raise
         completed.append(target)
-    pending.write_text(json.dumps(remaining, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_pending(paths, remaining)
     return completed
 
 
