@@ -16,7 +16,7 @@ from gestion_centro.domain.documents import PersonalDocument
 from gestion_centro.domain.education import EducationGoal, EducationUpdate, SchoolPlacement
 from gestion_centro.domain.education_service import (
     create_education_goal, add_education_update, set_education_goal_status,
-    create_school_placement, add_school_record, list_school_placements,
+    create_school_placement, add_school_record, list_education_goals, list_school_placements,
     revise_education_update,
 )
 from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationAdministration, VaccineRecord, VaccineDoseReview, VaccineCalendarItem, VaccineCalendarEdition
@@ -110,14 +110,14 @@ class EducationDialog(StaySelectorDialog):
     def refresh(self):
         stay_id = self.stay.currentData()
         with session_scope(self.factory) as session:
-            rows = session.scalars(select(EducationGoal).where(EducationGoal.stay_id == stay_id)
-                .order_by(EducationGoal.created_at.desc())).all() if stay_id else []
+            rows = list_education_goals(
+                session, actor_account_id=self.actor_id, stay_id=stay_id) if stay_id else []
             data = [(g.id, g.title, g.status, g.target_date.isoformat() if g.target_date else "—") for g in rows]
             updates = [(u.id, u.created_at, u.category, u.objective_description, u.actions_taken,
                 u.response_observed + (" · Seguimiento: " + u.follow_up if u.follow_up else ""),
                 u.author_name_snapshot)
                 for g in rows for u in g.updates]
-            placements = list_school_placements(session, stay_id=stay_id) if stay_id else []
+            placements = list_school_placements(session, actor_account_id=self.actor_id, stay_id=stay_id) if stay_id else []
             school_data = [(p.id, p.school_name, p.course, p.started_on.strftime("%d/%m/%Y"),
                 p.ended_on.strftime("%d/%m/%Y") if p.ended_on else "En curso") for p in placements]
         self.goals.setRowCount(len(data))
