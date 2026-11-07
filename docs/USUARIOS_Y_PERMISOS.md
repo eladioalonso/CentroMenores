@@ -78,6 +78,10 @@ Como regla general, el profesional que crea un registro podrá corregirlo direct
 - En esta versión, el permiso sanitario habilita conjuntamente la ficha sanitaria y la gestión de documentos sanitarios. La separación de consulta, modificación, adjuntos, exportación e impresión en permisos distintos queda pendiente.
 - Los documentos sanitarios heredarán restricciones equivalentes o más estrictas.
 - Los paneles, búsquedas e informes no mostrarán datos sanitarios a usuarios sin autorización.
+- La ficha del expediente ocultará los campos sanitarios (CIP, centro de salud, facultativos, caducidad e historial clínico), su edición y el acceso a ficha sanitaria y medicación cuando falte el permiso.
+- En el diario se filtrarán las anotaciones de categoría sanitaria y las incidencias de salud; su alta, rectificación y gestión también exigirán autorización.
+- Las citas de vacunación quedarán ocultas en agenda y calendario y no podrán crearse ni modificarse sin permiso sanitario.
+- Las autorizaciones médicas y las salidas sanitarias se filtrarán en las consultas y exigirán permiso para su gestión.
 - Los accesos y operaciones relevantes quedarán registrados.
 - No se incluirán datos sanitarios en notificaciones generales, mensajes de error ni registros técnicos.
 
@@ -136,3 +140,5 @@ Antes de implementar el sistema se deberá confirmar:
 ## Acceso de lectura a módulos compartidos
 
 Las consultas de agenda, comunicaciones, aportaciones, objetivos educativos, historial escolar y registros escolares requieren una cuenta activa desde sus servicios de dominio. Las lecturas quedan registradas en la auditoría de acceso. La consulta del historial educativo admite estancias cerradas para preservar el acceso autorizado a antecedentes; las operaciones de alta siguen exigiendo estancia activa cuando corresponde.
+
+Las consultas de expedientes, diario, autorizaciones, salidas y calendario aplican además el permiso sanitario cuando el contenido corresponde a información de salud. Las lecturas sanitarias autorizadas quedan registradas; las lecturas generales filtran anotaciones de salud, autorizaciones médicas, salidas sanitarias y citas de vacunación.
