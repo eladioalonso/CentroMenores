@@ -21,6 +21,7 @@ def aggregate_statistics(session: Session, *, actor_account_id: str,
         raise PermissionError("Se requiere una cuenta activa")
     if end_date < start_date:
         raise ValueError("El periodo final no puede preceder al inicial")
+    health_access = bool(actor.health_access)
 
     def count(query) -> int:
         return int(session.scalar(query) or 0)
@@ -35,9 +36,11 @@ def aggregate_statistics(session: Session, *, actor_account_id: str,
         "stays_closed": count(select(func.count()).select_from(Stay).where(
             Stay.ended_on >= start_date, Stay.ended_on <= end_date)),
         "diary_entries": count(select(func.count()).select_from(DiaryEntry).where(
-            DiaryEntry.recorded_at >= start_dt, DiaryEntry.recorded_at <= end_dt)),
+            DiaryEntry.recorded_at >= start_dt, DiaryEntry.recorded_at <= end_dt,
+            *([] if health_access else [DiaryEntry.category != "health"]))),
         "incidents": count(select(func.count()).select_from(Incident).where(
-            Incident.recorded_at >= start_dt, Incident.recorded_at <= end_dt)),
+            Incident.recorded_at >= start_dt, Incident.recorded_at <= end_dt,
+            *([] if health_access else [Incident.incident_type != "health"]))),
         "events": count(select(func.count()).select_from(Event).where(
             Event.recorded_at >= start_dt, Event.recorded_at <= end_dt)),
         "agenda_items_created": count(select(func.count()).select_from(AgendaItem).where(
@@ -46,17 +49,19 @@ def aggregate_statistics(session: Session, *, actor_account_id: str,
             Stay.started_on <= end_date,
             (Stay.ended_on.is_(None) | (Stay.ended_on > end_date)))),
     }
-    severity_rows = session.execute(
-        select(Incident.severity, func.count()).where(
-            Incident.recorded_at >= start_dt, Incident.recorded_at <= end_dt
-        ).group_by(Incident.severity)
-    ).all()
+    severity_query = select(Incident.severity, func.count()).where(
+        Incident.recorded_at >= start_dt, Incident.recorded_at <= end_dt
+    )
+    if not health_access:
+        severity_query = severity_query.where(Incident.incident_type != "health")
+    severity_rows = session.execute(severity_query.group_by(Incident.severity)).all()
     result["incidents_by_severity"] = {str(key): int(value) for key, value in severity_rows}
-    category_rows = session.execute(
-        select(DiaryEntry.category, func.count()).where(
-            DiaryEntry.recorded_at >= start_dt, DiaryEntry.recorded_at <= end_dt
-        ).group_by(DiaryEntry.category)
-    ).all()
+    category_query = select(DiaryEntry.category, func.count()).where(
+        DiaryEntry.recorded_at >= start_dt, DiaryEntry.recorded_at <= end_dt
+    )
+    if not health_access:
+        category_query = category_query.where(DiaryEntry.category != "health")
+    category_rows = session.execute(category_query.group_by(DiaryEntry.category)).all()
     result["diary_entries_by_category"] = {str(key): int(value) for key, value in category_rows}
     session.add(AccessAudit(account_id=actor.id, username_snapshot=actor.username,
         event="aggregate_report_generated", details=f"{start_date.isoformat()}:{end_date.isoformat()}"))
