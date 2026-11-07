@@ -280,3 +280,41 @@ def test_agenda_read_requires_active_actor_and_is_audited():
         with pytest.raises(PermissionError):
             list_agenda_items(session, actor_account_id="no-existe",
                 start=starts, end=starts)
+
+def test_diary_health_entries_and_incidents_are_filtered_and_permission_checked():
+    from gestion_centro.domain.service import (
+        record_diary_entry, record_incident, list_diary_records,
+        revise_diary_entry, close_incident,
+    )
+    with make_session() as session:
+        actor = create_professional_account(session, display_name="Prueba sanitaria",
+            username="diary-health", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        actor.health_access = True
+        day = date(2026, 11, 6)
+        moment = datetime(2026, 11, 6, 12, tzinfo=timezone.utc)
+        health_entry = record_diary_entry(session, actor_account_id=actor.id,
+            diary_date=day, shift="morning", category="health",
+            content="Anotación sanitaria ficticia", happened_at=moment, now=moment)
+        record_diary_entry(session, actor_account_id=actor.id, diary_date=day,
+            shift="morning", category="general", content="Anotación general ficticia",
+            happened_at=moment, now=moment)
+        incident = record_incident(session, actor_account_id=actor.id,
+            diary_date=day, title="Incidencia sanitaria ficticia",
+            description="Descripción ficticia", incident_type="health", severity="low",
+            happened_at=moment, participants=[], now=moment)
+        actor.health_access = False
+        _day, entries, incidents = list_diary_records(
+            session, actor_account_id=actor.id, diary_date=day)
+        assert [entry.category for entry in entries] == ["general"]
+        assert incidents == []
+        with pytest.raises(PermissionError, match="autorización sanitaria"):
+            record_diary_entry(session, actor_account_id=actor.id, diary_date=day,
+                shift="morning", category="health", content="No autorizado",
+                happened_at=moment, now=moment)
+        with pytest.raises(PermissionError, match="autorización sanitaria"):
+            revise_diary_entry(session, actor_account_id=actor.id,
+                original_entry_id=health_entry.id, content="Intento de cambio", now=moment)
+        with pytest.raises(PermissionError, match="autorización sanitaria"):
+            close_incident(session, actor_account_id=actor.id, incident_id=incident.id,
+                note="Intento de cierre", now=moment)
+
