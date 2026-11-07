@@ -14,6 +14,7 @@ from gestion_centro.domain.models import Stay
 from gestion_centro.domain.documents import Authorization, Outing, OutingStay
 from gestion_centro.domain.documents_service import (
     record_authorization, set_authorization_status, create_outing, set_outing_status,
+    list_active_stays, list_authorizations, list_valid_authorizations, list_outings,
 )
 
 
@@ -68,7 +69,7 @@ class AuthorizationsDialog(QDialog):
         actions.addWidget(refresh)
         layout.addLayout(actions)
         with session_scope(factory) as session:
-            stays = session.scalars(select(Stay).where(Stay.status == "active").order_by(Stay.started_on.desc())).all()
+            stays = list_active_stays(session, actor_account_id=self.actor_id)
             for stay in stays:
                 self.stay.addItem(f"{stay.minor.internal_code} · {stay.minor.given_names} {stay.minor.family_names}", stay.id)
         self.stay.currentIndexChanged.connect(self.refresh)
@@ -80,8 +81,7 @@ class AuthorizationsDialog(QDialog):
             self.table.setRowCount(0)
             return
         with session_scope(self.factory) as session:
-            rows = session.scalars(select(Authorization).where(Authorization.stay_id == stay_id)
-                .order_by(Authorization.valid_from.desc())).all()
+            rows = list_authorizations(session, actor_account_id=self.actor_id, stay_id=stay_id)
             data = [(a.id, a.authorization_type, a.scope, a.issuer,
                      f"{a.valid_from:%d/%m/%Y} – {a.valid_until:%d/%m/%Y}" if a.valid_until else f"{a.valid_from:%d/%m/%Y} – sin fin",
                      a.status) for a in rows]
@@ -198,21 +198,17 @@ class OutingsDialog(QDialog):
         if not stay_id:
             return
         with session_scope(self.factory) as session:
-            rows = session.scalars(select(Authorization).where(
-                Authorization.stay_id == stay_id, Authorization.status == "valid"
-            ).order_by(Authorization.valid_from.desc())).all()
+            rows = list_valid_authorizations(session, actor_account_id=self.actor_id, stay_id=stay_id)
             for item in rows:
                 self.auth.addItem(f"{item.authorization_type} · {item.scope[:70]}", item.id)
 
     def refresh(self):
         with session_scope(self.factory) as session:
-            rows = session.execute(select(Outing, OutingStay.stay_id)
-                .join(OutingStay, Outing.id == OutingStay.outing_id)
-                .where(OutingStay.stay_id == self.stay.currentData())
-                .order_by(Outing.planned_departure.desc())).all() if self.stay.currentData() else []
+            rows = list_outings(session, actor_account_id=self.actor_id,
+                stay_id=self.stay.currentData()) if self.stay.currentData() else []
             data = [(o.id, o.destination, o.planned_departure.astimezone().strftime("%d/%m/%Y %H:%M"),
                      o.status, o.actual_return.astimezone().strftime("%d/%m/%Y %H:%M") if o.actual_return else "—")
-                    for o, _ in rows]
+                    for o in rows]
         self.table.setRowCount(len(data))
         for row, values in enumerate(data):
             outing_id, *display = values
