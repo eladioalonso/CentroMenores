@@ -229,6 +229,11 @@ def sync_pending_backups(paths: DataPaths, external_root: Path) -> list[Path]:
     if not pending.exists():
         return []
     entries = json.loads(pending.read_text(encoding="utf-8"))
+    if not isinstance(entries, list) or any(
+        not isinstance(name, str) or Path(name).name != name or not name.endswith(".zip")
+        for name in entries
+    ):
+        raise ValueError("La cola de copias pendientes no es válida")
     external_root.mkdir(parents=True, exist_ok=True)
     completed = []
     remaining = []
