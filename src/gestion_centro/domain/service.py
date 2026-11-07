@@ -523,6 +523,8 @@ def create_agenda_item(
     actor = _active_author(session, actor_account_id)
     if kind not in AGENDA_KINDS:
         raise ValueError("Tipo de agenda no válido")
+    if kind == "vaccine" and not actor.health_access:
+        raise PermissionError("Se requiere autorización sanitaria para gestionar citas de vacunación")
     if not title.strip():
         raise ValueError("El título es obligatorio")
     if ends_at is not None and ends_at < starts_at:
@@ -568,8 +570,10 @@ def set_agenda_item_status(
     now: datetime | None = None,
 ):
     from gestion_centro.domain.models import AgendaItem
-    actor = _active_author(session, actor_account_id)
     item = session.get(AgendaItem, item_id)
+    actor = _active_author(session, actor_account_id)
+    if item is not None and item.kind == "vaccine" and not actor.health_access:
+        raise PermissionError("Se requiere autorización sanitaria para gestionar citas de vacunación")
     if item is None:
         raise ValueError("El elemento de agenda no existe")
     if status not in AGENDA_STATUSES:
@@ -598,6 +602,8 @@ def list_agenda_items(
     actor = _active_author(session, actor_account_id)
     if end < start:
         raise ValueError("El final del intervalo no puede ser anterior al inicio")
+    if kind == "vaccine" and not actor.health_access:
+        raise PermissionError("Se requiere autorización sanitaria para consultar citas de vacunación")
     statement = select(AgendaItem).where(
         AgendaItem.starts_at >= start, AgendaItem.starts_at <= end
     ).order_by(AgendaItem.starts_at, AgendaItem.title)
@@ -609,6 +615,8 @@ def list_agenda_items(
         if kind not in AGENDA_KINDS:
             raise ValueError("Tipo de agenda no válido")
         statement = statement.where(AgendaItem.kind == kind)
+    elif not actor.health_access:
+        statement = statement.where(AgendaItem.kind != "vaccine")
     _audit(session, actor, "agenda_accessed",
         f"Desde: {start.isoformat()}; hasta: {end.isoformat()}; estado: {status}; tipo: {kind}")
     return session.scalars(statement).all()
