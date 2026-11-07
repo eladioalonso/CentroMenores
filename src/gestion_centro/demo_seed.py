@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from gestion_centro.auth.models import UserAccount
 from gestion_centro.auth.service import Role, create_professional_account
-from gestion_centro.domain.models import Minor
+from gestion_centro.domain.models import DiaryDay, DiaryEntry, Incident, Minor
 from gestion_centro.domain.service import (
     create_minor, open_stay, record_diary_entry, record_incident,
 )
@@ -67,7 +67,18 @@ def seed_demo_data(factory) -> None:
             (2, "afternoon", "general", "Registro general de ejemplo: participación en tareas cotidianas del centro.", "DEMO-005"),
         ]
         for days_ago, shift, category, content, code in diary_examples:
+            if days_ago > 1:
+                continue
             diary_date = date.today() - timedelta(days=days_ago)
+            day = session.scalar(select(DiaryDay).where(DiaryDay.diary_date == diary_date))
+            duplicate = session.scalar(
+                select(DiaryEntry.id).where(
+                    DiaryEntry.diary_day_id == day.id,
+                    DiaryEntry.content == content,
+                )
+            ) if day else None
+            if duplicate:
+                continue
             happened = now - timedelta(days=days_ago, hours=2)
             record_diary_entry(
                 session, actor_account_id=actor_id, diary_date=diary_date,
@@ -81,12 +92,10 @@ def seed_demo_data(factory) -> None:
             (0, "Incidencia de seguridad de ejemplo", "Situación ficticia revisada por el equipo; queda pendiente completar el seguimiento.", "safety", "medium", "DEMO-004"),
         ]
         for days_ago, title, description, kind, severity, code in incident_examples:
+            if days_ago > 1:
+                continue
             diary_date = date.today() - timedelta(days=days_ago)
-            existing_day = next(
-                (d for d in []), None
-            )
             # Evita duplicados si se vuelve a iniciar la demo.
-            from gestion_centro.domain.models import Incident, DiaryDay, IncidentParticipant
             day = session.scalar(select(DiaryDay).where(DiaryDay.diary_date == diary_date))
             duplicate = session.scalar(
                 select(Incident.id).where(
