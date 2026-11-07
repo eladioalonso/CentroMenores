@@ -101,44 +101,49 @@ def create_backup(paths: DataPaths, *, kind: str = "manual",
     stamp = moment.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     target = paths.backups / f"{kind}-{stamp}-{uuid4().hex[:8]}.zip"
     temporary_archive = paths.backups / f".{target.name}.tmp"
-    with tempfile.TemporaryDirectory(prefix="centro-backup-") as temp_dir:
-        snapshot = Path(temp_dir) / "centro.db"
-        source = sqlite3.connect(paths.database)
-        destination = sqlite3.connect(snapshot)
-        try:
-            source.backup(destination)
-            check = destination.execute("PRAGMA integrity_check").fetchone()[0]
-            if check != "ok":
-                raise ValueError("La base de datos no supera integrity_check")
-        finally:
-            destination.close()
-            source.close()
-        files: dict[str, str] = {}
-        with zipfile.ZipFile(temporary_archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
-            bundle.write(snapshot, "database/centro.db")
-            files["database/centro.db"] = _sha256(snapshot)
-            for label, root in (("documents", paths.documents), ("images", paths.images)):
-                if root.is_symlink():
-                    raise ValueError(f"La carpeta {label} no puede ser un enlace simbólico")
-                if root.exists():
-                    for file in sorted(root.rglob("*")):
-                        if file.is_symlink():
-                            raise ValueError(f"Se ha detectado un enlace simbólico en {label}")
-                        if not file.is_file():
-                            continue
-                        name = f"{label}/{file.relative_to(root).as_posix()}"
-                        if not _safe_archive_name(name):
-                            raise ValueError("Ruta de archivo no segura")
-                        bundle.write(file, name)
-                        files[name] = _sha256(file)
-            manifest = {
-                "format": 1, "kind": kind, "created_at": moment.astimezone(timezone.utc).isoformat(),
-                "files": files,
-            }
-            bundle.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
     try:
-        verify_backup(temporary_archive)
-        os.replace(temporary_archive, target)
+        with tempfile.TemporaryDirectory(prefix="centro-backup-") as temp_dir:
+            snapshot = Path(temp_dir) / "centro.db"
+            source = sqlite3.connect(paths.database)
+            destination = sqlite3.connect(snapshot)
+            try:
+                source.backup(destination)
+                check = destination.execute("PRAGMA integrity_check").fetchone()[0]
+                if check != "ok":
+                    raise ValueError("La base de datos no supera integrity_check")
+            finally:
+                destination.close()
+                source.close()
+            files: dict[str, str] = {}
+            with zipfile.ZipFile(temporary_archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
+                bundle.write(snapshot, "database/centro.db")
+                files["database/centro.db"] = _sha256(snapshot)
+                for label, root in (("documents", paths.documents), ("images", paths.images)):
+                    if root.is_symlink():
+                        raise ValueError(f"La carpeta {label} no puede ser un enlace simbólico")
+                    if root.exists():
+                        for file in sorted(root.rglob("*")):
+                            if file.is_symlink():
+                                raise ValueError(f"Se ha detectado un enlace simbólico en {label}")
+                            if not file.is_file():
+                                continue
+                            name = f"{label}/{file.relative_to(root).as_posix()}"
+                            if not _safe_archive_name(name):
+                                raise ValueError("Ruta de archivo no segura")
+                            bundle.write(file, name)
+                            files[name] = _sha256(file)
+                manifest = {
+                    "format": 1, "kind": kind, "created_at": moment.astimezone(timezone.utc).isoformat(),
+                    "files": files,
+                }
+                bundle.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+        try:
+            verify_backup(temporary_archive)
+            os.replace(temporary_archive, target)
+        except Exception:
+            temporary_archive.unlink(missing_ok=True)
+            raise
+    
     except Exception:
         temporary_archive.unlink(missing_ok=True)
         raise
