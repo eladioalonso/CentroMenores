@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from gestion_centro.auth.service import Role, create_professional_account
-from gestion_centro.domain.documents_service import record_authorization, set_authorization_status
+from gestion_centro.domain.documents_service import record_authorization, register_document, set_authorization_status
 from gestion_centro.domain.external_reports_service import (
     create_external_report, get_external_report_for_review, review_external_report,
     mark_external_report_delivered, list_external_reports,
@@ -88,3 +88,28 @@ def test_external_report_delivery_rechecks_authorization_and_audits_preview():
             )
         assert list_external_reports(
             session, actor_account_id=reviewer.id, stay_id=stay.id)[0].status == "reviewed"
+
+def test_external_report_rejects_general_authorization_linked_to_health_document():
+    with make_session() as session:
+        creator, _reviewer, stay = setup_report_context(session)
+        creator.health_access = True
+        document = register_document(
+            session, actor_account_id=creator.id, stay_id=stay.id, category="health",
+            title="Documento clínico ficticio", original_filename="clinico.pdf",
+            relative_path="documentos/clinico.pdf", mime_type="application/pdf",
+            size_bytes=100, sha256="d" * 64,
+        )
+        authorization = record_authorization(
+            session, actor_account_id=creator.id, stay_id=stay.id,
+            authorization_type="general", scope="Autorización general ficticia",
+            issuer="Representante ficticio", valid_from=date.today(),
+            document_id=document.id,
+        )
+        with pytest.raises(ValueError, match="vinculadas a documentos sanitarios"):
+            create_external_report(
+                session, actor_account_id=creator.id, stay_id=stay.id,
+                authorization_id=authorization.id, recipient="Organismo ficticio",
+                purpose="Finalidad administrativa ficticia",
+                included_fields=["identity_basic"], content="Contenido ficticio",
+            )
+
