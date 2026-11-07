@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import sqlite3
+import stat
 import tempfile
 import zipfile
 from contextlib import closing
@@ -56,13 +57,25 @@ def verify_backup(archive: Path) -> dict:
         expected_names = set(files) | {"manifest.json"}
         if set(names) != expected_names:
             raise ValueError("El contenido del ZIP no coincide con el manifiesto")
+        for info in infos:
+            mode = (info.external_attr >> 16) & 0o170000
+            if mode == stat.S_IFLNK:
+                raise ValueError("El backup contiene enlaces simbólicos")
+            if info.flag_bits & 0x1:
+                raise ValueError("El backup contiene archivos cifrados no compatibles")
         for name, expected in files.items():
             if (not isinstance(name, str) or not _safe_archive_name(name)
-                    or not isinstance(expected, str)
-                    or hashlib.sha256(bundle.read(name)).hexdigest() != expected):
+                    or not isinstance(expected, str)):
+                raise ValueError(f"Entrada no válida en el manifiesto: {name}")
+            digest = hashlib.sha256()
+            with bundle.open(name, "r") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            if digest.hexdigest() != expected:
                 raise ValueError(f"Integridad incorrecta en {name}")
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temp:
-            temp.write(bundle.read("database/centro.db"))
+            with bundle.open("database/centro.db", "r") as source:
+                shutil.copyfileobj(source, temp, length=1024 * 1024)
             temp_path = Path(temp.name)
         connection = sqlite3.connect(temp_path)
         try:
@@ -87,6 +100,7 @@ def create_backup(paths: DataPaths, *, kind: str = "manual",
     moment = now or datetime.now(timezone.utc)
     stamp = moment.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     target = paths.backups / f"{kind}-{stamp}-{uuid4().hex[:8]}.zip"
+    temporary_archive = paths.backups / f".{target.name}.tmp"
     with tempfile.TemporaryDirectory(prefix="centro-backup-") as temp_dir:
         snapshot = Path(temp_dir) / "centro.db"
         source = sqlite3.connect(paths.database)
@@ -100,7 +114,7 @@ def create_backup(paths: DataPaths, *, kind: str = "manual",
             destination.close()
             source.close()
         files: dict[str, str] = {}
-        with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
+        with zipfile.ZipFile(temporary_archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
             bundle.write(snapshot, "database/centro.db")
             files["database/centro.db"] = _sha256(snapshot)
             for label, root in (("documents", paths.documents), ("images", paths.images)):
@@ -116,14 +130,21 @@ def create_backup(paths: DataPaths, *, kind: str = "manual",
                 "files": files,
             }
             bundle.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
-    verify_backup(target)
+    try:
+        verify_backup(temporary_archive)
+        os.replace(temporary_archive, target)
+    except Exception:
+        temporary_archive.unlink(missing_ok=True)
+        raise
     if external_root is not None:
+        external_temporary = external_root / f".{target.name}.tmp"
         try:
             external_root.mkdir(parents=True, exist_ok=True)
-            external_target = external_root / target.name
-            shutil.copy2(target, external_target)
-            verify_backup(external_target)
-        except OSError:
+            shutil.copy2(target, external_temporary)
+            verify_backup(external_temporary)
+            os.replace(external_temporary, external_root / target.name)
+        except (OSError, ValueError):
+            external_temporary.unlink(missing_ok=True)
             _mark_pending(paths, target)
     else:
         _mark_pending(paths, target)
