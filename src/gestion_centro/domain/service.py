@@ -282,6 +282,8 @@ def record_diary_entry(
     actor = _active_author(session, actor_account_id)
     if shift not in VALID_SHIFTS or category not in VALID_CATEGORIES:
         raise ValueError("Turno o categoría no válidos")
+    if category == "health" and not actor.health_access:
+        raise PermissionError("Se requiere autorización sanitaria para registrar anotaciones de salud")
     if not content.strip():
         raise ValueError("El contenido de la anotación es obligatorio")
     day = _get_or_create_diary_day(session, diary_date)
@@ -324,6 +326,8 @@ def revise_diary_entry(
     original = session.get(DiaryEntry, original_entry_id)
     if original is None:
         raise ValueError("La anotación original no existe")
+    if original.category == "health" and not actor.health_access:
+        raise PermissionError("Se requiere autorización sanitaria para consultar o corregir esta anotación")
     if original.author_account_id != actor.id:
         raise PermissionError("Solo puedes corregir tus propias anotaciones")
     day = session.get(DiaryDay, original.diary_day_id)
@@ -386,6 +390,8 @@ def correct_diary_entry(
     original = session.get(DiaryEntry, original_entry_id)
     if original is None:
         raise ValueError("La anotación original no existe")
+    if original.category == "health" and not actor.health_access:
+        raise PermissionError("Se requiere autorización sanitaria para rectificar esta anotación")
     if not content.strip() or not reason.strip():
         raise ValueError("La rectificación y su motivo son obligatorios")
     correction = DiaryEntry(
@@ -409,6 +415,8 @@ def record_incident(
     actor = _active_author(session, actor_account_id)
     if incident_type not in VALID_INCIDENT_TYPES or severity not in VALID_SEVERITIES:
         raise ValueError("Tipo o gravedad de incidencia no válidos")
+    if incident_type == "health" and not actor.health_access:
+        raise PermissionError("Se requiere autorización sanitaria para registrar incidencias de salud")
     if not title.strip() or not description.strip():
         raise ValueError("El título y la descripción son obligatorios")
     day = _get_or_create_diary_day(session, diary_date)
@@ -447,8 +455,10 @@ def close_incident(
     session: Session, *, actor_account_id: str, incident_id: str, note: str, now: datetime | None = None,
 ):
     from gestion_centro.domain.models import Incident
-    actor = _active_author(session, actor_account_id)
     incident = session.get(Incident, incident_id)
+    actor = _active_author(session, actor_account_id)
+    if incident is not None and incident.incident_type == "health" and not actor.health_access:
+        raise PermissionError("Se requiere autorización sanitaria para gestionar esta incidencia")
     if incident is None or incident.status != "open":
         raise ValueError("La incidencia no existe o no está abierta")
     if not note.strip():
@@ -464,8 +474,10 @@ def reopen_incident(
     session: Session, *, actor_account_id: str, incident_id: str, reason: str,
 ):
     from gestion_centro.domain.models import Incident
-    actor = _active_author(session, actor_account_id)
     incident = session.get(Incident, incident_id)
+    actor = _active_author(session, actor_account_id)
+    if incident is not None and incident.incident_type == "health" and not actor.health_access:
+        raise PermissionError("Se requiere autorización sanitaria para gestionar esta incidencia")
     if incident is None or incident.status != "closed":
         raise ValueError("La incidencia no existe o no está cerrada")
     if not reason.strip():
@@ -476,6 +488,25 @@ def reopen_incident(
     # El motivo del cierre anterior se conserva; la reapertura queda en auditoría.
     _audit(session, actor, "incident_reopened", f"Incidencia: {incident.id}; motivo: {reason.strip()}")
 
+
+
+def list_diary_records(session: Session, *, actor_account_id: str, diary_date: date):
+    """Consulta el diario con filtrado sanitario y registro de acceso."""
+    from gestion_centro.domain.models import DiaryDay, DiaryEntry, Incident
+    actor = _active_author(session, actor_account_id)
+    day = session.scalar(select(DiaryDay).where(DiaryDay.diary_date == diary_date))
+    if day is None:
+        _audit(session, actor, "diary_accessed", f"Fecha: {diary_date.isoformat()}; sin registros")
+        return None, [], []
+    entries_query = select(DiaryEntry).where(DiaryEntry.diary_day_id == day.id)
+    incidents_query = select(Incident).where(Incident.diary_day_id == day.id)
+    if not actor.health_access:
+        entries_query = entries_query.where(DiaryEntry.category != "health")
+        incidents_query = incidents_query.where(Incident.incident_type != "health")
+    entries = session.scalars(entries_query.order_by(DiaryEntry.happened_at)).all()
+    incidents = session.scalars(incidents_query.order_by(Incident.happened_at)).all()
+    _audit(session, actor, "diary_accessed", f"Fecha: {diary_date.isoformat()}")
+    return day, entries, incidents
 
 AGENDA_KINDS = {"appointment", "activity", "task", "meeting", "call", "contact", "vaccine", "birthday", "event"}
 AGENDA_STATUSES = {"pending", "in_progress", "done", "cancelled"}
