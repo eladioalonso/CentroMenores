@@ -131,3 +131,8 @@ Antes de implementar el sistema se deberá confirmar:
 
 
 > **Especificación vigente:** consultar [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md). Este documento reúne las decisiones aprobadas más recientes y prevalece sobre cualquier apartado anterior que las contradiga.
+
+
+## Acceso de lectura a módulos compartidos
+
+Las consultas de agenda, comunicaciones, aportaciones, objetivos educativos, historial escolar y registros escolares requieren una cuenta activa desde sus servicios de dominio. Las lecturas quedan registradas en la auditoría de acceso. La consulta del historial educativo admite estancias cerradas para preservar el acceso autorizado a antecedentes; las operaciones de alta siguen exigiendo estancia activa cuando corresponde.
