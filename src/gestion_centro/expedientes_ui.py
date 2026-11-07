@@ -157,6 +157,8 @@ class MinorWorkspaceDialog(QDialog):
         actions.addWidget(history)
         health = QPushButton('Ficha sanitaria y medicación')
         health.clicked.connect(self.open_health)
+        health.setEnabled(self.health_access)
+        health.setToolTip("" if self.health_access else "Tu cuenta no tiene autorización sanitaria.")
         actions.addWidget(health)
         education = QPushButton('Seguimiento educativo')
         education.clicked.connect(self.open_education)
