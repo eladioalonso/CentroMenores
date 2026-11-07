@@ -470,7 +470,7 @@ class CommunicationsDialog(QDialog):
         self.setWindowTitle("Comunicaciones internas")
         self.resize(900, 600)
         layout = QVBoxLayout(self)
-        intro = QLabel("Bandeja compartida del equipo. Abre una comunicación para consultar sus aportaciones; las rectificaciones se añaden vinculadas y conservan el contenido original.")
+        intro = QLabel("Bandeja compartida del equipo. Abre una comunicación para consultar sus aportaciones; las rectificaciones se añaden vinculadas y conservan el contenido original. No incluyas datos sanitarios ni detalles clínicos: utiliza la ficha sanitaria autorizada.")
         intro.setWordWrap(True)
         intro.setObjectName("formIntro")
         layout.addWidget(intro)
@@ -520,7 +520,7 @@ class CommunicationsDialog(QDialog):
     def create_item(self) -> None:
         title, ok = QInputDialog.getText(self, "Nueva comunicación", "Título:")
         if not ok or not title.strip(): return
-        content, ok = QInputDialog.getMultiLineText(self, "Nueva comunicación", "Primera aportación:")
+        content, ok = QInputDialog.getMultiLineText(self, "Nueva comunicación", "Primera aportación (sin datos sanitarios ni detalles clínicos):")
         if not ok or not content.strip(): return
         try:
             with session_scope(self.factory) as session:
@@ -543,7 +543,7 @@ class CommunicationsDialog(QDialog):
         if not item_id:
             QMessageBox.information(self, "Selecciona", "Selecciona una comunicación.")
             return
-        content, ok = QInputDialog.getMultiLineText(self, "Aportación", "Texto:")
+        content, ok = QInputDialog.getMultiLineText(self, "Aportación", "Texto (sin datos sanitarios ni detalles clínicos):")
         if not ok or not content.strip(): return
         try:
             with session_scope(self.factory) as session:
