@@ -16,7 +16,7 @@ from gestion_centro.domain.documents import PersonalDocument
 from gestion_centro.domain.education import EducationGoal, EducationUpdate, SchoolPlacement
 from gestion_centro.domain.education_service import (
     create_education_goal, add_education_update, set_education_goal_status,
-    create_school_placement, add_school_record, list_education_goals, list_school_placements,
+    create_school_placement, add_school_record, list_education_goals, list_school_placements, list_school_records,
     revise_education_update,
 )
 from gestion_centro.domain.health import HealthProfile, MedicationPlan, MedicationAdministration, VaccineRecord, VaccineDoseReview, VaccineCalendarItem, VaccineCalendarEdition
@@ -155,9 +155,10 @@ class EducationDialog(StaySelectorDialog):
     def refresh_school_records(self):
         placement_id = self.selected_placement_id()
         with session_scope(self.factory) as session:
-            placement = session.get(SchoolPlacement, placement_id) if placement_id else None
             rows = [(r.occurred_on, r.record_type, r.description, r.author_name_snapshot)
-                for r in placement.records] if placement else []
+                for r in list_school_records(
+                    session, actor_account_id=self.actor_id, placement_id=placement_id
+                )] if placement_id else []
         rows.sort(key=lambda x: x[0], reverse=True)
         self.school_records.setRowCount(len(rows))
         for i, values in enumerate(rows):
