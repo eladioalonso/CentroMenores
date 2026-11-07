@@ -195,3 +195,30 @@ def test_backup_refuses_symlinked_attachment_sources(tmp_path):
         create_backup(paths, kind="manual",
             now=datetime(2026, 5, 9, tzinfo=timezone.utc))
     assert list(paths.backups.glob("manual-*.zip")) == []
+
+def test_backup_verification_rejects_excessive_uncompressed_size_before_reading(
+    tmp_path, monkeypatch
+):
+    import zipfile
+    import pytest
+    from gestion_centro.persistence import backups
+
+    paths = prepare_paths(tmp_path / "portable")
+    archive = create_backup(paths, kind="manual",
+        now=datetime(2026, 5, 10, tzinfo=timezone.utc))
+    monkeypatch.setattr(backups, "MAX_BACKUP_TOTAL_UNCOMPRESSED_BYTES", 10)
+    with pytest.raises(ValueError, match="tamaño total descomprimido"):
+        verify_backup(archive)
+
+
+def test_backup_verification_rejects_excessive_entry_count(tmp_path, monkeypatch):
+    import pytest
+    from gestion_centro.persistence import backups
+
+    paths = prepare_paths(tmp_path / "portable")
+    archive = create_backup(paths, kind="manual",
+        now=datetime(2026, 5, 11, tzinfo=timezone.utc))
+    monkeypatch.setattr(backups, "MAX_BACKUP_ENTRIES", 1)
+    with pytest.raises(ValueError, match="número máximo de archivos"):
+        verify_backup(archive)
+
