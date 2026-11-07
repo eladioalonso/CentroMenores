@@ -135,3 +135,45 @@ def test_restore_rolls_back_documents_and_images_if_database_swap_fails(tmp_path
     assert (paths.images / "sample.png").read_bytes() == b"current image"
     with closing(sqlite3.connect(paths.database)) as connection:
         assert connection.execute("SELECT value FROM sample").fetchone() == ("fictitious",)
+
+
+
+def test_backup_verification_rejects_symbolic_links(tmp_path):
+    import hashlib
+    import zipfile
+    import pytest
+
+    paths = prepare_paths(tmp_path / "portable")
+    archive = create_backup(paths, kind="manual",
+        now=datetime(2026, 5, 7, tzinfo=timezone.utc))
+    malicious = tmp_path / "symlink.zip"
+    with zipfile.ZipFile(archive, "r") as source:
+        entries = {item.filename: source.read(item.filename) for item in source.infolist()}
+    with zipfile.ZipFile(malicious, "w", compression=zipfile.ZIP_DEFLATED) as target:
+        for name, payload in entries.items():
+            info = zipfile.ZipInfo(name)
+            if name == "documents/sample.pdf":
+                info.create_system = 3
+                info.external_attr = (0o120777 << 16) | 0o777
+            target.writestr(info, payload)
+    with pytest.raises(ValueError, match="enlaces simbólicos"):
+        verify_backup(malicious)
+
+
+def test_backup_creation_does_not_leave_partial_archive_when_verification_fails(
+    tmp_path, monkeypatch
+):
+    import pytest
+    from gestion_centro.persistence import backups
+
+    paths = prepare_paths(tmp_path / "portable")
+
+    def fail_verification(_archive):
+        raise ValueError("fallo de verificación simulado")
+
+    monkeypatch.setattr(backups, "verify_backup", fail_verification)
+    with pytest.raises(ValueError, match="fallo de verificación"):
+        create_backup(paths, kind="manual",
+            now=datetime(2026, 5, 8, tzinfo=timezone.utc))
+    assert list(paths.backups.glob("manual-*.zip")) == []
+    assert list(paths.backups.glob(".*.tmp")) == []
