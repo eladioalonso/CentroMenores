@@ -138,14 +138,15 @@ def admin_set_account_active(
     """Activa o desactiva cuentas con control de permisos y protección del último admin."""
     actor = session.get(UserAccount, actor_account_id)
     target = session.get(UserAccount, target_account_id)
-    if actor is None or not actor.active or actor.role != Role.ADMIN.value:
-        raise PermissionError("Se requiere una cuenta administradora activa")
+    if actor is None or not actor.active or not actor.professional.active or actor.role != Role.ADMIN.value:
+        raise PermissionError("Se requiere una cuenta administradora y un profesional activos")
     if target is None:
         raise ValueError("La cuenta indicada no existe")
     if not active and target.role == Role.ADMIN.value and target.active:
         active_admins = session.scalar(
-            select(func.count()).select_from(UserAccount).where(
-                UserAccount.role == Role.ADMIN.value, UserAccount.active.is_(True)
+            select(func.count()).select_from(UserAccount).join(Professional).where(
+                UserAccount.role == Role.ADMIN.value, UserAccount.active.is_(True),
+                Professional.active.is_(True),
             )
         )
         if active_admins <= 1:
@@ -161,8 +162,8 @@ def admin_set_account_active(
 
 def _require_admin(session: Session, actor_account_id: str) -> UserAccount:
     actor = session.get(UserAccount, actor_account_id)
-    if actor is None or not actor.active or actor.role != Role.ADMIN.value:
-        raise PermissionError("Se requiere una cuenta administradora activa")
+    if actor is None or not actor.active or not actor.professional.active or actor.role != Role.ADMIN.value:
+        raise PermissionError("Se requiere una cuenta administradora y un profesional activos")
     return actor
 
 
@@ -189,8 +190,9 @@ def admin_change_role(
     if target is None:
         raise ValueError("La cuenta indicada no existe")
     if target.role == Role.ADMIN.value and role is Role.EDUCATOR:
-        active_admins = session.scalar(select(func.count()).select_from(UserAccount).where(
-            UserAccount.role == Role.ADMIN.value, UserAccount.active.is_(True)
+        active_admins = session.scalar(select(func.count()).select_from(UserAccount).join(Professional).where(
+            UserAccount.role == Role.ADMIN.value, UserAccount.active.is_(True),
+            Professional.active.is_(True),
         ))
         if target.active and active_admins <= 1:
             raise ValueError("No se puede retirar el perfil al último administrador activo")
