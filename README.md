@@ -51,7 +51,7 @@ En desarrollo, la carpeta de datos se puede indicar con `CENTRO_DATOS_DIR`; por 
 - Ayuda integrada con guía operativa y preguntas frecuentes.
 - Modo de demostración aislado: ejecutar `GestionCentro.exe --demo`. En desarrollo puede ejecutarse `python -m gestion_centro --demo`. Usa una carpeta de demostración independiente (`demo_data` junto al EXE portable o `.centro_demo` en desarrollo); no abre la carpeta de datos normales.
 
-El modo de demostración arranca con una base separada y solicita crear un administrador de prueba. No copiar datos reales a esa carpeta.
+El modo de demostración arranca con una base separada y precarga cinco expedientes ficticios, sus estancias, anotaciones de diario y situaciones de ejemplo. Incluye la cuenta EDUCADOR (nombre visible: educador; contraseña inicial: 012345678910). La cuenta es de perfil Educador y no tiene acceso sanitario ni permisos de administración. La carga es idempotente: no duplica los ejemplos al volver a abrir la demo. No copiar datos reales a esa carpeta.
 
 El acceso móvil por Wi-Fi no está habilitado todavía. No abrir puertos ni exponer el equipo a redes externas para intentar activarlo. Requiere terminar la autenticación móvil, TLS con certificado confiable, expiración de tokens, cola de revisión y pruebas de seguridad.
 
