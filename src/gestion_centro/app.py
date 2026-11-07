@@ -788,7 +788,7 @@ class DocumentsDialog(QDialog):
                     details=f"{doc.id}; estancia:{doc.stay_id}"))
             if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(target))):
                 raise OSError("Windows no ha podido abrir el documento.")
-        except (OSError, ValueError, PermissionError) as exc:
+        except Exception as exc:
             QMessageBox.warning(self, "No se pudo abrir", str(exc))
 
     def save_document(self):
@@ -828,7 +828,7 @@ class DocumentsDialog(QDialog):
             self.selected_file = None
             self.file_label.setText("Ningún archivo seleccionado")
             self.refresh()
-        except (OSError, ValueError, PermissionError) as exc:
+        except Exception as exc:
             target.unlink(missing_ok=True)
             try:
                 target_dir.rmdir()
