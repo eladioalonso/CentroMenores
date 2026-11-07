@@ -44,7 +44,7 @@ class ExternalReportsDialog(QDialog):
             check.setProperty("field_key", key)
             self.field_checks.append(check)
             layout.addWidget(check)
-        layout.addWidget(QLabel("Contenido del informe. Introduce únicamente información correspondiente a los campos seleccionados:"))
+        layout.addWidget(QLabel("Contenido del informe. Incluye solo información necesaria para la finalidad y los campos seleccionados. No incorpores datos sanitarios en este circuito."))
         self.content = QTextEdit()
         self.content.setPlaceholderText("Redacción manual del contenido que se propone remitir…")
         layout.addWidget(self.content)
