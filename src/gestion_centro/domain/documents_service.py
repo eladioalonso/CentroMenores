@@ -90,11 +90,58 @@ def list_documents(session: Session, *, actor_account_id: str, stay_id: str):
     return session.scalars(query.order_by(PersonalDocument.created_at.desc())).all()
 
 
+
+def list_active_stays(session: Session, *, actor_account_id: str):
+    actor = _actor(session, actor_account_id)
+    _audit(session, actor, "active_stays_accessed", "Selector de estancias")
+    return session.scalars(
+        select(Stay).where(Stay.status == "active").order_by(Stay.started_on.desc())
+    ).all()
+
+
+def list_authorizations(session: Session, *, actor_account_id: str, stay_id: str):
+    actor = _actor(session, actor_account_id)
+    if session.get(Stay, stay_id) is None:
+        raise ValueError("La estancia no existe")
+    query = select(Authorization).where(Authorization.stay_id == stay_id)
+    if not actor.health_access:
+        query = query.where(Authorization.authorization_type != "medical")
+    _audit(session, actor, "authorizations_accessed", f"Estancia: {stay_id}")
+    return session.scalars(query.order_by(Authorization.valid_from.desc())).all()
+
+
+def list_valid_authorizations(session: Session, *, actor_account_id: str, stay_id: str,
+                              on_date: date | None = None):
+    actor = _actor(session, actor_account_id)
+    if session.get(Stay, stay_id) is None:
+        raise ValueError("La estancia no existe")
+    day = on_date or date.today()
+    query = select(Authorization).where(
+        Authorization.stay_id == stay_id, Authorization.status == "valid",
+        Authorization.valid_from <= day,
+    ).where((Authorization.valid_until.is_(None)) | (Authorization.valid_until >= day))
+    if not actor.health_access:
+        query = query.where(Authorization.authorization_type != "medical")
+    _audit(session, actor, "valid_authorizations_accessed", f"Estancia: {stay_id}; fecha: {day.isoformat()}")
+    return session.scalars(query.order_by(Authorization.valid_from.desc())).all()
+
+
+def list_outings(session: Session, *, actor_account_id: str, stay_id: str):
+    actor = _actor(session, actor_account_id)
+    if session.get(Stay, stay_id) is None:
+        raise ValueError("La estancia no existe")
+    query = (select(Outing).join(OutingStay, Outing.id == OutingStay.outing_id)
+             .where(OutingStay.stay_id == stay_id))
+    if not actor.health_access:
+        query = query.where(Outing.kind != "health")
+    _audit(session, actor, "outings_accessed", f"Estancia: {stay_id}")
+    return session.scalars(query.order_by(Outing.planned_departure.desc())).all()
+
 def record_authorization(session: Session, *, actor_account_id: str, stay_id: str,
                          authorization_type: str, scope: str, issuer: str,
                          valid_from: date, valid_until: date | None = None,
                          conditions: str | None = None, document_id: str | None = None):
-    actor = _actor(session, actor_account_id)
+    actor = _actor(session, actor_account_id, health=(authorization_type == "medical"))
     stay = session.get(Stay, stay_id)
     if stay is None or stay.status != "active":
         raise ValueError("La estancia no existe o está cerrada")
@@ -120,7 +167,7 @@ def record_authorization(session: Session, *, actor_account_id: str, stay_id: st
 
 def check_authorization(session: Session, *, actor_account_id: str, stay_id: str,
                         authorization_type: str, on_date: date, required_scope: str | None = None):
-    actor = _actor(session, actor_account_id)
+    actor = _actor(session, actor_account_id, health=(authorization_type == "medical"))
     matches = session.scalars(select(Authorization).where(
         Authorization.stay_id == stay_id, Authorization.authorization_type == authorization_type,
         Authorization.status == "valid", Authorization.valid_from <= on_date)).all()
@@ -149,7 +196,7 @@ def create_outing(session: Session, *, actor_account_id: str, kind: str, destina
                   purpose: str, planned_departure: datetime, planned_return: datetime,
                   responsible_account_id: str, stay_ids: list[str],
                   authorization_ids: list[str] | None = None, restrictions_checked: bool = False):
-    actor = _actor(session, actor_account_id)
+    actor = _actor(session, actor_account_id, health=(kind == "health"))
     responsible = _actor(session, responsible_account_id)
     if kind not in OUTING_KINDS or not destination.strip() or not purpose.strip():
         raise ValueError("Tipo, destino y finalidad son obligatorios")
@@ -188,8 +235,8 @@ def create_outing(session: Session, *, actor_account_id: str, kind: str, destina
 
 def set_outing_status(session: Session, *, actor_account_id: str, outing_id: str,
                       status: str, actual_at: datetime | None = None):
-    actor = _actor(session, actor_account_id)
     outing = session.get(Outing, outing_id)
+    actor = _actor(session, actor_account_id, health=bool(outing and outing.kind == "health"))
     if outing is None or status not in OUTING_STATUSES:
         raise ValueError("Salida o estado no válido")
     allowed_transitions = {"planned": {"in_progress", "cancelled"},
