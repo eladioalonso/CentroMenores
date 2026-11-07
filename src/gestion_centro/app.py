@@ -808,6 +808,7 @@ class DocumentsDialog(QDialog):
         target_dir = self.paths.documents / relative_dir
         target_dir.mkdir(parents=True, exist_ok=True)
         target = target_dir / source.name
+        registered = False
         try:
             shutil.copy2(source, target)
             with target.open("rb") as stream:
@@ -823,18 +824,27 @@ class DocumentsDialog(QDialog):
                     sha256=digest, expires_on=None if self.no_expiry.isChecked() else self.expiry.date().toPython(),
                     notes=self.notes.toPlainText(), supersedes_id=self.supersedes.currentData(),
                 )
-            self.title.clear()
-            self.notes.clear()
-            self.selected_file = None
-            self.file_label.setText("Ningún archivo seleccionado")
+            registered = True
+        except Exception as exc:
+            if not registered:
+                target.unlink(missing_ok=True)
+                try:
+                    target_dir.rmdir()
+                except OSError:
+                    pass
+            QMessageBox.warning(self, "No se pudo guardar", str(exc))
+            return
+
+        self.title.clear()
+        self.notes.clear()
+        self.selected_file = None
+        self.file_label.setText("Ningún archivo seleccionado")
+        try:
             self.refresh()
         except Exception as exc:
-            target.unlink(missing_ok=True)
-            try:
-                target_dir.rmdir()
-            except OSError:
-                pass
-            QMessageBox.warning(self, "No se pudo guardar", str(exc))
+            QMessageBox.warning(self, "Documento guardado",
+                "El documento se guardó correctamente, pero no se pudo actualizar la lista. "
+                "Pulsa Actualizar al volver a abrir la documentación. Detalle: " + str(exc))
 
 
 class MainWindow(QMainWindow):
