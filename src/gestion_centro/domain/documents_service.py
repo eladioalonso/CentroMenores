@@ -180,8 +180,9 @@ def check_authorization(session: Session, *, actor_account_id: str, stay_id: str
 
 def set_authorization_status(session: Session, *, actor_account_id: str, authorization_id: str,
                              status: str, reason: str):
-    actor = _actor(session, actor_account_id)
     authorization = session.get(Authorization, authorization_id)
+    actor = _actor(session, actor_account_id,
+        health=bool(authorization and authorization.authorization_type == "medical"))
     if authorization is None or status not in {"valid", "revoked", "expired"}:
         raise ValueError("Autorización o estado no válido")
     if not reason.strip():
