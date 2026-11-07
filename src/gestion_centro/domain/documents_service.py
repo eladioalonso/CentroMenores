@@ -18,7 +18,7 @@ def _actor(session: Session, account_id: str, *, health: bool = False) -> UserAc
     if actor is None or not actor.active or not actor.professional.active:
         raise PermissionError("Se requiere una cuenta y un profesional activos")
     if health and not actor.health_access:
-        raise PermissionError("La cuenta no tiene autorización para gestionar documentos sanitarios")
+        raise PermissionError("La cuenta no tiene autorización sanitaria para gestionar documentos sanitarios")
     return actor
 
 
