@@ -32,7 +32,7 @@ from gestion_centro.persistence.database import build_engine, build_session_fact
 from gestion_centro.persistence.migrations import upgrade_database
 from gestion_centro.domain.service import (
     close_expired_diary_days, create_agenda_item, list_agenda_items,
-    set_agenda_item_status,
+    set_agenda_item_status, has_health_access,
 )
 from gestion_centro.domain.models import Stay
 from gestion_centro.domain.models import AgendaItem, Incident
@@ -312,6 +312,8 @@ class AgendaDialog(QDialog):
     def __init__(self, factory, actor_id: str) -> None:
         super().__init__()
         self.factory, self.actor_id = factory, actor_id
+        with session_scope(factory) as session:
+            self.health_access = has_health_access(session, actor_account_id=actor_id)
         self.setWindowTitle("Agenda común y tareas")
         self.resize(980, 640)
         layout = QVBoxLayout(self)
@@ -322,7 +324,8 @@ class AgendaDialog(QDialog):
         form = QFormLayout()
         self.kind = QComboBox()
         for key, label in self.KIND_LABELS.items():
-            self.kind.addItem(label, key)
+            if key != "vaccine" or self.health_access:
+                self.kind.addItem(label, key)
         self.title = QLineEdit()
         self.title.setMaxLength(180)
         self.description = QTextEdit()
@@ -359,7 +362,8 @@ class AgendaDialog(QDialog):
         self.kind_filter = QComboBox()
         self.kind_filter.addItem("Todos los tipos", None)
         for key, label in self.KIND_LABELS.items():
-            self.kind_filter.addItem(label, key)
+            if key != "vaccine" or self.health_access:
+                self.kind_filter.addItem(label, key)
         self.status_filter = QComboBox()
         self.status_filter.addItem("Todos los estados", None)
         for key, label in self.STATUS_LABELS.items():
