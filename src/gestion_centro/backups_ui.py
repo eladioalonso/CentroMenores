@@ -42,22 +42,31 @@ class BackupDialog(QDialog):
         for archive in archives:
             self.list.addItem(str(archive))
 
+    @staticmethod
+    def require_admin(session, actor_id):
+        account = session.get(UserAccount, actor_id)
+        if (account is None or not account.active or not account.professional.active
+                or account.role != "admin"):
+            raise PermissionError("Se requiere una cuenta administradora activa")
+        return account
+
     def audit(self, event, details):
         with session_scope(self.factory) as session:
-            account = session.get(UserAccount, self.actor_id)
-            if account is not None:
-                session.add(AccessAudit(
-                    account_id=account.id, username_snapshot=account.username,
-                    event=event, details=details,
-                ))
+            account = self.require_admin(session, self.actor_id)
+            session.add(AccessAudit(
+                account_id=account.id, username_snapshot=account.username,
+                event=event, details=details,
+            ))
 
     def create_manual(self):
         try:
+            with session_scope(self.factory) as session:
+                self.require_admin(session, self.actor_id)
             archive = create_backup(self.paths, kind="manual")
             self.audit("backup_created", archive.name)
             QMessageBox.information(self, "Copia creada", "Copia verificada: " + archive.name)
             self.refresh()
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, PermissionError) as exc:
             QMessageBox.critical(self, "Error de copia", str(exc))
 
     def verify_selected(self):
@@ -66,11 +75,13 @@ class BackupDialog(QDialog):
             QMessageBox.information(self, "Selecciona", "Selecciona una copia.")
             return
         try:
+            with session_scope(self.factory) as session:
+                self.require_admin(session, self.actor_id)
             manifest = verify_backup(Path(item.text()))
             self.audit("backup_verified", Path(item.text()).name)
             QMessageBox.information(self, "Verificación correcta",
                 "Integridad correcta. Archivos incluidos: " + str(len(manifest["files"])))
-        except (OSError, ValueError, KeyError) as exc:
+        except (OSError, ValueError, KeyError, PermissionError) as exc:
             QMessageBox.critical(self, "Copia no válida", str(exc))
 
     def restore_selected(self):
@@ -90,7 +101,7 @@ class BackupDialog(QDialog):
         try:
             with session_scope(self.factory) as session:
                 actor = session.get(UserAccount, self.actor_id)
-                if actor is None or not actor.active or actor.role != "admin":
+                if actor is None or not actor.active or not actor.professional.active or actor.role != "admin":
                     raise PermissionError("Se requiere una cuenta administradora activa")
                 actor_name = actor.username
             # Cierra conexiones en pool antes de sustituir el fichero SQLite en Windows.
@@ -118,10 +129,12 @@ class BackupDialog(QDialog):
         if not directory:
             return
         try:
+            with session_scope(self.factory) as session:
+                self.require_admin(session, self.actor_id)
             completed = sync_pending_backups(self.paths, Path(directory))
             self.audit("backup_external_sync", str(len(completed)))
             QMessageBox.information(self, "Sincronización",
                 "Copias verificadas en el USB: " + str(len(completed)))
             self.refresh()
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, PermissionError) as exc:
             QMessageBox.critical(self, "Error de sincronización", str(exc))
