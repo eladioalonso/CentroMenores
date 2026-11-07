@@ -318,3 +318,27 @@ def test_diary_health_entries_and_incidents_are_filtered_and_permission_checked(
             close_incident(session, actor_account_id=actor.id, incident_id=incident.id,
                 note="Intento de cierre", now=moment)
 
+def test_vaccine_agenda_items_require_health_access_and_are_hidden_from_others():
+    from gestion_centro.domain.service import (
+        create_agenda_item, list_agenda_items, set_agenda_item_status,
+    )
+    with make_session() as session:
+        actor = create_professional_account(session, display_name="Educador autorizado",
+            username="agenda-health", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        actor.health_access = True
+        starts = datetime(2026, 11, 7, 10, tzinfo=timezone.utc)
+        vaccine = create_agenda_item(session, actor_account_id=actor.id, kind="vaccine",
+            title="Cita de vacunación ficticia", starts_at=starts)
+        actor.health_access = False
+        assert list_agenda_items(session, actor_account_id=actor.id,
+            start=starts, end=starts) == []
+        with pytest.raises(PermissionError, match="autorización sanitaria"):
+            list_agenda_items(session, actor_account_id=actor.id,
+                start=starts, end=starts, kind="vaccine")
+        with pytest.raises(PermissionError, match="autorización sanitaria"):
+            set_agenda_item_status(session, actor_account_id=actor.id,
+                item_id=vaccine.id, status="done")
+        with pytest.raises(PermissionError, match="autorización sanitaria"):
+            create_agenda_item(session, actor_account_id=actor.id, kind="vaccine",
+                title="Cita no autorizada", starts_at=starts)
+
