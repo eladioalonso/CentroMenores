@@ -169,7 +169,7 @@ def test_team_task_is_shared_and_can_be_completed_by_another_educator():
         item = create_agenda_item(session, actor_account_id=first.id, kind="task",
             title="Revisar material ficticio", starts_at=starts, assignment_scope="team")
         assert item.assigned_account_id is None
-        assert len(list_agenda_items(session, start=starts, end=starts)) == 1
+        assert len(list_agenda_items(session, actor_account_id=first.id, start=starts, end=starts)) == 1
         done = set_agenda_item_status(session, actor_account_id=second.id,
             item_id=item.id, status="done", now=datetime(2026, 5, 4, 10, tzinfo=timezone.utc))
         assert done.status == "done"
@@ -261,3 +261,21 @@ def test_minor_rejects_future_birth_date_and_invalid_email():
         with pytest.raises(ValueError, match="correo"):
             create_minor(session, actor_account_id=actor.id, internal_code="MC-2026-0101",
                 given_names="Caso", family_names="Ficticio", email="correo-invalido")
+
+
+
+def test_agenda_read_requires_active_actor_and_is_audited():
+    from gestion_centro.auth.models import AccessAudit
+    from gestion_centro.domain.service import list_agenda_items
+    with make_session() as session:
+        actor = create_professional_account(session, display_name="Educador",
+            username="agenda-reader", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        session.flush()
+        starts = datetime(2026, 5, 4, 9, tzinfo=timezone.utc)
+        assert list_agenda_items(session, actor_account_id=actor.id,
+            start=starts, end=starts) == []
+        assert session.scalar(select(AccessAudit).where(
+            AccessAudit.event == "agenda_accessed")) is not None
+        with pytest.raises(PermissionError):
+            list_agenda_items(session, actor_account_id="no-existe",
+                start=starts, end=starts)
