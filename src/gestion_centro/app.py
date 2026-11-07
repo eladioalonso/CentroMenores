@@ -28,6 +28,7 @@ from gestion_centro.auth.service import (
     change_own_password,
 )
 from gestion_centro.paths import data_paths, ensure_data_directories
+from gestion_centro.demo_seed import seed_demo_data
 from gestion_centro.persistence.database import build_engine, build_session_factory, session_scope
 from gestion_centro.persistence.migrations import upgrade_database
 from gestion_centro.domain.service import (
@@ -1305,6 +1306,15 @@ def main() -> int:
         instance_lock.unlock()
         return 1
     factory = build_session_factory(engine)
+
+    if demo_mode:
+        try:
+            seed_demo_data(factory)
+        except Exception as exc:
+            QMessageBox.critical(None, "Error al preparar la demostración", f"No se pudieron crear los datos ficticios de demostración:\n{exc}")
+            engine.dispose()
+            instance_lock.unlock()
+            return 1
 
     # Copia diaria local: una por día UTC. La sincronización externa queda pendiente
     # hasta que el administrador conecte la unidad USB desde la interfaz.
