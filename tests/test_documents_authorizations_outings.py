@@ -149,3 +149,42 @@ def test_health_documents_are_hidden_and_cannot_be_added_without_permission():
         from gestion_centro.domain.documents_service import list_documents
         visible = list_documents(session, actor_account_id=actor.id, stay_id=stay.id)
         assert document.id not in {item.id for item in visible}
+
+def test_medical_authorizations_and_outings_require_health_access_and_are_filtered():
+    from gestion_centro.domain.documents_service import list_authorizations, list_outings
+
+    with make_session() as session:
+        actor, stay = setup_stay(session)
+        with pytest.raises(PermissionError, match="autorización"):
+            record_authorization(
+                session, actor_account_id=actor.id, stay_id=stay.id,
+                authorization_type="medical", scope="Atención sanitaria",
+                issuer="Representante ficticio", valid_from=date(2026, 1, 1),
+            )
+        actor.health_access = True
+        medical_auth = record_authorization(
+            session, actor_account_id=actor.id, stay_id=stay.id,
+            authorization_type="medical", scope="Consulta sanitaria",
+            issuer="Representante ficticio", valid_from=date(2026, 1, 1),
+        )
+        starts = datetime(2026, 5, 4, 9, tzinfo=timezone.utc)
+        outing = create_outing(
+            session, actor_account_id=actor.id, kind="health",
+            destination="Centro sanitario ficticio", purpose="Consulta programada",
+            planned_departure=starts,
+            planned_return=datetime(2026, 5, 4, 12, tzinfo=timezone.utc),
+            responsible_account_id=actor.id, stay_ids=[stay.id],
+            authorization_ids=[medical_auth.id], restrictions_checked=True,
+        )
+        actor.health_access = False
+        assert all(item.authorization_type != "medical" for item in
+            list_authorizations(session, actor_account_id=actor.id, stay_id=stay.id))
+        assert outing.id not in {item.id for item in
+            list_outings(session, actor_account_id=actor.id, stay_id=stay.id)}
+        with pytest.raises(PermissionError, match="autorización"):
+            check_authorization(session, actor_account_id=actor.id, stay_id=stay.id,
+                authorization_type="medical", on_date=date(2026, 5, 4))
+        with pytest.raises(PermissionError, match="autorización"):
+            set_outing_status(session, actor_account_id=actor.id, outing_id=outing.id,
+                status="in_progress", actual_at=starts)
+
