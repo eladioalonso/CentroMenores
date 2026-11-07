@@ -5,15 +5,12 @@ from PySide6.QtWidgets import (
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
     QCheckBox, QHBoxLayout, QInputDialog,
 )
-from sqlalchemy import select
 from gestion_centro.persistence.database import session_scope
-from gestion_centro.domain.models import Stay
-from gestion_centro.domain.documents import Authorization
-from gestion_centro.domain.external_reports import ExternalReport
 from gestion_centro.domain.external_reports_service import (
     create_external_report, review_external_report, mark_external_report_delivered,
-    list_external_reports,
+    list_external_reports, get_external_report_for_review,
 )
+from gestion_centro.domain.documents_service import list_active_stays, list_valid_authorizations
 
 
 class ExternalReportsDialog(QDialog):
@@ -70,8 +67,7 @@ class ExternalReportsDialog(QDialog):
         actions.addWidget(review); actions.addWidget(deliver); actions.addWidget(refresh)
         layout.addLayout(actions)
         with session_scope(factory) as session:
-            stays = session.scalars(select(Stay).where(Stay.status == "active")
-                .order_by(Stay.started_on.desc())).all()
+            stays = list_active_stays(session, actor_account_id=self.actor_id)
             for stay in stays:
                 self.stay.addItem(
                     f"{stay.minor.internal_code} · {stay.minor.given_names} {stay.minor.family_names}",
@@ -85,13 +81,11 @@ class ExternalReportsDialog(QDialog):
         stay_id = self.stay.currentData()
         if not stay_id:
             return
-        from datetime import date
         with session_scope(self.factory) as session:
-            rows = session.scalars(select(Authorization).where(
-                Authorization.stay_id == stay_id, Authorization.status == "valid",
-                Authorization.valid_from <= date.today()).order_by(Authorization.valid_from.desc())).all()
+            rows = list_valid_authorizations(
+                session, actor_account_id=self.actor_id, stay_id=stay_id)
             for item in rows:
-                if item.valid_until is None or item.valid_until >= date.today():
+                if item.authorization_type != "medical":
                     self.authorization.addItem(
                         f"{item.authorization_type} · {item.issuer} · {item.scope[:60]}", item.id)
 
@@ -137,12 +131,15 @@ class ExternalReportsDialog(QDialog):
     def review(self):
         report_id = self.selected_report_id()
         if not report_id: return
-        with session_scope(self.factory) as session:
-            report = session.get(ExternalReport, report_id)
-            if report is None:
-                return
-            preview = (f"Destinatario: {report.recipient}\\nFinalidad: {report.purpose}\\n"
-                f"Campos seleccionados: {report.included_fields}\\n\\nContenido propuesto:\\n{report.content}")
+        try:
+            with session_scope(self.factory) as session:
+                report = get_external_report_for_review(
+                    session, actor_account_id=self.actor_id, report_id=report_id)
+                preview = (f"Destinatario: {report.recipient}\\nFinalidad: {report.purpose}\\n"
+                    f"Campos seleccionados: {report.included_fields}\\n\\nContenido propuesto:\\n{report.content}")
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se puede consultar el borrador", str(exc))
+            return
         confirmation = QMessageBox(self)
         confirmation.setWindowTitle("Revisión del informe")
         confirmation.setText("Revisa el contenido completo antes de aprobarlo.")
