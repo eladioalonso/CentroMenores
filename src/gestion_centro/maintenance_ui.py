@@ -130,7 +130,7 @@ class MaintenanceDialog(QDialog):
                 account = self.require_admin(session, self.actor_id)
                 session.add(AccessAudit(account_id=account.id, username_snapshot=account.username,
                     event="maintenance_diagnostics", details=f'checks={len(rows)}'))
-        except (OSError, ValueError, PermissionError) as exc:
+        except Exception as exc:
             QMessageBox.critical(self, "Diagnóstico interrumpido", str(exc))
 
     def export(self):
@@ -145,5 +145,5 @@ class MaintenanceDialog(QDialog):
                 self.require_admin(session, self.actor_id)
             Path(filename).write_text(json.dumps(self.report, ensure_ascii=False, indent=2), encoding="utf-8")
             QMessageBox.information(self, "Informe guardado", "Se ha guardado el informe técnico.")
-        except (OSError, PermissionError) as exc:
+        except Exception as exc:
             QMessageBox.critical(self, "No se pudo guardar", str(exc))
