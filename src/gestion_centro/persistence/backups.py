@@ -118,8 +118,14 @@ def create_backup(paths: DataPaths, *, kind: str = "manual",
             bundle.write(snapshot, "database/centro.db")
             files["database/centro.db"] = _sha256(snapshot)
             for label, root in (("documents", paths.documents), ("images", paths.images)):
+                if root.is_symlink():
+                    raise ValueError(f"La carpeta {label} no puede ser un enlace simbólico")
                 if root.exists():
-                    for file in sorted(p for p in root.rglob("*") if p.is_file()):
+                    for file in sorted(root.rglob("*")):
+                        if file.is_symlink():
+                            raise ValueError(f"Se ha detectado un enlace simbólico en {label}")
+                        if not file.is_file():
+                            continue
                         name = f"{label}/{file.relative_to(root).as_posix()}"
                         if not _safe_archive_name(name):
                             raise ValueError("Ruta de archivo no segura")
