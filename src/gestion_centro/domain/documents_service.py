@@ -107,8 +107,12 @@ def list_authorizations(session: Session, *, actor_account_id: str, stay_id: str
     if not actor.health_access:
         query = query.where(
             Authorization.authorization_type != "medical",
-            or_(Authorization.document_id.is_(None), Authorization.document_id.not_in(
-            select(PersonalDocument.id).where(PersonalDocument.category == "health")))),
+            or_(
+                Authorization.document_id.is_(None),
+                Authorization.document_id.not_in(
+                    select(PersonalDocument.id).where(PersonalDocument.category == "health")
+                ),
+            ),
         )
     _audit(session, actor, "authorizations_accessed", f"Estancia: {stay_id}")
     return session.scalars(query.order_by(Authorization.valid_from.desc())).all()
