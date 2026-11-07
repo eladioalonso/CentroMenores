@@ -38,7 +38,7 @@ from gestion_centro.domain.models import Stay
 from gestion_centro.domain.models import AgendaItem, Incident
 from gestion_centro.domain.documents import Outing, OutingStay
 from gestion_centro.domain.documents import PersonalDocument
-from gestion_centro.domain.documents_service import register_document, list_documents
+from gestion_centro.domain.documents_service import register_document, list_documents, list_active_stays
 from gestion_centro.operations_ui import AuthorizationsDialog, OutingsDialog
 from gestion_centro.backups_ui import BackupDialog
 from gestion_centro.persistence.backups import create_backup
@@ -655,14 +655,13 @@ class DocumentsDialog(QDialog):
         form = QFormLayout()
         self.stay = QComboBox()
         with session_scope(factory) as session:
-            stays = session.scalars(select(Stay).where(Stay.status == "active").order_by(Stay.started_on.desc())).all()
+            stays = list_active_stays(session, actor_account_id=actor_id)
             values = [(s.id, f"{s.minor.internal_code} · {s.minor.given_names} {s.minor.family_names}") for s in stays]
         for stay_id, label in values:
             self.stay.addItem(label, stay_id)
         self.category = QComboBox()
         with session_scope(factory) as session:
-            account = session.get(UserAccount, actor_id)
-            self.health_access = bool(account and account.active and account.health_access)
+            self.health_access = has_health_access(session, actor_account_id=actor_id)
         for label, key in self.CATEGORIES.items():
             if key == "health" and not self.health_access:
                 continue
@@ -716,10 +715,9 @@ class DocumentsDialog(QDialog):
         stay_id = self.stay.currentData()
         if stay_id:
             with session_scope(self.factory) as session:
-                docs = session.scalars(select(PersonalDocument).where(
-                    PersonalDocument.stay_id == stay_id,
-                    PersonalDocument.category == self.category.currentData()
-                ).order_by(PersonalDocument.created_at.desc())).all()
+                docs = [doc for doc in list_documents(
+                    session, actor_account_id=self.actor_id, stay_id=stay_id)
+                    if doc.category == self.category.currentData()]
                 for doc in docs:
                     self.supersedes.addItem(
                         f"{doc.title} · v{doc.version} · {doc.original_filename}",
@@ -802,14 +800,14 @@ class DocumentsDialog(QDialog):
         if source.stat().st_size <= 0 or source.stat().st_size > 25 * 1024 * 1024:
             QMessageBox.warning(self, "Tamaño no permitido", "El archivo debe ocupar entre 1 byte y 25 MB.")
             return
-        with source.open("rb") as stream:
-            digest = hashlib.file_digest(stream, "sha256").hexdigest()
         relative_dir = Path(str(uuid4()))
         target_dir = self.paths.documents / relative_dir
         target_dir.mkdir(parents=True, exist_ok=True)
         target = target_dir / source.name
         try:
             shutil.copy2(source, target)
+            with target.open("rb") as stream:
+                digest = hashlib.file_digest(stream, "sha256").hexdigest()
             relative_path = target.relative_to(self.paths.root).as_posix()
             mime_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
             with session_scope(self.factory) as session:
