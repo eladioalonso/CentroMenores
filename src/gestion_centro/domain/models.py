@@ -25,6 +25,8 @@ class Minor(Base):
     __table_args__ = (Index("uq_minors_nif_nie", "nif_nie", unique=True),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    # Identificador técnico heredado; se genera solo y nunca se muestra en la interfaz.
+    internal_code: Mapped[str] = mapped_column(String(32), nullable=False, unique=True, default=lambda: uuid4().hex)
     given_names: Mapped[str] = mapped_column(String(160), nullable=False)
     family_names: Mapped[str] = mapped_column(String(200), nullable=False)
     birth_country: Mapped[str | None] = mapped_column(String(100), nullable=True)
