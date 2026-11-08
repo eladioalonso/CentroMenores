@@ -83,8 +83,6 @@ def list_documents(session: Session, *, actor_account_id: str, stay_id: str):
         raise ValueError("La estancia no existe")
     _audit(session, actor, "personal_documents_accessed", stay_id)
     query = select(PersonalDocument).where(PersonalDocument.stay_id == stay_id)
-    if not actor.health_access:
-        query = query.where(PersonalDocument.category != "health")
     return session.scalars(query.order_by(PersonalDocument.created_at.desc())).all()
 
 
@@ -116,8 +114,6 @@ def list_valid_authorizations(session: Session, *, actor_account_id: str, stay_i
         Authorization.stay_id == stay_id, Authorization.status == "valid",
         Authorization.valid_from <= day,
     ).where((Authorization.valid_until.is_(None)) | (Authorization.valid_until >= day))
-    if not actor.health_access:
-        query = query.where(
             Authorization.authorization_type != "medical",
             or_(
                 Authorization.document_id.is_(None),
