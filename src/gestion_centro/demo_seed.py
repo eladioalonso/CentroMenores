@@ -44,6 +44,13 @@ def seed_demo_data(factory) -> None:
         for code, nif_nie, given, family, born, country, locality in examples:
             minor = session.scalar(select(Minor).where(Minor.nif_nie == nif_nie))
             if minor is None:
+                minor = session.scalar(select(Minor).where(
+                    Minor.given_names == given, Minor.family_names == family,
+                    Minor.birth_date == born,
+                ))
+                if minor is not None:
+                    minor.nif_nie = nif_nie
+            if minor is None:
                 minor = create_minor(
                     session, actor_account_id=actor_id,
                     nif_nie=nif_nie, given_names=given, family_names=family,
