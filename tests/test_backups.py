@@ -265,6 +265,8 @@ def test_backup_paths_reject_windows_drives_and_nonportable_segments():
     from gestion_centro.persistence.backups import _safe_archive_name
 
     assert not _safe_archive_name("C:/outside.txt")
+    assert not _safe_archive_name(r"documents\..\..\outside.txt")
+    assert not _safe_archive_name("documents/\x00outside.txt")
     assert not _safe_archive_name("documents//file.pdf")
     assert not _safe_archive_name("documents/./file.pdf")
     assert not _safe_archive_name("documents/../outside.pdf")
