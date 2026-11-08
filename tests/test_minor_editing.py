@@ -18,8 +18,7 @@ def test_personal_data_update_is_saved_and_audited():
         actor = create_professional_account(session, display_name='Test', username='edit-file',
             password='test password long enough', role=Role.EDUCATOR)
         actor.health_access = True
-        minor = create_minor(session, actor_account_id=actor.id, internal_code='TEST-EDIT-1',
-            given_names='Original', family_names='Name')
+        minor = create_minor(session, actor_account_id=actor.id, given_names='Original', family_names='Name')
         update_minor_personal_data(session, actor_account_id=actor.id, minor_id=minor.id,
             given_names='Corrected', family_names='Name', locality='Lorca',
             nif_nie='x1234567a', email='test@example.test', cip='cip-123',
@@ -55,8 +54,7 @@ def test_personal_data_update_rejects_future_birth_date():
     with Session(engine) as session:
         actor = create_professional_account(session, display_name='Test', username='edit-file-2',
             password='test password long enough', role=Role.EDUCATOR)
-        minor = create_minor(session, actor_account_id=actor.id, internal_code='TEST-EDIT-2',
-            given_names='Name', family_names='Test')
+        minor = create_minor(session, actor_account_id=actor.id, given_names='Name', family_names='Test')
         with pytest.raises(ValueError, match='nacimiento'):
             update_minor_personal_data(session, actor_account_id=actor.id, minor_id=minor.id,
                 given_names='Name', family_names='Test',
@@ -71,8 +69,7 @@ def test_educators_can_update_health_fields_in_resident_personal_data():
         authorized = create_professional_account(session, display_name='Health', username='edit-health',
             password='test password long enough', role=Role.EDUCATOR)
         authorized.health_access = True
-        minor = create_minor(session, actor_account_id=authorized.id, internal_code='TEST-EDIT-3',
-            given_names='Name', family_names='Test', clinical_history='Dato clínico ficticio')
+        minor = create_minor(session, actor_account_id=authorized.id, given_names='Name', family_names='Test', clinical_history='Dato clínico ficticio')
         update_minor_personal_data(session, actor_account_id=actor.id, minor_id=minor.id,
             given_names='Corrected', family_names='Test', clinical_history='Historia actualizada ficticia')
         assert session.get(Minor, minor.id).clinical_history == 'Historia actualizada ficticia'
@@ -84,7 +81,6 @@ def test_educators_can_create_resident_with_health_data():
     with Session(engine) as session:
         actor = create_professional_account(session, display_name='Test', username='create-no-health',
             password='test password long enough', role=Role.EDUCATOR)
-        minor = create_minor(session, actor_account_id=actor.id, internal_code='TEST-EDIT-4',
-            given_names='Name', family_names='Test', clinical_history='Dato clínico ficticio')
+        minor = create_minor(session, actor_account_id=actor.id, given_names='Name', family_names='Test', clinical_history='Dato clínico ficticio')
         assert minor.clinical_history == 'Dato clínico ficticio'
 
