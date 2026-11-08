@@ -40,8 +40,8 @@ def register_document(session: Session, *, actor_account_id: str, stay_id: str, 
                       supersedes_id: str | None = None):
     actor = _actor(session, actor_account_id)
     stay = session.get(Stay, stay_id)
-    if stay is None or stay.status != "active":
-        raise ValueError("La estancia no existe o está cerrada")
+    if stay is None:
+        raise ValueError("La estancia no existe")
     if category not in DOCUMENT_CATEGORIES or not title.strip():
         raise ValueError("Categoría o título documental no válido")
     if not original_filename.strip() or not mime_type.strip() or size_bytes <= 0 or size_bytes > 25 * 1024 * 1024:
@@ -92,6 +92,15 @@ def list_active_stays(session: Session, *, actor_account_id: str):
     _audit(session, actor, "active_stays_accessed", "Selector de estancias")
     return session.scalars(
         select(Stay).where(Stay.status == "active").order_by(Stay.started_on.desc())
+    ).all()
+
+
+def list_document_stays(session: Session, *, actor_account_id: str):
+    """Permite consultar documentación de estancias activas y ya cerradas."""
+    actor = _actor(session, actor_account_id)
+    _audit(session, actor, "document_stays_accessed", "Selector de expedientes documentales")
+    return session.scalars(
+        select(Stay).order_by(Stay.started_on.desc(), Stay.created_at.desc())
     ).all()
 
 
