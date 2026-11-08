@@ -1,7 +1,7 @@
 """Servicios de documentación, autorizaciones y salidas."""
 from datetime import date, datetime, timezone
 from pathlib import PurePosixPath
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from gestion_centro.auth.models import AccessAudit, UserAccount
 from gestion_centro.domain.models import Stay
@@ -17,8 +17,6 @@ def _actor(session: Session, account_id: str, *, health: bool = False) -> UserAc
     actor = session.get(UserAccount, account_id)
     if actor is None or not actor.active or not actor.professional.active:
         raise PermissionError("Se requiere una cuenta y un profesional activos")
-    if health and not actor.health_access:
-        raise PermissionError("La cuenta no tiene autorización sanitaria para gestionar documentos sanitarios")
     return actor
 
 
@@ -104,16 +102,6 @@ def list_authorizations(session: Session, *, actor_account_id: str, stay_id: str
     if session.get(Stay, stay_id) is None:
         raise ValueError("La estancia no existe")
     query = select(Authorization).where(Authorization.stay_id == stay_id)
-    if not actor.health_access:
-        query = query.where(
-            Authorization.authorization_type != "medical",
-            or_(
-                Authorization.document_id.is_(None),
-                Authorization.document_id.not_in(
-                    select(PersonalDocument.id).where(PersonalDocument.category == "health")
-                ),
-            ),
-        )
     _audit(session, actor, "authorizations_accessed", f"Estancia: {stay_id}")
     return session.scalars(query.order_by(Authorization.valid_from.desc())).all()
 
@@ -148,8 +136,6 @@ def list_outings(session: Session, *, actor_account_id: str, stay_id: str):
         raise ValueError("La estancia no existe")
     query = (select(Outing).join(OutingStay, Outing.id == OutingStay.outing_id)
              .where(OutingStay.stay_id == stay_id))
-    if not actor.health_access:
-        query = query.where(Outing.kind != "health")
     _audit(session, actor, "outings_accessed", f"Estancia: {stay_id}")
     return session.scalars(query.order_by(Outing.planned_departure.desc())).all()
 
@@ -169,8 +155,6 @@ def record_authorization(session: Session, *, actor_account_id: str, stay_id: st
         doc = session.get(PersonalDocument, document_id)
         if doc is None or doc.stay_id != stay_id:
             raise ValueError("El documento justificativo no corresponde a esta estancia")
-        if doc.category == "health" and not actor.health_access:
-            raise PermissionError("La cuenta no tiene autorización para consultar documentos sanitarios")
     item = Authorization(stay_id=stay_id, authorization_type=authorization_type,
         scope=scope.strip(), issuer=issuer.strip(), valid_from=valid_from, valid_until=valid_until,
         conditions=conditions.strip() if conditions else None, status="valid",
@@ -187,11 +171,6 @@ def check_authorization(session: Session, *, actor_account_id: str, stay_id: str
     query = select(Authorization).where(
         Authorization.stay_id == stay_id, Authorization.authorization_type == authorization_type,
         Authorization.status == "valid", Authorization.valid_from <= on_date)
-    if not actor.health_access:
-        query = query.where(
-            or_(Authorization.document_id.is_(None), Authorization.document_id.not_in(
-                select(PersonalDocument.id).where(PersonalDocument.category == "health")))
-        )
     matches = session.scalars(query).all()
     valid = [a for a in matches if a.valid_until is None or a.valid_until >= on_date]
     if required_scope:
@@ -237,14 +216,6 @@ def create_outing(session: Session, *, actor_account_id: str, kind: str, destina
     auths = [session.get(Authorization, item) for item in auth_ids]
     if kind != "health" and any(a is not None and a.authorization_type == "medical" for a in auths):
         raise ValueError("Las autorizaciones médicas solo pueden vincularse a salidas sanitarias")
-    if not actor.health_access and any(
-        a is not None and (
-            a.authorization_type == "medical"
-            or (a.document_id and (doc := session.get(PersonalDocument, a.document_id))
-                and doc.category == "health")
-        ) for a in auths
-    ):
-        raise PermissionError("Se requiere autorización sanitaria para utilizar autorizaciones vinculadas a salud")
     stay_set = {s.id for s in stays}
     outing_date = planned_departure.date()
     if any(a is None or a.stay_id not in stay_set or a.status != "valid"
