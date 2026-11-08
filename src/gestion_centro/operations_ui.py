@@ -148,7 +148,7 @@ class OutingsDialog(QDialog):
             self.kind.addItem(label, value)
         self.destination = QLineEdit()
         self.purpose = QTextEdit()
-        self.purpose.setMaximumHeight(60)
+        self.purpose.setMinimumHeight(100)
         self.auth = QComboBox()
         self.depart = QDateTimeEdit(QDateTime.currentDateTime())
         self.depart.setCalendarPopup(True)
