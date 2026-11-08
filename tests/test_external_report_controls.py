@@ -31,7 +31,7 @@ def setup_report_context(session):
         password="contraseña de prueba segura", role=Role.EDUCATOR,
     )
     minor = create_minor(session, actor_account_id=creator.id,
-        internal_code="MC-EXT-TEST", given_names="Caso", family_names="Ficticio")
+        given_names="Caso", family_names="Ficticio")
     stay = open_stay(session, actor_account_id=creator.id, minor_id=minor.id,
         started_on=date.today())
     return creator, reviewer, stay
