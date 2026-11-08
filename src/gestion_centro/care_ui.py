@@ -39,7 +39,7 @@ class StaySelectorDialog(QDialog):
             stays = session.scalars(select(Stay).where(Stay.status == "active")
                 .order_by(Stay.started_on.desc())).all()
             for s in stays:
-                self.stay.addItem(f"{s.minor.internal_code} · {s.minor.given_names} {s.minor.family_names}", s.id)
+                self.stay.addItem(f"{s.(minor.nif_nie or minor.passport_number or "Sin NIF/NIE")} · {s.minor.given_names} {s.minor.family_names}", s.id)
         if stay_id is not None:
             index = self.stay.findData(stay_id)
             if index >= 0:
@@ -388,13 +388,13 @@ class HealthDialog(StaySelectorDialog):
             if stay_id:
                 selected_stay = session.get(Stay, stay_id)
                 preferred_minor_id = selected_stay.minor_id if selected_stay else None
-            minors = session.scalars(select(Minor).order_by(Minor.active.desc(), Minor.internal_code)).all()
+            minors = session.scalars(select(Minor).order_by(Minor.active.desc(), Minor.family_names, Minor.given_names)).all()
             self.stay.clear()
             self.stay.addItem("Selecciona un residente…", None)
             for minor in minors:
                 status = "" if minor.active else " · Inactivo"
                 self.stay.addItem(
-                    f"{minor.internal_code} · {minor.given_names} {minor.family_names}{status}",
+                    f"{(minor.nif_nie or minor.passport_number or "Sin NIF/NIE")} · {minor.given_names} {minor.family_names}{status}",
                     minor.id,
                 )
         if preferred_minor_id:
@@ -575,7 +575,7 @@ class HealthDialog(StaySelectorDialog):
                 if self.admin_shift_filter.currentData() is None
                 or row[1].shift == self.admin_shift_filter.currentData()
             ]
-        resident_name = f"{minor.internal_code} · {minor.given_names} {minor.family_names}"
+        resident_name = f"{(minor.nif_nie or minor.passport_number or "Sin NIF/NIE")} · {minor.given_names} {minor.family_names}"
         if active_stay:
             self.resident_context.setText(
                 f"{resident_name}  |  Ingreso activo desde {active_stay.started_on:%d/%m/%Y}  |  "
