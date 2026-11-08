@@ -51,7 +51,7 @@ En desarrollo, la carpeta de datos se puede indicar con `CENTRO_DATOS_DIR`; por 
 - Ayuda integrada con guía operativa y preguntas frecuentes.
 - Modo de demostración aislado: ejecutar `GestionCentro.exe --demo`. En desarrollo puede ejecutarse `python -m gestion_centro --demo`. Usa una carpeta de demostración independiente (`demo_data` junto al EXE portable o `.centro_demo` en desarrollo); no abre la carpeta de datos normales.
 
-El modo de demostración arranca con una base separada y precarga cinco expedientes ficticios, sus estancias, anotaciones de diario y situaciones de ejemplo. Incluye la cuenta EDUCADOR (nombre visible: educador; contraseña inicial: 012345678910). La cuenta es de perfil Educador y no tiene acceso sanitario ni permisos de administración. La carga es idempotente: no duplica los ejemplos al volver a abrir la demo. No copiar datos reales a esa carpeta.
+El modo de demostración arranca con una base separada y precarga cinco expedientes ficticios, sus estancias, anotaciones de diario y situaciones de ejemplo. Incluye la cuenta EDUCADOR (nombre visible: educador; contraseña inicial: 012345678910), de perfil Educador y sin permisos de administración. Los educadores activos pueden consultar y registrar información sanitaria según las reglas actuales de la aplicación; el campo histórico `health_access` ya no bloquea ese acceso. La carga es idempotente: no duplica los ejemplos al volver a abrir la demo. No copiar datos reales a esa carpeta.
 
 El acceso móvil por Wi-Fi no está habilitado todavía. No abrir puertos ni exponer el equipo a redes externas para intentar activarlo. Requiere terminar la autenticación móvil, TLS con certificado confiable, expiración de tokens, cola de revisión y pruebas de seguridad.
 
@@ -60,7 +60,7 @@ El acceso móvil por Wi-Fi no está habilitado todavía. No abrir puertos ni exp
 Rama activa: `desarrollo/nucleo-aplicacion`. No fusionar ni desplegar desde `main`.
 
 Incluye actualmente modelos, servicios y primeras interfaces para:
-- Cuentas individuales, perfiles, bloqueo por inactividad, auditoría y permiso sanitario explícito denegado por defecto.
+- Cuentas individuales, perfiles, bloqueo por inactividad y auditoría. Los educadores activos pueden consultar y gestionar la ficha sanitaria; las operaciones sanitarias relevantes quedan auditadas.
 - Menores, estancias, acontecimientos, diario e incidencias.
 - Agenda compartida y tareas.
 - Comunicaciones internas con aportaciones trazables.
@@ -70,4 +70,4 @@ Incluye actualmente modelos, servicios y primeras interfaces para:
 - Autorizaciones y salidas.
 - Copias ZIP verificables y sincronización externa pendiente.
 
-La interfaz sigue en desarrollo y no todos los flujos están completos. Las ejecuciones de CI deben comprobarse para el commit más reciente antes de considerar válida una compilación. No utilizar con datos reales: faltan validación funcional integral, restauración integral probada, revisión de seguridad y protección de datos, y aprobación de la organización responsable.
+La interfaz sigue en desarrollo y no todos los flujos están completos. Las ejecuciones de CI deben comprobarse para el commit más reciente antes de considerar válida una compilación. No utilizar con datos reales: faltan validación funcional integral en el equipo definitivo, pruebas operativas de restauración y migración, revisión de seguridad y protección de datos, y aprobación de la organización responsable.
