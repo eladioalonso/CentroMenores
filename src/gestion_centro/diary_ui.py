@@ -17,14 +17,16 @@ from gestion_centro.domain.service import (
     correct_diary_entry, has_health_access, list_diary_records,
 )
 from gestion_centro.domain.documents_service import list_active_stays
+from gestion_centro.domain.health_service import read_health_profile, list_medication_plans
 
 
 class DiaryDialog(QDialog):
     SHIFTS = {"Mañana": "morning", "Tarde": "afternoon", "Noche": "night"}
     CATEGORIES = {
-        "General": "general", "Actividad": "activity", "Salud": "health",
-        "Observación": "observation", "Positiva": "positive",
-        "Negativa": "negative", "Mantenimiento": "maintenance", "Otros": "other",
+        "Actividades realizadas": "activity",
+        "Comportamientos positivos": "positive",
+        "Comportamientos negativos": "negative",
+        "Observaciones": "observation",
     }
     INCIDENT_TYPES = {
         "Conducta": "behavior", "Salud": "health", "Seguridad": "safety",
@@ -60,37 +62,44 @@ class DiaryDialog(QDialog):
         self.happened = QDateTimeEdit()
         self.happened.setCalendarPopup(True)
         self.happened.setDateTime(QDateTime.currentDateTime())
+        self.shift.hide()
+        self.happened.hide()
         self.content = QTextEdit()
         self.content.setMinimumHeight(130)
         self.content.setPlaceholderText("Describe los hechos con claridad. El texto se ajustará automáticamente al ancho del cuadro.")
         self.participant_hint = QLineEdit("Sin menores vinculados")
         self.participant_hint.setReadOnly(True)
         self.selected_stay_ids = []
-        form.addRow("Fecha del diario", self.day)
-        form.addRow("Turno", self.shift)
-        form.addRow("Categoría", self.category)
-        form.addRow("Fecha y hora del hecho", self.happened)
-        form.addRow("Anotación objetiva", self.content)
+        form.addRow("Fecha del parte", self.day)
+        form.addRow("Apartado", self.category)
+        form.addRow("Contenido", self.content)
         select_stays = QPushButton("Vincular menores / estancias…")
         select_stays.clicked.connect(self.choose_stays)
         form.addRow("Personas vinculadas", self.participant_hint)
         form.addRow("", select_stays)
         layout.addLayout(form)
+        layout.addWidget(QLabel("Enfermedades y tratamientos · información vinculada a las fichas sanitarias"))
+        self.health_summary = QTextEdit()
+        self.health_summary.setReadOnly(True)
+        self.health_summary.setMaximumHeight(145)
+        self.health_summary.setPlaceholderText("La información sanitaria se consulta desde los expedientes y no se vuelve a escribir en el parte.")
+        layout.addWidget(self.health_summary)
         actions = QHBoxLayout()
-        self.add_button = QPushButton("Añadir anotación")
+        self.add_button = QPushButton("Guardar apartado")
         self.add_button.clicked.connect(self.add_entry)
         self.incident_button = QPushButton("Registrar incidencia")
         self.incident_button.clicked.connect(self.add_incident)
-        self.close_button = QPushButton("Cerrar diario del día")
+        self.incident_button.hide()
+        self.close_button = QPushButton("Cerrar parte del día")
         self.close_button.clicked.connect(self.close_day)
         self.revise_button = QPushButton("Corregir mi anotación")
         self.revise_button.clicked.connect(self.revise_entry)
         refresh = QPushButton("Actualizar")
         refresh.clicked.connect(self.refresh)
-        for b in (self.add_button, self.incident_button, self.close_button, self.revise_button, refresh): actions.addWidget(b)
+        for b in (self.add_button, self.close_button, self.revise_button, refresh): actions.addWidget(b)
         layout.addLayout(actions)
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Hora", "Turno", "Tipo", "Contenido / incidencia", "Autor"])
+        self.table = QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(["Hora", "Apartado / tipo", "Contenido", "Autor"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setWordWrap(True)
@@ -127,8 +136,9 @@ class DiaryDialog(QDialog):
 
     def add_entry(self):
         try:
-            local = self.happened.dateTime().toPython()
-            moment = local.astimezone(timezone.utc) if local.tzinfo else local.astimezone().astimezone(timezone.utc)
+            local_now = datetime.now().astimezone()
+            local = datetime.combine(self.day.date().toPython(), local_now.time().replace(tzinfo=None))
+            moment = local.astimezone().astimezone(timezone.utc)
             with session_scope(self.factory) as session:
                 record_diary_entry(session, actor_account_id=self.actor_id,
                     diary_date=self.day.date().toPython(), shift=self.shift.currentData(),
@@ -225,24 +235,46 @@ class DiaryDialog(QDialog):
         with session_scope(self.factory) as session:
             day, entries, incidents = list_diary_records(
                 session, actor_account_id=self.actor_id, diary_date=selected)
-            rows = [(x.happened_at, x.shift, x.category, x.content, x.author_name_snapshot,
+            rows = [(x.happened_at, x.category, x.content, x.author_name_snapshot,
                 {"kind": "entry", "id": x.id}) for x in entries]
-            rows += [(x.happened_at, "Incidencia", x.severity,
+            rows += [(x.happened_at, f"Incidencia · {x.severity}",
                 f"{x.title} · {x.description} [{x.status}]", x.author_name_snapshot,
                 {"kind": "incident", "id": x.id}) for x in incidents]
             rows.sort(key=lambda x: x[0])
             is_closed = bool(day and day.closed_at)
+            health_rows = []
+            for stay in list_active_stays(session, actor_account_id=self.actor_id):
+                minor = stay.minor
+                profile = read_health_profile(session, actor_account_id=self.actor_id, minor_id=minor.id)
+                plans = list_medication_plans(session, actor_account_id=self.actor_id, minor_id=minor.id)
+                details = []
+                if profile and profile.relevant_conditions:
+                    details.append(f"Enfermedades/condiciones: {profile.relevant_conditions}")
+                if profile and profile.allergies:
+                    details.append(f"Alergias: {profile.allergies}")
+                active_plans = [plan for plan in plans if plan.active
+                    and plan.starts_on <= selected
+                    and (plan.ends_on is None or plan.ends_on >= selected)]
+                details.extend(
+                    f"Tratamiento: {plan.medication_name} · {plan.prescribed_dose} · {plan.schedule_text}"
+                    for plan in active_plans
+                )
+                if details:
+                    health_rows.append(f"{minor.given_names} {minor.family_names}\n" + "\n".join(details))
+            health_text = "\n\n".join(health_rows) if health_rows else (
+                "No hay enfermedades o tratamientos activos registrados para los menores que se encuentran actualmente en el centro."
+            )
+        self.health_summary.setPlainText(health_text)
         self.table.setRowCount(len(rows))
         for i, values in enumerate(rows):
-            display = [values[0].astimezone().strftime("%d/%m %H:%M"), *values[1:5]]
+            display = [values[0].astimezone().strftime("%d/%m %H:%M"), *values[1:4]]
             for j, value in enumerate(display):
                 item = QTableWidgetItem(str(value))
                 if j == 0:
-                    item.setData(Qt.ItemDataRole.UserRole, values[5])
+                    item.setData(Qt.ItemDataRole.UserRole, values[4])
                 self.table.setItem(i, j, item)
         self.content.setReadOnly(is_closed)
         self.add_button.setEnabled(not is_closed)
-        self.incident_button.setEnabled(not is_closed)
         self.close_button.setEnabled(not is_closed)
         self.revise_button.setEnabled(bool(rows))
         self.day_state.setText("DIARIO CERRADO · Solo consulta" if is_closed else "DIARIO ABIERTO · Se pueden registrar anotaciones e incidencias")
