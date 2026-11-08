@@ -1079,26 +1079,34 @@ class MainWindow(QMainWindow):
 
         if factory is not None and account_id is not None:
             daily = QWidget()
-            tabs.addTab(daily, "Día a día")
+            tabs.addTab(daily, "Parte diario")
             add_actions(daily, [
-                ("Expedientes y estancias", "Consulta residentes, situación actual e historial de estancias.", lambda: ExpedientesDialog(factory, account_id).exec()),
-                ("Diario e incidencias", "Registra el trabajo del turno y realiza seguimiento de incidencias.", lambda: DiaryDialog(factory, account_id).exec()),
-                ("Agenda común y tareas", "Organiza tareas, citas, actividades y responsables.", lambda: AgendaDialog(factory, account_id).exec()),
-                ("Comunicaciones internas", "Comparte información entre profesionales con aportaciones trazables.", lambda: CommunicationsDialog(factory, account_id).exec()),
+                ("Abrir parte diario", "Registra las actividades, comportamientos, salud y observaciones del día.", lambda: DiaryDialog(factory, account_id).exec()),
+            ], columns=1)
+
+            minors_page = QWidget()
+            tabs.addTab(minors_page, "Menores")
+            add_actions(minors_page, [
+                ("Expedientes", "Consulta menores, estancias e historial personal.", lambda: ExpedientesDialog(factory, account_id).exec()),
+                ("Seguimiento educativo", "Consulta y registra la evolución educativa y escolar.", lambda: EducationDialog(factory, account_id).exec()),
+                ("Ficha sanitaria y medicación", "Consulta información sanitaria, tratamientos y medicación.", lambda: open_health_dialog()),
+                ("Salidas", "Registra salidas y controla los retornos.", lambda: OutingsDialog(factory, account_id).exec()),
+                ("Autorizaciones", "Consulta y gestiona autorizaciones y consentimientos.", lambda: AuthorizationsDialog(factory, account_id).exec()),
             ])
 
-            management = QWidget()
-            tabs.addTab(management, "Gestión y consultas")
-            add_actions(management, [
-                ("Calendario", "Consulta fechas relevantes y planificación del centro.", lambda: CalendarDialog(factory, account_id).exec()),
-                ("Documentación personal", "Gestiona documentos vinculados a los expedientes.", lambda: DocumentsDialog(factory, account_id, paths).exec()),
-                ("Autorizaciones", "Registra y consulta autorizaciones y consentimientos.", lambda: AuthorizationsDialog(factory, account_id).exec()),
-                ("Salidas", "Controla salidas, retornos y situaciones en curso.", lambda: OutingsDialog(factory, account_id).exec()),
-                ("Seguimiento educativo y escolaridad", "Registra objetivos, evolución y coordinación escolar.", lambda: EducationDialog(factory, account_id).exec()),
-                ("Ficha sanitaria y medicación", "Consulta información sanitaria y pautas de medicación.", lambda: open_health_dialog()),
-                ("Informes externos", "Prepara y consulta documentación e informes externos.", lambda: ExternalReportsDialog(factory, account_id).exec()),
+            documents_page = QWidget()
+            tabs.addTab(documents_page, "Documentación")
+            add_actions(documents_page, [
+                ("Documentos de menores", "Añade y consulta documentación vinculada a cada expediente.", lambda: DocumentsDialog(factory, account_id, paths).exec()),
+                ("Informes externos", "Prepara y consulta informes y documentación para organismos externos.", lambda: ExternalReportsDialog(factory, account_id).exec()),
             ])
 
+            calendar_page = QWidget()
+            tabs.addTab(calendar_page, "Calendario")
+            add_actions(calendar_page, [
+                ("Calendario y agenda común", "Consulta citas, actividades, tareas y fechas relevantes por día, semana, mes o año.", lambda: CalendarDialog(factory, account_id).exec()),
+                ("Organizar tareas", "Añade tareas, citas y actividades para todo el equipo.", lambda: AgendaDialog(factory, account_id).exec()),
+            ])
         if role is Role.ADMIN and factory is not None and account_id is not None:
             administration = QWidget()
             tabs.addTab(administration, "Administración")
@@ -1113,11 +1121,13 @@ class MainWindow(QMainWindow):
         # para el contenido del apartado seleccionado.
         sidebar_items = [
             ("Inicio", 0),
-            ("Día a día", 1),
-            ("Gestión y consultas", 2),
+            ("Parte diario", 1),
+            ("Menores", 2),
+            ("Documentación", 3),
+            ("Calendario", 4),
         ]
-        if role is Role.ADMIN and tabs.count() > 3:
-            sidebar_items.append(("Administración", 3))
+        if role is Role.ADMIN and tabs.count() > 5:
+            sidebar_items.append(("Administración", 5))
         for label, page_index in sidebar_items:
             nav_button = QPushButton(label)
             nav_button.setObjectName("navigationButton")
