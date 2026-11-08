@@ -648,9 +648,10 @@ class DocumentsDialog(QDialog):
         "Familiar": "family", "Otros": "other",
     }
 
-    def __init__(self, factory, actor_id: str, paths) -> None:
+    def __init__(self, factory, actor_id: str, paths, minor_id: str | None = None) -> None:
         super().__init__()
         self.factory, self.actor_id, self.paths = factory, actor_id, paths
+        self.minor_id = minor_id
         self.setWindowTitle("Documentación personal")
         self.resize(900, 540)
         layout = QVBoxLayout(self)
@@ -658,6 +659,8 @@ class DocumentsDialog(QDialog):
         self.stay = QComboBox()
         with session_scope(factory) as session:
             stays = list_document_stays(session, actor_account_id=actor_id)
+            if minor_id is not None:
+                stays = [stay for stay in stays if stay.minor_id == minor_id]
             values = [(s.id, f"{(s.minor.nif_nie or s.minor.passport_number or 'Sin NIF/NIE')} · {s.minor.given_names} {s.minor.family_names} · {s.started_on.strftime('%d/%m/%Y')} · {'Activa' if s.status == 'active' else 'Cerrada'}") for s in stays]
         for stay_id, label in values:
             self.stay.addItem(label, stay_id)
@@ -1095,7 +1098,7 @@ class MainWindow(QMainWindow):
             minors_page = QWidget()
             tabs.addTab(minors_page, "Menores")
             add_actions(minors_page, [
-                ("Expedientes", "Consulta menores, estancias e historial personal.", lambda: ExpedientesDialog(factory, account_id).exec()),
+                ("Expedientes", "Consulta menores, estancias e historial personal.", lambda: ExpedientesDialog(factory, account_id, documents_opener=lambda minor_id: DocumentsDialog(factory, account_id, paths, minor_id=minor_id).exec()).exec()),
                 ("Seguimiento educativo", "Consulta y registra la evolución educativa y escolar.", lambda: EducationDialog(factory, account_id).exec()),
                 ("Ficha sanitaria y medicación", "Consulta información sanitaria, tratamientos y medicación.", lambda: open_health_dialog()),
                 ("Salidas", "Registra salidas y controla los retornos.", lambda: OutingsDialog(factory, account_id).exec()),
