@@ -3,6 +3,7 @@
 from PySide6.QtWidgets import QApplication, QPushButton, QTabWidget
 
 from gestion_centro.app import MainWindow, CredentialsDialog
+from gestion_centro.expedientes_ui import MinorWorkspaceDialog
 from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -11,7 +12,8 @@ from gestion_centro.persistence.base import Base
 from gestion_centro.auth.models import Professional, UserAccount
 from gestion_centro.domain.models import Minor, Stay
 from gestion_centro.domain.documents import Outing, OutingStay
-from gestion_centro.auth.service import Role
+from gestion_centro.auth.service import Role, create_professional_account
+from gestion_centro.domain.service import create_minor, open_stay
 
 
 # Mantener viva la envoltura Python de QApplication durante toda la suite.
@@ -142,6 +144,38 @@ def test_main_window_exposes_logout_action():
         assert window.logout_requested is True
     finally:
         window.close()
+
+
+def test_resident_workspace_includes_documents_tab_and_opener():
+    _application()
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory() as session:
+        actor = create_professional_account(
+            session, display_name="Educador ficticio", username="workspace-test",
+            password="contraseña de prueba segura", role=Role.EDUCATOR,
+        )
+        minor = create_minor(
+            session, actor_account_id=actor.id, given_names="Caso", family_names="Ficticio",
+        )
+        open_stay(session, actor_account_id=actor.id, minor_id=minor.id, started_on=date.today())
+        actor_id, minor_id = actor.id, minor.id
+        session.commit()
+
+    opened = []
+    dialog = MinorWorkspaceDialog(
+        factory, actor_id, minor_id, documents_opener=lambda selected: opened.append(selected),
+    )
+    try:
+        labels = [dialog.tabs.tabText(i) for i in range(dialog.tabs.count())]
+        assert "Documentación" in labels
+        assert dialog.documents_table.columnCount() == 5
+        dialog.open_documents()
+        assert opened == [minor_id]
+    finally:
+        dialog.close()
+        engine.dispose()
 
 
 def test_dashboard_counts_residents_outside_and_overdue_returns():
