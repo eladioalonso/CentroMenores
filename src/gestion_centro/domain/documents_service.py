@@ -155,7 +155,7 @@ def record_authorization(session: Session, *, actor_account_id: str, stay_id: st
 
 def check_authorization(session: Session, *, actor_account_id: str, stay_id: str,
                         authorization_type: str, on_date: date, required_scope: str | None = None):
-    actor = _actor(session, actor_account_id, health=(authorization_type == "medical"))
+    actor = _actor(session, actor_account_id)
     query = select(Authorization).where(
         Authorization.stay_id == stay_id, Authorization.authorization_type == authorization_type,
         Authorization.status == "valid", Authorization.valid_from <= on_date)
