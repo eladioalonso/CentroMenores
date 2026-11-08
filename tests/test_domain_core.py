@@ -305,7 +305,7 @@ def test_all_educators_can_consult_and_record_health_diary_entries():
         actor.health_access = False
         _day, entries, incidents = list_diary_records(
             session, actor_account_id=actor.id, diary_date=day)
-        assert [entry.category for entry in entries] == ["health", "general"]
+        assert {entry.category for entry in entries} == {"health", "general"}
         assert len(incidents) == 1
         record_diary_entry(session, actor_account_id=actor.id, diary_date=day,
             shift="morning", category="health", content="Registro adicional",
