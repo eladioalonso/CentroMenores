@@ -16,23 +16,23 @@ def make_session():
     return Session(engine)
 
 
-def test_minor_has_unique_code_and_only_one_active_stay():
+def test_minor_has_unique_nif_nie_and_only_one_active_stay():
     with make_session() as session:
         actor = create_professional_account(session, display_name="Prueba", username="p1", password="contraseña de prueba segura", role=Role.EDUCATOR)
         session.flush()
-        minor = create_minor(session, actor_account_id=actor.id, internal_code="MC-2026-0001", given_names="Caso", family_names="Ficticio")
+        minor = create_minor(session, actor_account_id=actor.id, nif_nie="X0000001A", given_names="Caso", family_names="Ficticio")
         open_stay(session, actor_account_id=actor.id, minor_id=minor.id, started_on=date(2026, 1, 1))
         with pytest.raises(ValueError, match="estancia activa"):
             open_stay(session, actor_account_id=actor.id, minor_id=minor.id, started_on=date(2026, 2, 1))
         with pytest.raises(ValueError, match="ya existe"):
-            create_minor(session, actor_account_id=actor.id, internal_code="mc-2026-0001", given_names="Otro", family_names="Caso")
+            create_minor(session, actor_account_id=actor.id, nif_nie="x0000001a", given_names="Otro", family_names="Caso")
 
 
 def test_reentry_creates_new_stay_and_history_is_preserved():
     with make_session() as session:
         actor = create_professional_account(session, display_name="Prueba", username="p2", password="contraseña de prueba segura", role=Role.EDUCATOR)
         session.flush()
-        minor = create_minor(session, actor_account_id=actor.id, internal_code="MC-2026-0002", given_names="Caso", family_names="Ficticio")
+        minor = create_minor(session, actor_account_id=actor.id, nif_nie="X0000002B", given_names="Caso", family_names="Ficticio")
         first = open_stay(session, actor_account_id=actor.id, minor_id=minor.id, started_on=date(2026, 1, 1))
         close_stay(session, actor_account_id=actor.id, stay_id=first.id, ended_on=date(2026, 1, 5), reason="Fin de estancia ficticia")
         second = open_stay(session, actor_account_id=actor.id, minor_id=minor.id, started_on=date(2026, 3, 1))
@@ -44,8 +44,8 @@ def test_shared_event_is_one_record_with_multiple_minor_links_and_snapshots():
     with make_session() as session:
         account = create_professional_account(session, display_name="Profesional de prueba",
             username="educador", password="contraseña de prueba segura", role=Role.EDUCATOR)
-        first = create_minor(session, actor_account_id=account.id, internal_code="MC-2026-0003", given_names="Caso Uno", family_names="Ficticio")
-        second = create_minor(session, actor_account_id=account.id, internal_code="MC-2026-0004", given_names="Caso Dos", family_names="Ficticio")
+        first = create_minor(session, actor_account_id=account.id, nif_nie="X0000003C", given_names="Caso Uno", family_names="Ficticio")
+        second = create_minor(session, actor_account_id=account.id, nif_nie="X0000004D", given_names="Caso Dos", family_names="Ficticio")
         stay1 = open_stay(session, actor_account_id=account.id, minor_id=first.id, started_on=date(2026, 1, 1))
         stay2 = open_stay(session, actor_account_id=account.id, minor_id=second.id, started_on=date(2026, 1, 1))
         event = record_event(session, author_account_id=account.id, title="Actividad grupal",
@@ -54,7 +54,7 @@ def test_shared_event_is_one_record_with_multiple_minor_links_and_snapshots():
         assert session.scalar(select(Event.id).where(Event.id == event.id)) == event.id
         links = session.scalars(select(EventStayLink).where(EventStayLink.event_id == event.id)).all()
         assert len(links) == 2
-        assert {link.minor_code_snapshot for link in links} == {"MC-2026-0003", "MC-2026-0004"}
+        assert {link.minor_code_snapshot for link in links} == {"X0000003C", "X0000004D"}
 
 
 def test_event_requires_active_author_and_valid_stays():
@@ -94,7 +94,7 @@ def test_incident_participants_have_roles_and_auditable_closure_reopening():
     with make_session() as session:
         actor = create_professional_account(session, display_name="Prueba", username="incident", password="contraseña de prueba segura", role=Role.EDUCATOR)
         session.flush()
-        minor = create_minor(session, actor_account_id=actor.id, internal_code="MC-2026-0099", given_names="Caso", family_names="Ficticio")
+        minor = create_minor(session, actor_account_id=actor.id, nif_nie="X0000099Z", given_names="Caso", family_names="Ficticio")
         stay = open_stay(session, actor_account_id=actor.id, minor_id=minor.id, started_on=date(2026, 1, 1))
         happened = datetime(2026, 4, 1, 10, tzinfo=timezone.utc)
         incident = record_incident(session, actor_account_id=actor.id, diary_date=date(2026, 4, 1),
@@ -229,7 +229,7 @@ def test_create_minor_persists_optional_personal_and_health_details():
             username="complete-file", password="contraseña de prueba segura", role=Role.EDUCATOR)
         actor.health_access = True
         minor = create_minor(
-            session, actor_account_id=actor.id, internal_code="MC-2026-0099",
+            session, actor_account_id=actor.id, nif_nie="X0000099Z",
             given_names="Caso", family_names="Ficticio",
             birth_country="España", locality="Lorca", nationality="Española",
             birth_date=date(2010, 5, 20), nif_nie="X1234567A",
@@ -256,11 +256,11 @@ def test_minor_rejects_future_birth_date_and_invalid_email():
         actor = create_professional_account(session, display_name="Prueba",
             username="invalid-file", password="contraseña de prueba segura", role=Role.EDUCATOR)
         with pytest.raises(ValueError, match="nacimiento"):
-            create_minor(session, actor_account_id=actor.id, internal_code="MC-2026-0100",
+            create_minor(session, actor_account_id=actor.id, nif_nie="X0000100A",
                 given_names="Caso", family_names="Ficticio",
                 birth_date=date.today().replace(year=date.today().year + 1))
         with pytest.raises(ValueError, match="correo"):
-            create_minor(session, actor_account_id=actor.id, internal_code="MC-2026-0101",
+            create_minor(session, actor_account_id=actor.id, nif_nie="X0000101B",
                 given_names="Caso", family_names="Ficticio", email="correo-invalido")
 
 
