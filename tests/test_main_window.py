@@ -109,6 +109,7 @@ def test_first_admin_setup_ignores_preseeded_demo_accounts():
         available_accounts=[("educador", "educador")],
     )
     try:
+        dialog.show()
         assert dialog.account_selector.count() == 0
         assert not dialog.username.isReadOnly()
         assert dialog.name.isVisible()
