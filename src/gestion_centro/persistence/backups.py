@@ -33,7 +33,7 @@ def _sha256(path: Path) -> str:
 
 
 def _safe_archive_name(name: str) -> bool:
-    if not isinstance(name, str) or not name or "\\x00" in name or "\\\\" in name or ":" in name:
+    if not isinstance(name, str) or not name or "\x00" in name or "\\" in name or ":" in name:
         return False
     if any(part in {"", ".", ".."} for part in name.split("/")):
         return False
