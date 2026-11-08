@@ -37,8 +37,9 @@ Marca cada punto como correcto, incorrecto o no probado. Anota el texto del erro
 - [ ] La aplicación abre con --demo y solicita crear el administrador inicial.
 - [ ] Se puede crear una cuenta profesional y entrar con ella.
 - [ ] Un usuario educador no ve las herramientas exclusivas de administración.
-- [ ] Una cuenta sin permiso sanitario no puede abrir la ficha ni consultar documentos sanitarios.
-- [ ] El administrador puede conceder y retirar el permiso sanitario, y la operación queda auditada.
+- [ ] La cuenta Educador puede consultar la ficha sanitaria y gestionar registros sanitarios de prueba.
+- [ ] Las consultas y operaciones sanitarias relevantes quedan registradas en auditoría.
+- [ ] La cuenta Educador no puede abrir las herramientas exclusivas de administración.
 - [ ] Cambiar la contraseña propia exige la contraseña actual y guarda el cambio.
 - [ ] Cerrar sesión devuelve a la pantalla de acceso.
 - [ ] El bloqueo por inactividad vuelve a pedir credenciales.
@@ -74,6 +75,8 @@ Marca cada punto como correcto, incorrecto o no probado. Anota el texto del erro
 - [ ] Comprobar que los registros históricos siguen consultables al cerrar una estancia.
 
 ### Salud y vacunación
+
+Los educadores activos tienen acceso al módulo sanitario. El antiguo campo técnico `health_access` se conserva por compatibilidad, pero ya no actúa como bloqueo de acceso.
 
 - [ ] Abrir la ficha sanitaria del expediente.
 - [ ] Registrar una pauta ficticia y sus horarios.
