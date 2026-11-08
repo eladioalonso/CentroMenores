@@ -19,7 +19,7 @@ def edu():
  with factory() as s:
   p=Professional(display_name="Educador"); s.add(p); s.flush()
   a=UserAccount(professional_id=p.id,username="edu",password_hash="x",role="educator"); s.add(a)
-  m=Minor(internal_code="MC-TEST-1",given_names="Caso",family_names="Ficticio"); s.add(m); s.flush()
+  m=Minor(given_names="Caso",family_names="Ficticio"); s.add(m); s.flush()
   stay=Stay(minor_id=m.id,sequence_number=1,started_on=date(2026,1,1),status="active"); s.add(stay); s.flush()
   yield s,a.id,stay.id
  engine.dispose()
