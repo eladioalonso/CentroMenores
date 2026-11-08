@@ -13,7 +13,7 @@ OUTING_KINDS = {"family", "activity", "school", "health", "administrative", "oth
 OUTING_STATUSES = {"planned", "in_progress", "returned", "cancelled"}
 
 
-def _actor(session: Session, account_id: str, *, health: bool = False) -> UserAccount:
+def _actor(session: Session, account_id: str) -> UserAccount:
     actor = session.get(UserAccount, account_id)
     if actor is None or not actor.active or not actor.professional.active:
         raise PermissionError("Se requiere una cuenta y un profesional activos")
@@ -38,7 +38,7 @@ def register_document(session: Session, *, actor_account_id: str, stay_id: str, 
                       size_bytes: int, sha256: str, document_date: date | None = None,
                       expires_on: date | None = None, notes: str | None = None,
                       supersedes_id: str | None = None):
-    actor = _actor(session, actor_account_id, health=(category == "health"))
+    actor = _actor(session, actor_account_id)
     stay = session.get(Stay, stay_id)
     if stay is None or stay.status != "active":
         raise ValueError("La estancia no existe o está cerrada")
@@ -114,14 +114,6 @@ def list_valid_authorizations(session: Session, *, actor_account_id: str, stay_i
         Authorization.stay_id == stay_id, Authorization.status == "valid",
         Authorization.valid_from <= day,
     ).where((Authorization.valid_until.is_(None)) | (Authorization.valid_until >= day))
-            Authorization.authorization_type != "medical",
-            or_(
-                Authorization.document_id.is_(None),
-                Authorization.document_id.not_in(
-                    select(PersonalDocument.id).where(PersonalDocument.category == "health")
-                ),
-            ),
-        )
     _audit(session, actor, "valid_authorizations_accessed", f"Estancia: {stay_id}; fecha: {day.isoformat()}")
     return session.scalars(query.order_by(Authorization.valid_from.desc())).all()
 
@@ -139,7 +131,7 @@ def record_authorization(session: Session, *, actor_account_id: str, stay_id: st
                          authorization_type: str, scope: str, issuer: str,
                          valid_from: date, valid_until: date | None = None,
                          conditions: str | None = None, document_id: str | None = None):
-    actor = _actor(session, actor_account_id, health=(authorization_type == "medical"))
+    actor = _actor(session, actor_account_id)
     stay = session.get(Stay, stay_id)
     if stay is None or stay.status != "active":
         raise ValueError("La estancia no existe o está cerrada")
@@ -178,11 +170,7 @@ def check_authorization(session: Session, *, actor_account_id: str, stay_id: str
 def set_authorization_status(session: Session, *, actor_account_id: str, authorization_id: str,
                              status: str, reason: str):
     authorization = session.get(Authorization, authorization_id)
-    linked_document = (session.get(PersonalDocument, authorization.document_id)
-        if authorization is not None and authorization.document_id else None)
-    actor = _actor(session, actor_account_id, health=bool(
-        authorization and (authorization.authorization_type == "medical"
-            or (linked_document and linked_document.category == "health"))))
+    actor = _actor(session, actor_account_id)
     if authorization is None or status not in {"valid", "revoked", "expired"}:
         raise ValueError("Autorización o estado no válido")
     if not reason.strip():
@@ -197,7 +185,7 @@ def create_outing(session: Session, *, actor_account_id: str, kind: str, destina
                   purpose: str, planned_departure: datetime, planned_return: datetime,
                   responsible_account_id: str, stay_ids: list[str],
                   authorization_ids: list[str] | None = None, restrictions_checked: bool = False):
-    actor = _actor(session, actor_account_id, health=(kind == "health"))
+    actor = _actor(session, actor_account_id)
     responsible = _actor(session, responsible_account_id)
     if kind not in OUTING_KINDS or not destination.strip() or not purpose.strip():
         raise ValueError("Tipo, destino y finalidad son obligatorios")
@@ -239,7 +227,7 @@ def create_outing(session: Session, *, actor_account_id: str, kind: str, destina
 def set_outing_status(session: Session, *, actor_account_id: str, outing_id: str,
                       status: str, actual_at: datetime | None = None):
     outing = session.get(Outing, outing_id)
-    actor = _actor(session, actor_account_id, health=bool(outing and outing.kind == "health"))
+    actor = _actor(session, actor_account_id)
     if outing is None or status not in OUTING_STATUSES:
         raise ValueError("Salida o estado no válido")
     allowed_transitions = {"planned": {"in_progress", "cancelled"},
