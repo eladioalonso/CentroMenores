@@ -148,7 +148,6 @@ def test_dashboard_counts_residents_outside_and_overdue_returns():
         stays = []
         for index in range(2):
             minor = Minor(
-                internal_code=f"MC-DASH-{index}",
                 given_names=f"Caso {index}", family_names="Ficticio",
             )
             session.add(minor)
