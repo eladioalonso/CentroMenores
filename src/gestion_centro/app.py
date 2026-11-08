@@ -39,7 +39,7 @@ from gestion_centro.domain.models import Stay
 from gestion_centro.domain.models import AgendaItem, Incident
 from gestion_centro.domain.documents import Outing, OutingStay
 from gestion_centro.domain.documents import PersonalDocument
-from gestion_centro.domain.documents_service import register_document, list_documents, list_active_stays
+from gestion_centro.domain.documents_service import register_document, list_documents, list_document_stays
 from gestion_centro.operations_ui import AuthorizationsDialog, OutingsDialog
 from gestion_centro.backups_ui import BackupDialog
 from gestion_centro.persistence.backups import create_backup
@@ -655,16 +655,12 @@ class DocumentsDialog(QDialog):
         form = QFormLayout()
         self.stay = QComboBox()
         with session_scope(factory) as session:
-            stays = list_active_stays(session, actor_account_id=actor_id)
-            values = [(s.id, f"{s.minor.internal_code} · {s.minor.given_names} {s.minor.family_names}") for s in stays]
+            stays = list_document_stays(session, actor_account_id=actor_id)
+            values = [(s.id, f"{s.minor.internal_code} · {s.minor.given_names} {s.minor.family_names} · {s.started_on.strftime('%d/%m/%Y')} · {'Activa' if s.status == 'active' else 'Cerrada'}") for s in stays]
         for stay_id, label in values:
             self.stay.addItem(label, stay_id)
         self.category = QComboBox()
-        with session_scope(factory) as session:
-            self.health_access = has_health_access(session, actor_account_id=actor_id)
         for label, key in self.CATEGORIES.items():
-            if key == "health" and not self.health_access:
-                continue
             self.category.addItem(label, key)
         self.title = QLineEdit()
         self.title.setMaxLength(180)
@@ -680,7 +676,7 @@ class DocumentsDialog(QDialog):
         self.selected_file: Path | None = None
         choose = QPushButton("Seleccionar archivo…")
         choose.clicked.connect(self.choose_file)
-        form.addRow("Estancia activa", self.stay)
+        form.addRow("Expediente / estancia", self.stay)
         form.addRow("Categoría", self.category)
         form.addRow("Título", self.title)
         form.addRow("Sustituye a (nueva versión)", self.supersedes)
