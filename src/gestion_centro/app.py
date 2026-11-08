@@ -1033,6 +1033,14 @@ class MainWindow(QMainWindow):
             dashboard_layout.addWidget(refresh_button)
             dashboard_layout.addStretch(1)
             refresh_dashboard()
+        else:
+            dashboard = QWidget()
+            tabs.addTab(dashboard, "Inicio")
+            dashboard_layout = QVBoxLayout(dashboard)
+            dashboard_layout.addWidget(QLabel(
+                "El resumen del turno y sus indicadores estarán disponibles al iniciar una sesión de trabajo."
+            ))
+            dashboard_layout.addStretch(1)
 
         def open_health_dialog():
             with session_scope(factory) as session:
