@@ -19,7 +19,7 @@ def test_aggregates_are_anonymous_and_audited(tmp_path):
             password_hash="hash-de-prueba", role="educator")
         session.add(account)
         session.flush()
-        minor = Minor(internal_code="MC-REPORT-TEST", given_names="Caso", family_names="Ficticio")
+        minor = Minor(given_names="Caso", family_names="Ficticio")
         session.add(minor)
         session.flush()
         stay = Stay(minor_id=minor.id, sequence_number=1, started_on=date(2026, 1, 2), status="active")
