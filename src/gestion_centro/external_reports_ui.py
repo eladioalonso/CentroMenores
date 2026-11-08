@@ -70,7 +70,7 @@ class ExternalReportsDialog(QDialog):
             stays = list_active_stays(session, actor_account_id=self.actor_id)
             for stay in stays:
                 self.stay.addItem(
-                    f"{stay.minor.internal_code} · {stay.minor.given_names} {stay.minor.family_names}",
+                    f"{(stay.minor.nif_nie or stay.minor.passport_number or 'Sin NIF/NIE')} · {stay.minor.given_names} {stay.minor.family_names}",
                     stay.id)
         self.stay.currentIndexChanged.connect(self.refresh_authorizations)
         self.refresh_authorizations()
