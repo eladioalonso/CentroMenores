@@ -31,7 +31,6 @@ class NewMinorDialog(QDialog):
 
         personal = QWidget()
         personal_form = QFormLayout(personal)
-        self.code = QLineEdit()
         self.given = QLineEdit()
         self.family = QLineEdit()
         self.birth_country = QLineEdit()
@@ -51,7 +50,7 @@ class NewMinorDialog(QDialog):
         self.address.setMinimumHeight(90)
         self.email = QLineEdit()
         for label, widget in [
-            ("Código interno *", self.code), ("Nombre(s) *", self.given),
+            ("Nombre(s) *", self.given),
             ("Apellidos *", self.family), ("País de nacimiento", self.birth_country),
             ("Localidad", self.locality), ("Nacionalidad", self.nationality),
             ("Fecha de nacimiento", self.birth_date), ("Edad (calculada)", self.age_label),
@@ -107,7 +106,7 @@ class NewMinorDialog(QDialog):
         birth = self.birth_date.date().toPython() if self.birth_date.date() > self.birth_date.minimumDate() else None
         expiry = self.card_expiry.date().toPython() if self.card_expiry.date() > self.card_expiry.minimumDate() else None
         return {
-            "internal_code": self.code.text(), "given_names": self.given.text(),
+            "given_names": self.given.text(),
             "family_names": self.family.text(), "birth_country": self.birth_country.text(),
             "locality": self.locality.text(), "nationality": self.nationality.text(),
             "birth_date": birth, "nif_nie": self.nif_nie.text(),
@@ -175,10 +174,10 @@ class MinorWorkspaceDialog(QDialog):
             if minor is None:
                 self.reject()
                 return
-            self.setWindowTitle('Expediente · ' + minor.internal_code + ' · ' + minor.given_names + ' ' + minor.family_names)
+            self.setWindowTitle('Expediente · ' + (minor.nif_nie or minor.passport_number or 'Sin NIF/NIE') + ' · ' + minor.given_names + ' ' + minor.family_names)
             while self.personal_form.rowCount():
                 self.personal_form.removeRow(0)
-            fields = [('Código', minor.internal_code), ('Nombre', minor.given_names), ('Apellidos', minor.family_names), ('País de nacimiento', minor.birth_country), ('Localidad', minor.locality), ('Nacionalidad', minor.nationality), ('Fecha nacimiento', str(minor.birth_date or '—')), ('Edad', str(minor.age) if minor.age is not None else '—'), ('NIF/NIE', minor.nif_nie), ('Pasaporte', minor.passport_number), ('Dirección', minor.address), ('Email', minor.email)]
+            fields = [('NIF/NIE', minor.nif_nie), ('Nombre', minor.given_names), ('Apellidos', minor.family_names), ('País de nacimiento', minor.birth_country), ('Localidad', minor.locality), ('Nacionalidad', minor.nationality), ('Fecha nacimiento', str(minor.birth_date or '—')), ('Edad', str(minor.age) if minor.age is not None else '—'), ('NIF/NIE', minor.nif_nie), ('Pasaporte', minor.passport_number), ('Dirección', minor.address), ('Email', minor.email)]
             for label, value in fields:
                 self.personal_form.addRow(label, QLabel(value or '—'))
             while self.health_form.rowCount():
@@ -436,7 +435,7 @@ class ExpedientesDialog(QDialog):
         filters = QHBoxLayout()
         self.search = QLineEdit()
         self.search.setClearButtonEnabled(True)
-        self.search.setPlaceholderText("Buscar por código o nombre…")
+        self.search.setPlaceholderText("Buscar por NIF/NIE, nombre o pasaporte…")
         self.search.textChanged.connect(self.refresh)
         filters.addWidget(self.search, 2)
         self.status_filter = QComboBox()
@@ -457,7 +456,7 @@ class ExpedientesDialog(QDialog):
         self.summary.setStyleSheet("color: #53677D; padding: 2px 1px 6px 1px;")
         layout.addWidget(self.summary)
         self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Código", "Nombre", "Estado expediente", "Estancia", "Ingreso"])
+        self.table.setHorizontalHeaderLabels(["NIF/NIE", "Nombre", "Estado expediente", "Estancia", "Ingreso"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -490,7 +489,7 @@ class ExpedientesDialog(QDialog):
         minor_status = self.status_filter.currentData()
         stay_status = self.stay_filter.currentData()
         with session_scope(self.factory) as session:
-            minors = session.scalars(select(Minor).order_by(Minor.internal_code)).all()
+            minors = session.scalars(select(Minor).order_by(Minor.family_names, Minor.given_names)).all()
             rows = []
             for minor in minors:
                 if minor_status == "active" and not minor.active:
@@ -498,7 +497,7 @@ class ExpedientesDialog(QDialog):
                 if minor_status == "inactive" and minor.active:
                     continue
                 name = f"{minor.given_names} {minor.family_names}"
-                if term and term not in minor.internal_code.casefold() and term not in name.casefold():
+                if term and term not in (minor.nif_nie or "").casefold() and term not in (minor.passport_number or "").casefold() and term not in name.casefold():
                     continue
                 stays = sorted(minor.stays, key=lambda x: x.sequence_number, reverse=True)
                 if stay_status == "none":
@@ -510,7 +509,7 @@ class ExpedientesDialog(QDialog):
                 else:
                     selected_stays = stays if stays else [None]
                 for stay in selected_stays:
-                    rows.append((minor.id, stay.id if stay else None, minor.internal_code,
+                    rows.append((minor.id, stay.id if stay else None, minor.nif_nie or "—",
                         name, "Activo" if minor.active else "Inactivo",
                         ("Activa" if stay.status == "active" else "Cerrada") if stay else "Sin ingresos",
                         stay.started_on.strftime("%d/%m/%Y") if stay else "—"))
@@ -536,8 +535,8 @@ class ExpedientesDialog(QDialog):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         values = dialog.values()
-        if not values["internal_code"].strip() or not values["given_names"].strip() or not values["family_names"].strip():
-            QMessageBox.warning(self, "Datos incompletos", "Código interno, nombre y apellidos son obligatorios.")
+        if not values["given_names"].strip() or not values["family_names"].strip():
+            QMessageBox.warning(self, "Datos incompletos", "El nombre y los apellidos son obligatorios.")
             return
         open_now = QMessageBox.question(self, "Primer ingreso",
             "¿Registrar también una estancia activa desde hoy?",
