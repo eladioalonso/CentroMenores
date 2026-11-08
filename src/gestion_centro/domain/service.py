@@ -301,7 +301,7 @@ def record_diary_entry(
     for stay in stays:
         minor = stay.minor
         session.add(DiaryEntryStayLink(
-            entry_id=entry.id, stay_id=stay.id, minor_code_snapshot=minor.internal_code,
+            entry_id=entry.id, stay_id=stay.id, minor_code_snapshot=(minor.nif_nie or minor.passport_number or ""),
             minor_name_snapshot=f"{minor.given_names} {minor.family_names}",
         ))
     _audit(session, actor, "diary_entry_recorded", f"Anotación: {entry.id}")
@@ -435,7 +435,7 @@ def record_incident(
         minor = stay.minor
         session.add(IncidentParticipant(
             incident_id=incident.id, stay_id=stay.id, role=role,
-            factual_note=factual_note, minor_code_snapshot=minor.internal_code,
+            factual_note=factual_note, minor_code_snapshot=(minor.nif_nie or minor.passport_number or ""),
             minor_name_snapshot=f"{minor.given_names} {minor.family_names}",
         ))
     _audit(session, actor, "incident_recorded", f"Incidencia: {incident.id}")
@@ -540,7 +540,7 @@ def create_agenda_item(
         minor = stay.minor
         session.add(AgendaItemStayLink(
             agenda_item_id=item.id, stay_id=stay.id,
-            minor_code_snapshot=minor.internal_code,
+            minor_code_snapshot=(minor.nif_nie or minor.passport_number or ""),
             minor_name_snapshot=f"{minor.given_names} {minor.family_names}",
         ))
     _audit(session, actor, "agenda_item_created", f"Elemento: {item.id}; tipo: {kind}")
