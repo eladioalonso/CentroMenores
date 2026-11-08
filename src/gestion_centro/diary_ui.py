@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QHeaderView, QMessageBox, QInputDialog, QListWidget, QListWidgetItem,
     QDialogButtonBox, QLabel,
 )
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import DiaryDay, DiaryEntry, Incident, Stay
@@ -78,7 +78,7 @@ class DiaryDialog(QDialog):
         form.addRow("Personas vinculadas", self.participant_hint)
         form.addRow("", select_stays)
         layout.addLayout(form)
-        layout.addWidget(QLabel("Enfermedades y tratamientos · información vinculada a las fichas sanitarias"))
+        layout.addWidget(QLabel("Enfermedades y tratamientos · consulta de expedientes presentes en la fecha seleccionada"))
         self.health_summary = QTextEdit()
         self.health_summary.setReadOnly(True)
         self.health_summary.setMaximumHeight(145)
@@ -254,7 +254,13 @@ class DiaryDialog(QDialog):
             rows.sort(key=lambda x: x[0])
             is_closed = bool(day and day.closed_at)
             health_rows = []
-            for stay in list_active_stays(session, actor_account_id=self.actor_id):
+            health_stays = session.scalars(
+                select(Stay).where(
+                    Stay.started_on <= selected,
+                    or_(Stay.ended_on.is_(None), Stay.ended_on >= selected),
+                ).order_by(Stay.started_on, Stay.id)
+            ).all()
+            for stay in health_stays:
                 minor = stay.minor
                 profile = read_health_profile(session, actor_account_id=self.actor_id, minor_id=minor.id)
                 plans = list_medication_plans(session, actor_account_id=self.actor_id, minor_id=minor.id)
