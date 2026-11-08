@@ -229,7 +229,7 @@ def test_create_minor_persists_optional_personal_and_health_details():
             username="complete-file", password="contraseña de prueba segura", role=Role.EDUCATOR)
         actor.health_access = True
         minor = create_minor(
-            session, actor_account_id=actor.id, nif_nie="X0000099Z",
+            session, actor_account_id=actor.id,
             given_names="Caso", family_names="Ficticio",
             birth_country="España", locality="Lorca", nationality="Española",
             birth_date=date(2010, 5, 20), nif_nie="X1234567A",
