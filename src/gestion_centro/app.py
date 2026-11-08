@@ -656,7 +656,7 @@ class DocumentsDialog(QDialog):
         self.stay = QComboBox()
         with session_scope(factory) as session:
             stays = list_document_stays(session, actor_account_id=actor_id)
-            values = [(s.id, f"{s.minor.internal_code} · {s.minor.given_names} {s.minor.family_names} · {s.started_on.strftime('%d/%m/%Y')} · {'Activa' if s.status == 'active' else 'Cerrada'}") for s in stays]
+            values = [(s.id, f"{(s.minor.nif_nie or s.minor.passport_number or "Sin NIF/NIE")} · {s.minor.given_names} {s.minor.family_names} · {s.started_on.strftime('%d/%m/%Y')} · {'Activa' if s.status == 'active' else 'Cerrada'}") for s in stays]
         for stay_id, label in values:
             self.stay.addItem(label, stay_id)
         self.category = QComboBox()
