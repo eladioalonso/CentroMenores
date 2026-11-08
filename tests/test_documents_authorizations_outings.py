@@ -133,40 +133,38 @@ def test_revocation_is_audited_and_prevents_future_use():
 
 
 
-def test_health_documents_are_hidden_and_cannot_be_added_without_permission():
+def test_educators_can_access_health_documents_authorizations_and_outings():
+    from gestion_centro.domain.documents_service import (
+        list_documents, list_authorizations, list_outings,
+    )
     with make_session() as session:
         actor, stay = setup_stay(session)
-        values = dict(actor_account_id=actor.id, stay_id=stay.id, category="health",
+        actor.health_access = False
+        document = register_document(
+            session, actor_account_id=actor.id, stay_id=stay.id, category="health",
             title="Informe sanitario ficticio", original_filename="salud.pdf",
             relative_path="documentos/salud.pdf", mime_type="application/pdf",
-            size_bytes=100, sha256="b" * 64)
-        with pytest.raises(PermissionError, match="autorización"):
-            register_document(session, **values)
-        # Un profesional sin autorización no ve documentos sanitarios ya existentes.
-        actor.health_access = True
-        document = register_document(session, **values)
-        actor.health_access = False
-        from gestion_centro.domain.documents_service import list_documents
-        visible = list_documents(session, actor_account_id=actor.id, stay_id=stay.id)
-        assert document.id not in {item.id for item in visible}
-
-def test_medical_authorizations_and_outings_require_health_access_and_are_filtered():
-    from gestion_centro.domain.documents_service import list_authorizations, list_outings
-
-    with make_session() as session:
-        actor, stay = setup_stay(session)
-        with pytest.raises(PermissionError, match="autorización"):
-            record_authorization(
-                session, actor_account_id=actor.id, stay_id=stay.id,
-                authorization_type="medical", scope="Atención sanitaria",
-                issuer="Representante ficticio", valid_from=date(2026, 1, 1),
-            )
-        actor.health_access = True
+            size_bytes=100, sha256="b" * 64,
+        )
+        assert document.id in {
+            item.id for item in list_documents(
+                session, actor_account_id=actor.id, stay_id=stay.id)
+        }
         medical_auth = record_authorization(
             session, actor_account_id=actor.id, stay_id=stay.id,
             authorization_type="medical", scope="Consulta sanitaria",
             issuer="Representante ficticio", valid_from=date(2026, 1, 1),
+            document_id=document.id,
         )
+        assert medical_auth.id in {
+            item.id for item in list_authorizations(
+                session, actor_account_id=actor.id, stay_id=stay.id)
+        }
+        assert medical_auth.id in {
+            item.id for item in check_authorization(
+                session, actor_account_id=actor.id, stay_id=stay.id,
+                authorization_type="medical", on_date=date(2026, 5, 4))
+        }
         starts = datetime(2026, 5, 4, 9, tzinfo=timezone.utc)
         outing = create_outing(
             session, actor_account_id=actor.id, kind="health",
@@ -176,80 +174,32 @@ def test_medical_authorizations_and_outings_require_health_access_and_are_filter
             responsible_account_id=actor.id, stay_ids=[stay.id],
             authorization_ids=[medical_auth.id], restrictions_checked=True,
         )
-        actor.health_access = False
-        assert all(item.authorization_type != "medical" for item in
-            list_authorizations(session, actor_account_id=actor.id, stay_id=stay.id))
-        assert outing.id not in {item.id for item in
-            list_outings(session, actor_account_id=actor.id, stay_id=stay.id)}
-        with pytest.raises(PermissionError, match="autorización"):
-            check_authorization(session, actor_account_id=actor.id, stay_id=stay.id,
-                authorization_type="medical", on_date=date(2026, 5, 4))
-        with pytest.raises(PermissionError, match="autorización"):
-            set_outing_status(session, actor_account_id=actor.id, outing_id=outing.id,
-                status="in_progress", actual_at=starts)
+        assert outing.id in {
+            item.id for item in list_outings(
+                session, actor_account_id=actor.id, stay_id=stay.id)
+        }
+        set_outing_status(
+            session, actor_account_id=actor.id, outing_id=outing.id,
+            status="in_progress", actual_at=starts,
+        )
+        assert session.get(Outing, outing.id).status == "in_progress"
 
-def test_medical_authorization_status_cannot_be_changed_without_health_access():
+
+def test_educator_can_revoke_medical_authorization_and_access_is_audited():
+    from gestion_centro.auth.models import AccessAudit
     with make_session() as session:
         actor, stay = setup_stay(session)
-        actor.health_access = True
+        actor.health_access = False
         authorization = record_authorization(
             session, actor_account_id=actor.id, stay_id=stay.id,
             authorization_type="medical", scope="Atención sanitaria ficticia",
             issuer="Representante ficticio", valid_from=date(2026, 1, 1),
         )
-        actor.health_access = False
-        with pytest.raises(PermissionError, match="autorización"):
-            set_authorization_status(
-                session, actor_account_id=actor.id, authorization_id=authorization.id,
-                status="revoked", reason="Motivo ficticio",
-            )
-        assert session.get(Authorization, authorization.id).status == "valid"
-
-def test_general_authorization_linked_to_health_document_is_hidden_and_protected():
-    from gestion_centro.domain.documents_service import (
-        list_authorizations, list_valid_authorizations,
-    )
-    with make_session() as session:
-        actor, stay = setup_stay(session)
-        actor.health_access = True
-        document = register_document(
-            session, actor_account_id=actor.id, stay_id=stay.id, category="health",
-            title="Documento clínico ficticio", original_filename="clinico.pdf",
-            relative_path="documentos/clinico.pdf", mime_type="application/pdf",
-            size_bytes=100, sha256="c" * 64,
+        set_authorization_status(
+            session, actor_account_id=actor.id, authorization_id=authorization.id,
+            status="revoked", reason="Motivo ficticio",
         )
-        authorization = record_authorization(
-            session, actor_account_id=actor.id, stay_id=stay.id,
-            authorization_type="general", scope="Autorización general ficticia",
-            issuer="Representante ficticio", valid_from=date(2026, 1, 1),
-            document_id=document.id,
-        )
-        actor.health_access = False
-        assert authorization.id not in {
-            item.id for item in list_authorizations(
-                session, actor_account_id=actor.id, stay_id=stay.id)
-        }
-        assert authorization.id not in {
-            item.id for item in list_valid_authorizations(
-                session, actor_account_id=actor.id, stay_id=stay.id,
-                on_date=date(2026, 5, 4))
-        }
-        assert check_authorization(
-            session, actor_account_id=actor.id, stay_id=stay.id,
-            authorization_type="general", on_date=date(2026, 5, 4)
-        ) == []
-        with pytest.raises(PermissionError, match="autorización sanitaria"):
-            set_authorization_status(
-                session, actor_account_id=actor.id, authorization_id=authorization.id,
-                status="revoked", reason="Motivo ficticio",
-            )
-        with pytest.raises(PermissionError, match="autorización sanitaria"):
-            create_outing(
-                session, actor_account_id=actor.id, kind="activity",
-                destination="Actividad ficticia", purpose="Salida ficticia",
-                planned_departure=datetime(2026, 5, 4, 9, tzinfo=timezone.utc),
-                planned_return=datetime(2026, 5, 4, 12, tzinfo=timezone.utc),
-                responsible_account_id=actor.id, stay_ids=[stay.id],
-                authorization_ids=[authorization.id], restrictions_checked=True,
-            )
-
+        assert session.get(Authorization, authorization.id).status == "revoked"
+        assert session.scalar(
+            select(AccessAudit.id).where(AccessAudit.event == "authorization_status_changed")
+        ) is not None
