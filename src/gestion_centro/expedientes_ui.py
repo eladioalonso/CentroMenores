@@ -119,9 +119,10 @@ class NewMinorDialog(QDialog):
 
 
 class MinorWorkspaceDialog(QDialog):
-    def __init__(self, factory, actor_id, minor_id, parent=None):
+    def __init__(self, factory, actor_id, minor_id, parent=None, documents_opener=None):
         super().__init__(parent)
         self.factory, self.actor_id, self.minor_id = factory, actor_id, minor_id
+        self.documents_opener = documents_opener
         with session_scope(factory) as session:
             self.health_access = has_health_access(session, actor_account_id=actor_id)
         self.resize(850, 600)
@@ -143,6 +144,16 @@ class MinorWorkspaceDialog(QDialog):
         self.events.setHorizontalHeaderLabels(['Fecha', 'Acontecimiento', 'Descripción', 'Autor'])
         self.events.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.tabs.addTab(self.events, 'Acontecimientos')
+        documents_tab = QWidget()
+        documents_layout = QVBoxLayout(documents_tab)
+        documents_info = QLabel('Los documentos se conservan vinculados a cada ingreso o reingreso. Puedes consultar el historial documental de todas las estancias desde aquí.')
+        documents_info.setWordWrap(True)
+        documents_layout.addWidget(documents_info)
+        documents_button = QPushButton('Añadir o consultar documentación')
+        documents_button.clicked.connect(self.open_documents)
+        documents_layout.addWidget(documents_button)
+        documents_layout.addStretch(1)
+        self.tabs.addTab(documents_tab, 'Documentación')
         actions = QHBoxLayout()
         for label, callback in [('Nuevo ingreso / reingreso', self.new_stay), ('Cerrar estancia', self.close_stay), ('Registrar acontecimiento', self.add_event), ('Historial completo', lambda: self.tabs.setCurrentWidget(self.events))]:
             button = QPushButton(label)
@@ -177,7 +188,7 @@ class MinorWorkspaceDialog(QDialog):
             self.setWindowTitle('Expediente · ' + (minor.nif_nie or minor.passport_number or 'Sin NIF/NIE') + ' · ' + minor.given_names + ' ' + minor.family_names)
             while self.personal_form.rowCount():
                 self.personal_form.removeRow(0)
-            fields = [('NIF/NIE', minor.nif_nie), ('Nombre', minor.given_names), ('Apellidos', minor.family_names), ('País de nacimiento', minor.birth_country), ('Localidad', minor.locality), ('Nacionalidad', minor.nationality), ('Fecha nacimiento', str(minor.birth_date or '—')), ('Edad', str(minor.age) if minor.age is not None else '—'), ('NIF/NIE', minor.nif_nie), ('Pasaporte', minor.passport_number), ('Dirección', minor.address), ('Email', minor.email)]
+            fields = [('Nombre', minor.given_names), ('Apellidos', minor.family_names), ('País de nacimiento', minor.birth_country), ('Localidad', minor.locality), ('Nacionalidad', minor.nationality), ('Fecha nacimiento', str(minor.birth_date or '—')), ('Edad', str(minor.age) if minor.age is not None else '—'), ('NIF/NIE', minor.nif_nie), ('Pasaporte', minor.passport_number), ('Dirección', minor.address), ('Email', minor.email)]
             for label, value in fields:
                 self.personal_form.addRow(label, QLabel(value or '—'))
             while self.health_form.rowCount():
@@ -308,6 +319,13 @@ class MinorWorkspaceDialog(QDialog):
             ))
             return stay
 
+    def open_documents(self):
+        if self.documents_opener is None:
+            QMessageBox.information(self, 'Documentación', 'Abre la sección Documentación para gestionar los archivos de este expediente.')
+            return
+        self.documents_opener(self.minor_id)
+        self.refresh()
+
     def open_health(self):
         # La ficha sanitaria pertenece al residente y puede consultarse aunque
         # no tenga una estancia activa. Las actuaciones de medicación mantienen
@@ -420,9 +438,10 @@ class MinorWorkspaceDialog(QDialog):
             QMessageBox.warning(self, 'No se pudo modificar', str(exc))
 
 class ExpedientesDialog(QDialog):
-    def __init__(self, factory, actor_id):
+    def __init__(self, factory, actor_id, documents_opener=None):
         super().__init__()
         self.factory, self.actor_id = factory, actor_id
+        self.documents_opener = documents_opener
         with session_scope(factory) as session:
             self.health_access = has_health_access(session, actor_account_id=actor_id)
         self.setWindowTitle("Expedientes y estancias")
@@ -481,7 +500,8 @@ class ExpedientesDialog(QDialog):
         if not minor_id:
             QMessageBox.information(self, 'Selecciona expediente', 'Selecciona primero un expediente.')
             return
-        MinorWorkspaceDialog(self.factory, self.actor_id, minor_id, self).exec()
+        MinorWorkspaceDialog(self.factory, self.actor_id, minor_id, self,
+                             documents_opener=self.documents_opener).exec()
         self.refresh()
 
     def refresh(self):
