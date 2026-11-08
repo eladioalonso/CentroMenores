@@ -72,21 +72,18 @@ Como regla general, el profesional que crea un registro podrá corregirlo direct
 - El administrador no tendrá que autorizar ni ejecutar las correcciones ordinarias del autor. La administración y supervisión se mantendrán separadas de la autoría.
 - Cada módulo concretará sus estados editables y excepciones. Para el diario se mantiene la regla específica: el autor corrige durante el periodo de apertura del turno, hasta un máximo absoluto de 48 horas; después se incorpora una rectificación vinculada.
 
-## 5. Protección reforzada del área sanitaria
+## 5. Acceso al área sanitaria: implementación vigente
 
-- El acceso estará limitado a usuarios expresamente autorizados mediante el permiso independiente «Acceso sanitario» de cada cuenta. El permiso está desactivado por defecto, también para administradores técnicos.
-- En esta versión, el permiso sanitario habilita conjuntamente la ficha sanitaria y la gestión de documentos sanitarios. La separación de consulta, modificación, adjuntos, exportación e impresión en permisos distintos queda pendiente.
-- Los documentos sanitarios heredarán restricciones equivalentes o más estrictas.
-- Los paneles, búsquedas e informes no mostrarán datos sanitarios a usuarios sin autorización.
-- La ficha del expediente ocultará los campos sanitarios (CIP, centro de salud, facultativos, caducidad e historial clínico), su edición y el acceso a ficha sanitaria y medicación cuando falte el permiso.
-- En el diario se filtrarán las anotaciones de categoría sanitaria y las incidencias de salud; su alta, rectificación y gestión también exigirán autorización.
-- Las citas de vacunación quedarán ocultas en agenda y calendario y no podrán crearse ni modificarse sin permiso sanitario.
-- Las autorizaciones médicas y las salidas sanitarias se filtrarán en las consultas y exigirán permiso para su gestión.
-- Los accesos y operaciones relevantes quedarán registrados.
-- No se incluirán datos sanitarios en notificaciones generales, mensajes de error ni registros técnicos.
+La decisión funcional más reciente permite que todos los educadores activos consulten la información sanitaria y registren las actuaciones que corresponden a su trabajo. No se exige una autorización sanitaria individual ni que el administrador habilite previamente a cada educador.
 
-La función técnica de concesión y retirada del permiso está implementada y auditada. La designación de las cuentas autorizadas y la validación de su alcance corresponde al centro y sigue pendiente de aprobación institucional.
+- La ficha sanitaria, la medicación y la vacunación están vinculadas al expediente del menor.
+- Las operaciones sanitarias relevantes y las consultas protegidas quedan registradas en auditoría.
+- Los datos sanitarios no deben duplicarse en el diario; este puede mostrar un resumen de tratamientos activos procedente de la ficha sanitaria.
+- El antiguo campo técnico `health_access` permanece en la base de datos por compatibilidad con versiones anteriores, pero no bloquea el acceso de los educadores activos.
+- El perfil Educador no obtiene por ello funciones de administración técnica, copias o restauración.
+- La autorización institucional, la minimización de datos, la revisión de roles y la aprobación de protección de datos siguen siendo requisitos previos a cualquier uso con información real.
 
+La separación de permisos por operación (consulta, alta, modificación, exportación e impresión) podrá definirse en una fase posterior si el centro la solicita y aprueba.
 ## 6. Identificación y sesión
 
 - Cada profesional tendrá una cuenta individual.
