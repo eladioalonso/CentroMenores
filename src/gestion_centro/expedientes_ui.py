@@ -11,6 +11,7 @@ from sqlalchemy import select
 
 from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import Minor, Stay, Event, EventStayLink, MinorPersonalDataVersion
+from gestion_centro.domain.documents_service import list_documents
 from gestion_centro.domain.service import (
     create_minor, open_stay, close_stay, record_event,
     has_health_access, audit_minor_health_access, HEALTH_PERSONAL_FIELDS,
@@ -149,6 +150,12 @@ class MinorWorkspaceDialog(QDialog):
         documents_info = QLabel('Los documentos se conservan vinculados a cada ingreso o reingreso. Puedes consultar el historial documental de todas las estancias desde aquí.')
         documents_info.setWordWrap(True)
         documents_layout.addWidget(documents_info)
+        self.documents_table = QTableWidget(0, 5)
+        self.documents_table.setHorizontalHeaderLabels(['Documento', 'Categoría', 'Archivo', 'Versión', 'Caducidad'])
+        self.documents_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.documents_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.documents_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        documents_layout.addWidget(self.documents_table)
         documents_button = QPushButton('Añadir o consultar documentación')
         documents_button.clicked.connect(self.open_documents)
         documents_layout.addWidget(documents_button)
@@ -206,6 +213,16 @@ class MinorWorkspaceDialog(QDialog):
                     display.setPlainText(value or '—')
                     self.health_form.addRow(label, display)
             stays = sorted(minor.stays, key=lambda item: item.sequence_number, reverse=True)
+            documents = []
+            for stay in stays:
+                documents.extend(list_documents(session, actor_account_id=self.actor_id, stay_id=stay.id))
+            documents.sort(key=lambda item: item.created_at, reverse=True)
+            self.documents_table.setRowCount(len(documents))
+            for row, document in enumerate(documents):
+                values = [document.title, document.category, document.original_filename,
+                          str(document.version), document.expires_on.strftime('%d/%m/%Y') if document.expires_on else '—']
+                for col, value in enumerate(values):
+                    self.documents_table.setItem(row, col, QTableWidgetItem(value))
             self.stays.setRowCount(len(stays))
             for row, stay in enumerate(stays):
                 vals = [str(stay.started_on), str(stay.ended_on or '—'), 'Activa' if stay.status == 'active' else 'Cerrada', stay.closure_reason or '—']
