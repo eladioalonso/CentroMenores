@@ -35,8 +35,6 @@ def create_minor(
         raise ValueError("La fecha de nacimiento no puede ser futura")
     if health_card_expires_on and health_card_expires_on < date(1900, 1, 1):
         raise ValueError("La fecha de caducidad de la tarjeta sanitaria no es válida")
-    if not actor.health_access and any((cip, health_center, physician, nurse, health_card_expires_on, clinical_history)):
-        raise PermissionError("Se requiere autorización sanitaria para registrar datos sanitarios")
     if email and ("@" not in email or email.strip().startswith("@") or email.strip().endswith("@")):
         raise ValueError("El correo electrónico no tiene un formato válido")
     minor = Minor(
@@ -105,8 +103,6 @@ def update_minor_personal_data(
     }
     for name, value in optional_health_values.items():
         if value is not _UNSET:
-            if not actor.health_access and getattr(minor, name) != value:
-                raise PermissionError("Se requiere autorización sanitaria para modificar datos sanitarios")
             values[name] = value
     changed = [name for name, value in values.items() if getattr(minor, name) != value]
     if not changed:
@@ -323,8 +319,6 @@ def revise_diary_entry(
     original = session.get(DiaryEntry, original_entry_id)
     if original is None:
         raise ValueError("La anotación original no existe")
-    if original.category == "health" and not actor.health_access:
-        raise PermissionError("Se requiere autorización sanitaria para consultar o corregir esta anotación")
     if original.author_account_id != actor.id:
         raise PermissionError("Solo puedes corregir tus propias anotaciones")
     day = session.get(DiaryDay, original.diary_day_id)
@@ -387,8 +381,6 @@ def correct_diary_entry(
     original = session.get(DiaryEntry, original_entry_id)
     if original is None:
         raise ValueError("La anotación original no existe")
-    if original.category == "health" and not actor.health_access:
-        raise PermissionError("Se requiere autorización sanitaria para rectificar esta anotación")
     if not content.strip() or not reason.strip():
         raise ValueError("La rectificación y su motivo son obligatorios")
     correction = DiaryEntry(
@@ -412,8 +404,6 @@ def record_incident(
     actor = _active_author(session, actor_account_id)
     if incident_type not in VALID_INCIDENT_TYPES or severity not in VALID_SEVERITIES:
         raise ValueError("Tipo o gravedad de incidencia no válidos")
-    if incident_type == "health" and not actor.health_access:
-        raise PermissionError("Se requiere autorización sanitaria para registrar incidencias de salud")
     if not title.strip() or not description.strip():
         raise ValueError("El título y la descripción son obligatorios")
     day = _get_or_create_diary_day(session, diary_date)
@@ -454,8 +444,6 @@ def close_incident(
     from gestion_centro.domain.models import Incident
     incident = session.get(Incident, incident_id)
     actor = _active_author(session, actor_account_id)
-    if incident is not None and incident.incident_type == "health" and not actor.health_access:
-        raise PermissionError("Se requiere autorización sanitaria para gestionar esta incidencia")
     if incident is None or incident.status != "open":
         raise ValueError("La incidencia no existe o no está abierta")
     if not note.strip():
@@ -473,8 +461,6 @@ def reopen_incident(
     from gestion_centro.domain.models import Incident
     incident = session.get(Incident, incident_id)
     actor = _active_author(session, actor_account_id)
-    if incident is not None and incident.incident_type == "health" and not actor.health_access:
-        raise PermissionError("Se requiere autorización sanitaria para gestionar esta incidencia")
     if incident is None or incident.status != "closed":
         raise ValueError("La incidencia no existe o no está cerrada")
     if not reason.strip():
@@ -497,9 +483,6 @@ def list_diary_records(session: Session, *, actor_account_id: str, diary_date: d
         return None, [], []
     entries_query = select(DiaryEntry).where(DiaryEntry.diary_day_id == day.id)
     incidents_query = select(Incident).where(Incident.diary_day_id == day.id)
-    if not actor.health_access:
-        entries_query = entries_query.where(DiaryEntry.category != "health")
-        incidents_query = incidents_query.where(Incident.incident_type != "health")
     entries = session.scalars(entries_query.order_by(DiaryEntry.happened_at)).all()
     incidents = session.scalars(incidents_query.order_by(Incident.happened_at)).all()
     _audit(session, actor, "diary_accessed", f"Fecha: {diary_date.isoformat()}")
@@ -520,8 +503,6 @@ def create_agenda_item(
     actor = _active_author(session, actor_account_id)
     if kind not in AGENDA_KINDS:
         raise ValueError("Tipo de agenda no válido")
-    if kind == "vaccine" and not actor.health_access:
-        raise PermissionError("Se requiere autorización sanitaria para gestionar citas de vacunación")
     if not title.strip():
         raise ValueError("El título es obligatorio")
     if ends_at is not None and ends_at < starts_at:
@@ -569,8 +550,6 @@ def set_agenda_item_status(
     from gestion_centro.domain.models import AgendaItem
     item = session.get(AgendaItem, item_id)
     actor = _active_author(session, actor_account_id)
-    if item is not None and item.kind == "vaccine" and not actor.health_access:
-        raise PermissionError("Se requiere autorización sanitaria para gestionar citas de vacunación")
     if item is None:
         raise ValueError("El elemento de agenda no existe")
     if status not in AGENDA_STATUSES:
@@ -599,8 +578,6 @@ def list_agenda_items(
     actor = _active_author(session, actor_account_id)
     if end < start:
         raise ValueError("El final del intervalo no puede ser anterior al inicio")
-    if kind == "vaccine" and not actor.health_access:
-        raise PermissionError("Se requiere autorización sanitaria para consultar citas de vacunación")
     statement = select(AgendaItem).where(
         AgendaItem.starts_at >= start, AgendaItem.starts_at <= end
     ).order_by(AgendaItem.starts_at, AgendaItem.title)
@@ -612,8 +589,6 @@ def list_agenda_items(
         if kind not in AGENDA_KINDS:
             raise ValueError("Tipo de agenda no válido")
         statement = statement.where(AgendaItem.kind == kind)
-    elif not actor.health_access:
-        statement = statement.where(AgendaItem.kind != "vaccine")
     _audit(session, actor, "agenda_accessed",
         f"Desde: {start.isoformat()}; hasta: {end.isoformat()}; estado: {status}; tipo: {kind}")
     return session.scalars(statement).all()
