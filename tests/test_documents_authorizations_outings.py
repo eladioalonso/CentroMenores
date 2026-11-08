@@ -26,8 +26,7 @@ def setup_stay(session):
     )
     session.flush()
     minor = create_minor(
-        session, actor_account_id=actor.id, internal_code="MC-TEST-0001",
-        given_names="Caso", family_names="Ficticio",
+        session, actor_account_id=actor.id, given_names="Caso", family_names="Ficticio",
     )
     stay = open_stay(session, actor_account_id=actor.id, minor_id=minor.id,
                      started_on=date(2026, 1, 1))
