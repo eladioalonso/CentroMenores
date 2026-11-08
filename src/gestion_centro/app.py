@@ -782,8 +782,6 @@ class DocumentsDialog(QDialog):
                 actor = session.get(UserAccount, self.actor_id)
                 if actor is None or not actor.active or not actor.professional.active:
                     raise PermissionError("La cuenta o el profesional ya no están activos.")
-                if doc.category == "health" and not actor.health_access:
-                    raise PermissionError("La cuenta no tiene autorización sanitaria expresa.")
                 session.add(AccessAudit(account_id=actor.id,
                     username_snapshot=actor.username, event="personal_document_opened",
                     details=f"{doc.id}; estancia:{doc.stay_id}"))
