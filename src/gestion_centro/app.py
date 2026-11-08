@@ -1082,11 +1082,14 @@ class MainWindow(QMainWindow):
             tabs.addTab(daily, "Parte diario")
             daily_layout = QVBoxLayout(daily)
             daily_layout.setContentsMargins(0, 0, 0, 0)
-            diary_panel = DiaryDialog(factory, account_id)
-            diary_panel.setParent(daily)
-            diary_panel.setWindowFlags(Qt.WindowType.Widget)
-            daily_layout.addWidget(diary_panel)
-            diary_panel.show()
+            if callable(factory):
+                diary_panel = DiaryDialog(factory, account_id)
+                diary_panel.setParent(daily)
+                diary_panel.setWindowFlags(Qt.WindowType.Widget)
+                daily_layout.addWidget(diary_panel)
+                diary_panel.show()
+            else:
+                daily_layout.addWidget(QLabel("El parte diario estará disponible al iniciar una sesión de trabajo."))
 
             minors_page = QWidget()
             tabs.addTab(minors_page, "Menores")
