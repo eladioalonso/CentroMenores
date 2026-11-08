@@ -1080,9 +1080,13 @@ class MainWindow(QMainWindow):
         if factory is not None and account_id is not None:
             daily = QWidget()
             tabs.addTab(daily, "Parte diario")
-            add_actions(daily, [
-                ("Abrir parte diario", "Registra las actividades, comportamientos, salud y observaciones del día.", lambda: DiaryDialog(factory, account_id).exec()),
-            ], columns=1)
+            daily_layout = QVBoxLayout(daily)
+            daily_layout.setContentsMargins(0, 0, 0, 0)
+            diary_panel = DiaryDialog(factory, account_id)
+            diary_panel.setParent(daily)
+            diary_panel.setWindowFlags(Qt.WindowType.Widget)
+            daily_layout.addWidget(diary_panel)
+            diary_panel.show()
 
             minors_page = QWidget()
             tabs.addTab(minors_page, "Menores")
