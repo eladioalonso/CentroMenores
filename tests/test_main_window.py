@@ -102,6 +102,20 @@ def test_administration_is_separate_tab_only_for_admin():
         educator.close()
         admin.close()
 
+def test_first_admin_setup_ignores_preseeded_demo_accounts():
+    _application()
+    dialog = CredentialsDialog(
+        first_admin=True,
+        available_accounts=[("educador", "educador")],
+    )
+    try:
+        assert dialog.account_selector.count() == 0
+        assert not dialog.username.isReadOnly()
+        assert dialog.name.isVisible()
+    finally:
+        dialog.close()
+
+
 def test_login_account_selector_fills_username_and_requires_password():
     app = _application()
     dialog = CredentialsDialog(
