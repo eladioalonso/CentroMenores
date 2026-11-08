@@ -304,9 +304,9 @@ def test_vaccine_administration_and_review_must_share_the_same_catalog_dose(heal
  assert review.calendar_item_id==first_item.id
 
 
-def test_health_services_deny_accounts_without_explicit_health_access(health_case):
+def test_educators_can_consult_health_records_without_special_permission(health_case):
  s,actor,stay=health_case
  account=s.get(UserAccount,actor)
  account.health_access=False
- with pytest.raises(PermissionError,match="autorización sanitaria"):
-  read_health_profile(s,actor_account_id=actor,minor_id=s.get(Stay,stay).minor_id)
+ assert read_health_profile(s,actor_account_id=actor,minor_id=s.get(Stay,stay).minor_id) is None
+ assert any(row.event == "health_profile_accessed" for row in s.scalars(select(AccessAudit)).all())
