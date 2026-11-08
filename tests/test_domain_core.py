@@ -281,7 +281,7 @@ def test_agenda_read_requires_active_actor_and_is_audited():
             list_agenda_items(session, actor_account_id="no-existe",
                 start=starts, end=starts)
 
-def test_diary_health_entries_and_incidents_are_filtered_and_permission_checked():
+def test_all_educators_can_consult_and_record_health_diary_entries():
     from gestion_centro.domain.service import (
         record_diary_entry, record_incident, list_diary_records,
         revise_diary_entry, close_incident,
@@ -305,20 +305,17 @@ def test_diary_health_entries_and_incidents_are_filtered_and_permission_checked(
         actor.health_access = False
         _day, entries, incidents = list_diary_records(
             session, actor_account_id=actor.id, diary_date=day)
-        assert [entry.category for entry in entries] == ["general"]
-        assert incidents == []
-        with pytest.raises(PermissionError, match="autorización sanitaria"):
-            record_diary_entry(session, actor_account_id=actor.id, diary_date=day,
-                shift="morning", category="health", content="No autorizado",
-                happened_at=moment, now=moment)
-        with pytest.raises(PermissionError, match="autorización sanitaria"):
-            revise_diary_entry(session, actor_account_id=actor.id,
-                original_entry_id=health_entry.id, content="Intento de cambio", now=moment)
-        with pytest.raises(PermissionError, match="autorización sanitaria"):
-            close_incident(session, actor_account_id=actor.id, incident_id=incident.id,
-                note="Intento de cierre", now=moment)
+        assert [entry.category for entry in entries] == ["health", "general"]
+        assert len(incidents) == 1
+        record_diary_entry(session, actor_account_id=actor.id, diary_date=day,
+            shift="morning", category="health", content="Registro adicional",
+            happened_at=moment, now=moment)
+        revise_diary_entry(session, actor_account_id=actor.id,
+            original_entry_id=health_entry.id, content="Corrección ficticia", now=moment)
+        close_incident(session, actor_account_id=actor.id, incident_id=incident.id,
+            note="Seguimiento realizado", now=moment)
 
-def test_vaccine_agenda_items_require_health_access_and_are_hidden_from_others():
+def test_vaccine_agenda_items_are_visible_to_all_educators():
     from gestion_centro.domain.service import (
         create_agenda_item, list_agenda_items, set_agenda_item_status,
     )
@@ -331,14 +328,12 @@ def test_vaccine_agenda_items_require_health_access_and_are_hidden_from_others()
             title="Cita de vacunación ficticia", starts_at=starts)
         actor.health_access = False
         assert list_agenda_items(session, actor_account_id=actor.id,
-            start=starts, end=starts) == []
-        with pytest.raises(PermissionError, match="autorización sanitaria"):
-            list_agenda_items(session, actor_account_id=actor.id,
-                start=starts, end=starts, kind="vaccine")
-        with pytest.raises(PermissionError, match="autorización sanitaria"):
-            set_agenda_item_status(session, actor_account_id=actor.id,
-                item_id=vaccine.id, status="done")
-        with pytest.raises(PermissionError, match="autorización sanitaria"):
-            create_agenda_item(session, actor_account_id=actor.id, kind="vaccine",
-                title="Cita no autorizada", starts_at=starts)
+            start=starts, end=starts) == [vaccine]
+        assert list_agenda_items(session, actor_account_id=actor.id,
+            start=starts, end=starts, kind="vaccine") == [vaccine]
+        set_agenda_item_status(session, actor_account_id=actor.id,
+            item_id=vaccine.id, status="done")
+        another = create_agenda_item(session, actor_account_id=actor.id, kind="vaccine",
+            title="Segunda cita ficticia", starts_at=starts)
+        assert another is not None
 
