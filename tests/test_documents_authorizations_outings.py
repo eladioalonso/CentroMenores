@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from gestion_centro.auth.service import Role, create_professional_account
-from gestion_centro.domain.service import create_minor, open_stay
+from gestion_centro.domain.service import create_minor, open_stay, close_stay
 from gestion_centro.domain.documents import PersonalDocument, Authorization, Outing
 from gestion_centro.domain.documents_service import (
     register_document, record_authorization, check_authorization,
@@ -203,3 +203,26 @@ def test_educator_can_revoke_medical_authorization_and_access_is_audited():
         assert session.scalar(
             select(AccessAudit.id).where(AccessAudit.event == "authorization_status_changed")
         ) is not None
+
+
+
+def test_closed_stay_documents_remain_available_and_can_be_added():
+    from gestion_centro.domain.documents_service import list_document_stays, list_documents
+    with make_session() as session:
+        actor, stay = setup_stay(session)
+        close_stay(
+            session, actor_account_id=actor.id, stay_id=stay.id,
+            ended_on=date(2026, 2, 1), reason="Cierre ficticio",
+        )
+        stays = list_document_stays(session, actor_account_id=actor.id)
+        assert stay.id in {item.id for item in stays}
+        document = register_document(
+            session, actor_account_id=actor.id, stay_id=stay.id, category="identity",
+            title="Documento recibido tras el cierre", original_filename="identidad.pdf",
+            relative_path="documentos/cierre.pdf", mime_type="application/pdf",
+            size_bytes=100, sha256="d" * 64,
+        )
+        assert document.id in {
+            item.id for item in list_documents(
+                session, actor_account_id=actor.id, stay_id=stay.id)
+        }
