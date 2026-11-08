@@ -71,7 +71,7 @@ class AuthorizationsDialog(QDialog):
         with session_scope(factory) as session:
             stays = list_active_stays(session, actor_account_id=self.actor_id)
             for stay in stays:
-                self.stay.addItem(f"{(stay.minor.nif_nie or stay.minor.passport_number or "Sin NIF/NIE")} · {stay.minor.given_names} {stay.minor.family_names}", stay.id)
+                self.stay.addItem(f"{(stay.minor.nif_nie or stay.minor.passport_number or 'Sin NIF/NIE')} · {stay.minor.given_names} {stay.minor.family_names}", stay.id)
         self.stay.currentIndexChanged.connect(self.refresh)
         self.refresh()
 
@@ -187,7 +187,7 @@ class OutingsDialog(QDialog):
         with session_scope(factory) as session:
             stays = session.scalars(select(Stay).where(Stay.status == "active").order_by(Stay.started_on.desc())).all()
             for stay in stays:
-                self.stay.addItem(f"{(stay.minor.nif_nie or stay.minor.passport_number or "Sin NIF/NIE")} · {stay.minor.given_names} {stay.minor.family_names}", stay.id)
+                self.stay.addItem(f"{(stay.minor.nif_nie or stay.minor.passport_number or 'Sin NIF/NIE')} · {stay.minor.given_names} {stay.minor.family_names}", stay.id)
         self.stay.currentIndexChanged.connect(self.refresh_authorizations)
         self.refresh_authorizations()
         self.refresh()
