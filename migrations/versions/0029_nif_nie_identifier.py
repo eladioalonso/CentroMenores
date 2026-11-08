@@ -1,4 +1,4 @@
-"""Sustituye el código interno del expediente por NIF/NIE."""
+"""Establece NIF/NIE como identificador visible del expediente."""
 from alembic import op
 import sqlalchemy as sa
 
@@ -10,7 +10,7 @@ depends_on = None
 
 def upgrade():
     # Los registros históricos conservan una instantánea del identificador visible.
-    # Se actualiza a NIF/NIE o pasaporte antes de retirar el código interno.
+    # Se actualiza a NIF/NIE o pasaporte; la clave técnica heredada permanece oculta.
     for table in (
         "event_stay_links",
         "diary_entry_stay_links",
