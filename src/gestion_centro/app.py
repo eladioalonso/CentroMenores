@@ -66,7 +66,9 @@ class CredentialsDialog(QDialog):
         super().__init__()
         self.first_admin = first_admin
         self.fixed_username = fixed_username
-        self.available_accounts = available_accounts or []
+        # En el primer arranque (también en demo) se debe crear un administrador.
+        # No mostrar entonces el selector de cuentas de educadores precargadas.
+        self.available_accounts = [] if first_admin else (available_accounts or [])
         self.setWindowTitle("Crear administrador inicial" if first_admin else "Iniciar sesión")
         self.username = QLineEdit(fixed_username or "")
         self.username.setMaxLength(80)
