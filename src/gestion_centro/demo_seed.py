@@ -34,19 +34,19 @@ def seed_demo_data(factory) -> None:
         actor_id = account.id
 
         examples = [
-            ("DEMO-001", "Alex", "Ríos Medina", date(2010, 4, 12), "España", "Melilla"),
-            ("DEMO-002", "Samira", "Benali", date(2009, 9, 3), "Marruecos", "Nador"),
-            ("DEMO-003", "Daniel", "Santos Vega", date(2012, 1, 27), "España", "Málaga"),
-            ("DEMO-004", "Yasmin", "El Amrani", date(2008, 6, 18), "Marruecos", "Tetuán"),
-            ("DEMO-005", "Nora", "García León", date(2011, 11, 9), "España", "Granada"),
+            ("DEMO-001", "X0000001A", "Alex", "Ríos Medina", date(2010, 4, 12), "España", "Melilla"),
+            ("DEMO-002", "X0000002B", "Samira", "Benali", date(2009, 9, 3), "Marruecos", "Nador"),
+            ("DEMO-003", "X0000003C", "Daniel", "Santos Vega", date(2012, 1, 27), "España", "Málaga"),
+            ("DEMO-004", "X0000004D", "Yasmin", "El Amrani", date(2008, 6, 18), "Marruecos", "Tetuán"),
+            ("DEMO-005", "X0000005E", "Nora", "García León", date(2011, 11, 9), "España", "Granada"),
         ]
         stays = {}
-        for code, given, family, born, country, locality in examples:
-            minor = session.scalar(select(Minor).where(Minor.internal_code == code))
+        for code, nif_nie, given, family, born, country, locality in examples:
+            minor = session.scalar(select(Minor).where(Minor.nif_nie == nif_nie))
             if minor is None:
                 minor = create_minor(
                     session, actor_account_id=actor_id,
-                    internal_code=code, given_names=given, family_names=family,
+                    nif_nie=nif_nie, given_names=given, family_names=family,
                     birth_country=country, locality=locality, nationality=country,
                     birth_date=born,
                 )
