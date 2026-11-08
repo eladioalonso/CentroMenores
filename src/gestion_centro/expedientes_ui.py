@@ -48,7 +48,7 @@ class NewMinorDialog(QDialog):
         self.nif_nie = QLineEdit()
         self.passport = QLineEdit()
         self.address = QTextEdit()
-        self.address.setMaximumHeight(65)
+        self.address.setMinimumHeight(90)
         self.email = QLineEdit()
         for label, widget in [
             ("Código interno *", self.code), ("Nombre(s) *", self.given),
@@ -192,7 +192,7 @@ class MinorWorkspaceDialog(QDialog):
                 for label, value in health_fields:
                     display = QTextEdit()
                     display.setReadOnly(True)
-                    display.setMaximumHeight(90 if label == 'Historial clínico' else 42)
+                    display.setMinimumHeight(120 if label == 'Historial clínico' else 75)
                     display.setPlainText(value or '—')
                     self.health_form.addRow(label, display)
             stays = sorted(minor.stays, key=lambda item: item.sequence_number, reverse=True)
