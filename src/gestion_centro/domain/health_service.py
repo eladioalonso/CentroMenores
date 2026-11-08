@@ -13,8 +13,6 @@ def _actor(session: Session, account_id: str) -> UserAccount:
     actor=session.get(UserAccount,account_id)
     if actor is None or not actor.active or not actor.professional.active:
         raise PermissionError("Se requiere una cuenta y un profesional activos")
-    if not actor.health_access:
-        raise PermissionError("La cuenta no tiene autorización sanitaria expresa")
     return actor
 
 def _audit(session: Session, actor: UserAccount, event: str, details: str):
