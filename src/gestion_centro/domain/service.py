@@ -137,15 +137,14 @@ def update_minor_personal_data(
 
 
 def has_health_access(session: Session, *, actor_account_id: str) -> bool:
-    """Indica si la cuenta activa tiene permiso sanitario, sin exponer datos clínicos."""
-    return bool(_active_author(session, actor_account_id).health_access)
+    """Todos los profesionales activos del centro pueden consultar datos sanitarios."""
+    _active_author(session, actor_account_id)
+    return True
 
 
 def audit_minor_health_access(session: Session, *, actor_account_id: str, minor_id: str) -> None:
-    """Autoriza y registra la consulta de la ficha sanitaria del expediente."""
+    """Registra la consulta sanitaria de cualquier profesional activo."""
     actor = _active_author(session, actor_account_id)
-    if not actor.health_access:
-        raise PermissionError("La cuenta no tiene autorización para consultar datos sanitarios")
     if session.get(Minor, minor_id) is None:
         raise ValueError("El expediente no existe")
     _audit(session, actor, "minor_health_data_accessed", f"Expediente: {minor_id}")
@@ -282,8 +281,6 @@ def record_diary_entry(
     actor = _active_author(session, actor_account_id)
     if shift not in VALID_SHIFTS or category not in VALID_CATEGORIES:
         raise ValueError("Turno o categoría no válidos")
-    if category == "health" and not actor.health_access:
-        raise PermissionError("Se requiere autorización sanitaria para registrar anotaciones de salud")
     if not content.strip():
         raise ValueError("El contenido de la anotación es obligatorio")
     day = _get_or_create_diary_day(session, diary_date)
