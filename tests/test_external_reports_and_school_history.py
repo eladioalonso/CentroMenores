@@ -22,8 +22,7 @@ def setup():
         password="contraseña de prueba A segura", role=Role.EDUCATOR)
     reviewer = create_professional_account(session, display_name="Educador B", username="report-b",
         password="contraseña de prueba B segura", role=Role.EDUCATOR)
-    minor = create_minor(session, actor_account_id=author.id, internal_code="MC-TEST-R1",
-        given_names="Caso", family_names="Ficticio")
+    minor = create_minor(session, actor_account_id=author.id, given_names="Caso", family_names="Ficticio")
     stay = open_stay(session, actor_account_id=author.id, minor_id=minor.id, started_on=date(2026, 1, 1))
     auth = record_authorization(session, actor_account_id=author.id, stay_id=stay.id,
         authorization_type="other", scope="Emisión de informe externo ficticio",
