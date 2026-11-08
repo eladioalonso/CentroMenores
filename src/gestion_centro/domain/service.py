@@ -16,7 +16,7 @@ HEALTH_PERSONAL_FIELDS = {
 
 
 def create_minor(
-    session: Session, *, actor_account_id: str, internal_code: str, given_names: str, family_names: str,
+    session: Session, *, actor_account_id: str, given_names: str, family_names: str,
     birth_country: str | None = None, locality: str | None = None,
     nationality: str | None = None, birth_date: date | None = None,
     nif_nie: str | None = None, passport_number: str | None = None,
@@ -26,11 +26,11 @@ def create_minor(
     clinical_history: str | None = None, email: str | None = None
 ) -> Minor:
     actor = _active_author(session, actor_account_id)
-    code = internal_code.strip().upper()
-    if not code or not given_names.strip() or not family_names.strip():
-        raise ValueError("El código y el nombre completo son obligatorios")
-    if session.scalar(select(Minor.id).where(Minor.internal_code == code)) is not None:
-        raise ValueError("El identificador interno ya existe")
+    clean_nif_nie = (nif_nie or "").strip().upper() or None
+    if not given_names.strip() or not family_names.strip():
+        raise ValueError("El nombre y los apellidos son obligatorios")
+    if clean_nif_nie and session.scalar(select(Minor.id).where(Minor.nif_nie == clean_nif_nie)) is not None:
+        raise ValueError("Ya existe un expediente con ese NIF/NIE")
     if birth_date and birth_date > date.today():
         raise ValueError("La fecha de nacimiento no puede ser futura")
     if health_card_expires_on and health_card_expires_on < date(1900, 1, 1):
@@ -38,11 +38,11 @@ def create_minor(
     if email and ("@" not in email or email.strip().startswith("@") or email.strip().endswith("@")):
         raise ValueError("El correo electrónico no tiene un formato válido")
     minor = Minor(
-        internal_code=code, given_names=given_names.strip(), family_names=family_names.strip(),
+        given_names=given_names.strip(), family_names=family_names.strip(),
         birth_country=(birth_country or "").strip() or None,
         locality=(locality or "").strip() or None,
         nationality=(nationality or "").strip() or None, birth_date=birth_date,
-        nif_nie=(nif_nie or "").strip().upper() or None,
+        nif_nie=clean_nif_nie,
         passport_number=(passport_number or "").strip() or None,
         cip=(cip or "").strip() or None, address=(address or "").strip() or None,
         health_center=(health_center or "").strip() or None,
@@ -81,6 +81,10 @@ def update_minor_personal_data(
     clean_email = (email or "").strip() or None
     if clean_email and ("@" not in clean_email or clean_email.startswith("@") or clean_email.endswith("@")):
         raise ValueError("El correo electrónico no tiene un formato válido")
+    clean_nif_nie = (nif_nie or "").strip().upper() or None
+    duplicate_nif = session.scalar(select(Minor.id).where(Minor.nif_nie == clean_nif_nie, Minor.id != minor.id)) if clean_nif_nie else None
+    if duplicate_nif:
+        raise ValueError("Ya existe otro expediente con ese NIF/NIE")
     values = {
         "given_names": given_names.strip(),
         "family_names": family_names.strip(),
@@ -88,7 +92,7 @@ def update_minor_personal_data(
         "locality": (locality or "").strip() or None,
         "nationality": (nationality or "").strip() or None,
         "birth_date": birth_date,
-        "nif_nie": (nif_nie or "").strip().upper() or None,
+        "nif_nie": clean_nif_nie,
         "passport_number": (passport_number or "").strip() or None,
         "address": (address or "").strip() or None,
         "email": clean_email,
@@ -200,7 +204,7 @@ def record_event(
         minor = stay.minor
         session.add(EventStayLink(
             event_id=event.id, stay_id=stay.id, participation_role="participant",
-            minor_code_snapshot=minor.internal_code,
+            minor_code_snapshot=(minor.nif_nie or minor.passport_number or ""),
             minor_name_snapshot=f"{minor.given_names} {minor.family_names}",
         ))
     session.flush()
