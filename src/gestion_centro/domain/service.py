@@ -474,7 +474,7 @@ def reopen_incident(
 
 
 def list_diary_records(session: Session, *, actor_account_id: str, diary_date: date):
-    """Consulta el diario con filtrado sanitario y registro de acceso."""
+    """Consulta todas las anotaciones e incidencias del día y registra el acceso."""
     from gestion_centro.domain.models import DiaryDay, DiaryEntry, Incident
     actor = _active_author(session, actor_account_id)
     day = session.scalar(select(DiaryDay).where(DiaryDay.diary_date == diary_date))
