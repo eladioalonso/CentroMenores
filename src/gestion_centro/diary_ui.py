@@ -42,7 +42,7 @@ class DiaryDialog(QDialog):
         self.setWindowTitle("Diario e incidencias")
         self.resize(980, 640)
         layout = QVBoxLayout(self)
-        intro = QLabel("Registra hechos observables del turno y consulta las anotaciones e incidencias de la fecha seleccionada. Las entradas quedan vinculadas a su autor.")
+        intro = QLabel("Completa los apartados del día. Las enfermedades y los tratamientos se consultan automáticamente desde las fichas sanitarias. Las anotaciones quedan vinculadas a su autor.")
         intro.setWordWrap(True)
         intro.setObjectName("formIntro")
         layout.addWidget(intro)
@@ -235,7 +235,18 @@ class DiaryDialog(QDialog):
         with session_scope(self.factory) as session:
             day, entries, incidents = list_diary_records(
                 session, actor_account_id=self.actor_id, diary_date=selected)
-            rows = [(x.happened_at, x.category, x.content, x.author_name_snapshot,
+            category_labels = {
+                "activity": "Actividades realizadas",
+                "positive": "Comportamientos positivos",
+                "negative": "Comportamientos negativos",
+                "observation": "Observaciones",
+                "general": "General (histórico)",
+                "health": "Salud (histórico)",
+                "maintenance": "Mantenimiento (histórico)",
+                "other": "Otros (histórico)",
+            }
+            rows = [(x.happened_at, category_labels.get(x.category, x.category),
+                x.content, x.author_name_snapshot,
                 {"kind": "entry", "id": x.id}) for x in entries]
             rows += [(x.happened_at, f"Incidencia · {x.severity}",
                 f"{x.title} · {x.description} [{x.status}]", x.author_name_snapshot,
@@ -277,7 +288,7 @@ class DiaryDialog(QDialog):
         self.add_button.setEnabled(not is_closed)
         self.close_button.setEnabled(not is_closed)
         self.revise_button.setEnabled(bool(rows))
-        self.day_state.setText("DIARIO CERRADO · Solo consulta" if is_closed else "DIARIO ABIERTO · Se pueden registrar anotaciones e incidencias")
+        self.day_state.setText("PARTE CERRADO · Solo consulta" if is_closed else "PARTE ABIERTO · Puedes completar o corregir tus apartados")
         self.day_state.setProperty("closed", is_closed)
         self.day_state.style().unpolish(self.day_state)
         self.day_state.style().polish(self.day_state)
