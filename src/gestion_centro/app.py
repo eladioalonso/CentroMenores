@@ -161,8 +161,8 @@ class AccountManagementDialog(QDialog):
         self.setWindowTitle("Administración de cuentas")
         self.resize(760, 420)
         layout = QVBoxLayout(self)
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Profesional", "Usuario", "Perfil", "Acceso sanitario", "Estado"])
+        self.table = QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(["Profesional", "Usuario", "Perfil", "Estado"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -171,7 +171,6 @@ class AccountManagementDialog(QDialog):
         for label, callback in [("Crear cuenta", self.create_account),
             ("Restablecer contraseña", self.reset_password),
             ("Cambiar perfil", self.change_role),
-            ("Conceder / retirar acceso sanitario", self.toggle_health_access),
             ("Activar / desactivar", self.toggle_active)]:
             button = QPushButton(label)
             button.clicked.connect(callback)
@@ -184,7 +183,6 @@ class AccountManagementDialog(QDialog):
             accounts = session.scalars(select(UserAccount).order_by(UserAccount.username)).all()
             rows = [(a.id, a.professional.display_name, a.username,
                 "Administrador" if a.role == Role.ADMIN.value else "Educador",
-                "Autorizado" if a.health_access else "No autorizado",
                 "Activa" if a.active and a.professional.active else "Inactiva") for a in accounts]
         self.table.setRowCount(len(rows))
         for row, values in enumerate(rows):
@@ -1039,11 +1037,10 @@ class MainWindow(QMainWindow):
         def open_health_dialog():
             with session_scope(factory) as session:
                 account = session.get(UserAccount, account_id)
-                if account is None or not account.active or not account.health_access:
+                if account is None or not account.active or not account.professional.active:
                     QMessageBox.warning(
-                        self, "Acceso sanitario restringido",
-                        "Esta cuenta no tiene autorización sanitaria expresa. "
-                        "El administrador debe asignar el permiso correspondiente.",
+                        self, "Sesión no válida",
+                        "La cuenta debe estar activa para consultar la ficha sanitaria.",
                     )
                     return
             HealthDialog(factory, account_id).exec()
