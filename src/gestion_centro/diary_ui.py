@@ -118,7 +118,7 @@ class DiaryDialog(QDialog):
         choices = QListWidget()
         with session_scope(self.factory) as session:
             stays = list_active_stays(session, actor_account_id=self.actor_id)
-            rows = [(s.id, f"{s.minor.internal_code} · {s.minor.given_names} {s.minor.family_names}") for s in stays]
+            rows = [(s.id, f"{(s.minor.nif_nie or s.minor.passport_number or "Sin NIF/NIE")} · {s.minor.given_names} {s.minor.family_names}") for s in stays]
         for stay_id, label in rows:
             item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, stay_id)
