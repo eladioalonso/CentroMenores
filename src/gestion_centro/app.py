@@ -918,8 +918,25 @@ class MainWindow(QMainWindow):
         top_actions.addWidget(logout_button)
         layout.addLayout(top_actions)
 
+        workspace = QHBoxLayout()
+        workspace.setSpacing(0)
+        layout.addLayout(workspace, 1)
+
+        sidebar = QWidget()
+        sidebar.setObjectName("navigationSidebar")
+        sidebar.setFixedWidth(205)
+        sidebar_layout = QVBoxLayout(sidebar)
+        sidebar_layout.setContentsMargins(10, 14, 10, 14)
+        sidebar_layout.setSpacing(6)
+        sidebar_title = QLabel("MENÚ PRINCIPAL")
+        sidebar_title.setObjectName("navigationTitle")
+        sidebar_layout.addWidget(sidebar_title)
+
         tabs = QTabWidget()
-        layout.addWidget(tabs, 1)
+        tabs.tabBar().hide()
+        tabs.setDocumentMode(True)
+        workspace.addWidget(sidebar)
+        workspace.addWidget(tabs, 1)
 
         # Las pruebas de navegación pueden inyectar objetos centinela como
         # infraestructura; el panel solo consulta la BD con una fábrica invocable.
@@ -1092,6 +1109,41 @@ class MainWindow(QMainWindow):
                 ("Estadísticas y memoria", "Genera consultas agregadas e informes de actividad.", lambda: ReportsDialog(factory, account_id).exec()),
             ])
 
+        # La navegación queda a la izquierda y el área central conserva el espacio
+        # para el contenido del apartado seleccionado.
+        sidebar_items = [
+            ("Inicio", 0),
+            ("Día a día", 1),
+            ("Gestión y consultas", 2),
+        ]
+        if role is Role.ADMIN and tabs.count() > 3:
+            sidebar_items.append(("Administración", 3))
+        for label, page_index in sidebar_items:
+            nav_button = QPushButton(label)
+            nav_button.setObjectName("navigationButton")
+            nav_button.setCheckable(True)
+            nav_button.setMinimumHeight(42)
+            nav_button.clicked.connect(
+                lambda checked=False, index=page_index: tabs.setCurrentIndex(index)
+            )
+            sidebar_layout.addWidget(nav_button)
+            if page_index == 0:
+                nav_button.setChecked(True)
+        sidebar_layout.addStretch(1)
+        sidebar_note = QLabel(f"Sesión: {display_name}")
+        sidebar_note.setObjectName("navigationUser")
+        sidebar_note.setWordWrap(True)
+        sidebar_layout.addWidget(sidebar_note)
+
+        def sync_navigation(index: int) -> None:
+            current_label = next(
+                (label for label, page_index in sidebar_items if page_index == index), ""
+            )
+            for button in sidebar.findChildren(QPushButton, "navigationButton"):
+                button.setChecked(button.text() == current_label)
+
+        tabs.currentChanged.connect(sync_navigation)
+
         notice = QLabel(
             "Núcleo técnico en desarrollo. Todavía no está habilitado para introducir datos reales "
             "de menores ni para uso asistencial."
@@ -1125,6 +1177,38 @@ def main() -> int:
         }
         QLabel {
             background: transparent;
+        }
+        QWidget#navigationSidebar {
+            background: #EAF0F6;
+            border-right: 1px solid #DCE4EE;
+        }
+        QLabel#navigationTitle {
+            color: #6A7D91;
+            font-size: 8pt;
+            font-weight: 700;
+            padding: 2px 8px 10px 8px;
+        }
+        QPushButton#navigationButton {
+            background: transparent;
+            color: #425A70;
+            border: 0;
+            border-radius: 7px;
+            text-align: left;
+            padding: 9px 12px;
+            font-weight: 600;
+        }
+        QPushButton#navigationButton:hover {
+            background: #DCE7F0;
+        }
+        QPushButton#navigationButton:checked {
+            background: #FFFFFF;
+            color: #175C8E;
+            border: 1px solid #D4E2EE;
+        }
+        QLabel#navigationUser {
+            color: #65768A;
+            font-size: 9pt;
+            padding: 8px;
         }
         QFrame#dashboardCard {
             background: #FFFFFF;
