@@ -18,6 +18,20 @@ def upgrade():
         ORDER BY happened_at, recorded_at, id
     """)).mappings().all()
     for incident in incidents:
+        existing_entries = connection.execute(sa.text("""
+            SELECT content FROM diary_entries WHERE diary_day_id = :diary_day_id
+        """), {"diary_day_id": incident["diary_day_id"]}).scalars().all()
+        title_key = (incident["title"] or "").strip().casefold()
+        description_key = (incident["description"] or "").strip().casefold()
+        already_documented = any(
+            (title_key and title_key in (content or "").casefold())
+            or (description_key and description_key in (content or "").casefold())
+            for content in existing_entries
+        )
+        if already_documented:
+            # El parte ya contiene este hecho; se conserva la incidencia formal
+            # antigua como histórico, sin duplicar el acontecimiento.
+            continue
         entry_id = str(uuid4())
         category = (
             "health" if incident["incident_type"] == "health"
