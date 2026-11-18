@@ -264,10 +264,10 @@ class EducationDialog(StaySelectorDialog):
                 selected_update.follow_up or "",
             )
         dialog = QDialog(self)
-        dialog.setWindowTitle("Rectificar mi seguimiento")
+        dialog.setWindowTitle("Revisar seguimiento educativo")
         dialog.resize(560, 430)
         layout = QVBoxLayout(dialog)
-        hint = QLabel("Se muestran los datos actuales para que puedas corregir solo lo necesario. La rectificación quedará vinculada y no sustituirá el original.")
+        hint = QLabel("Se muestran los datos actuales para que puedas corregir solo lo necesario. La nueva versión quedará vinculada y no sustituirá el original.")
         hint.setWordWrap(True)
         layout.addWidget(hint)
         form = QFormLayout()
@@ -288,7 +288,7 @@ class EducationDialog(StaySelectorDialog):
         form.addRow("Seguimiento pendiente (opcional)", follow_up)
         layout.addLayout(form)
         buttons = QHBoxLayout()
-        save = QPushButton("Guardar rectificación")
+        save = QPushButton("Guardar nueva versión")
         cancel = QPushButton("Cancelar")
         save.clicked.connect(dialog.accept)
         cancel.clicked.connect(dialog.reject)
@@ -305,8 +305,8 @@ class EducationDialog(StaySelectorDialog):
                     actions_taken=actions.toPlainText(),
                     response_observed=response.toPlainText(),
                     follow_up=follow_up.toPlainText())
-            QMessageBox.information(self, "Rectificación guardada",
-                "Se ha añadido una rectificación vinculada. El seguimiento original se conserva.")
+            QMessageBox.information(self, "Nueva versión guardada",
+                "Se ha añadido una versión vinculada. El seguimiento original se conserva y queda registrada la persona que realizó el cambio.")
             self.refresh()
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo rectificar", str(exc))
