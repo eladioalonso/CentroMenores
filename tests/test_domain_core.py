@@ -385,3 +385,28 @@ def test_incident_report_drafts_issue_and_rectification_are_versioned_and_shared
         assert report.versions[1].content == "Versión definitiva"
         assert report.versions[2].content == "Versión rectificada"
         assert len(list_incident_reports(session, actor_account_id=editor.id)) == 1
+
+
+
+def test_incident_report_rejects_superseded_diary_entry_and_uses_latest_revision():
+    from gestion_centro.domain.incident_reports_service import save_incident_report
+    from gestion_centro.domain.service import record_diary_entry, revise_diary_entry
+    with make_session() as session:
+        actor = create_professional_account(session, display_name="Educador",
+            username="report-correction", password="contraseña de prueba segura",
+            role=Role.EDUCATOR)
+        moment = datetime(2026, 6, 2, 10, tzinfo=timezone.utc)
+        original = record_diary_entry(session, actor_account_id=actor.id,
+            diary_date=date(2026, 6, 2), shift="morning", category="general",
+            content="Texto original", happened_at=moment, now=moment)
+        latest = revise_diary_entry(session, actor_account_id=actor.id,
+            original_entry_id=original.id, content="Texto corregido",
+            reason="Corrección de prueba", now=moment)
+        with pytest.raises(ValueError, match="versión sustituida"):
+            save_incident_report(session, actor_account_id=actor.id,
+                title="Informe", recipient=None, content="Informe incorrecto",
+                entry_ids=[original.id])
+        report = save_incident_report(session, actor_account_id=actor.id,
+            title="Informe", recipient=None, content="Informe correcto",
+            entry_ids=[latest.id])
+        assert report.versions[0].entries[0].entry_id == latest.id
