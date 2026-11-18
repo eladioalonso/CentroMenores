@@ -188,23 +188,24 @@ Criterios funcionales acordados, sujetos a validación normativa:
 9. Validar la estructura final de la carpeta portable y pruebas de restauración/migración en Windows limpio.
 10. Establecer política institucional de custodia del ordenador, carpeta portable y USB.
 
-## 13. Fases propuestas de desarrollo (no iniciadas)
+## 13. Fases de implementación
 
-1. Base técnica, cuentas, permisos, auditoría, sesiones, configuración y copias.
-2. Panel, turnos, diario, comunicaciones y borradores.
-3. Fichas, estancias, familiares, restricciones, documentos y autorizaciones.
-4. Sanidad, medicación, vacunación y episodios.
-5. Seguimiento educativo, escolaridad y actividades.
-6. Agenda, tareas, salidas y contactos.
-7. Informes, estadísticas y memorias.
-8. Móvil local, ayuda, demostración y validación integral.
+La implementación está en curso en `desarrollo/nucleo-aplicacion`. El orden de trabajo vigente es:
 
-**La implementación está autorizada.** Los cambios se realizarán de forma incremental en `desarrollo/nucleo-aplicacion`, preservando los datos y verificando las pruebas antes de preparar cada versión compilada.
+1. Consolidar navegación y permisos compartidos en los cuatro módulos.
+2. Terminar la trazabilidad y edición de expedientes principales y sanitarios.
+3. Consolidar el parte diario como fuente cronológica de hechos y conservar el historial de rectificaciones.
+4. Completar borradores, emisión, rectificación e historial de informes basados en anotaciones del parte.
+5. Revisar las funciones secundarias para que queden integradas dentro de los cuatro módulos.
+6. Validar migraciones, integridad de datos, copias, restauración y funcionamiento en Windows.
+7. Ejecutar pruebas funcionales con datos ficticios y preparar una compilación candidata para pruebas del usuario.
+
+Los cambios se realizan de forma incremental, sin borrar información histórica ni modificar datos de usuario de forma destructiva. Una compilación de desarrollo no se considerará definitiva hasta superar las pruebas y la revisión funcional.
 
 
 ## 14. Decisiones técnicas aprobadas en la revisión
 
-Estas decisiones complementan las decisiones funcionales anteriores y quedan aprobadas para la fase de diseño técnico. No autorizan por sí solas el inicio de la programación.
+Estas decisiones complementan las decisiones funcionales anteriores y guían la implementación incremental autorizada.
 
 ### SQLite y acceso concurrente
 
