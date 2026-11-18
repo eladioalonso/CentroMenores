@@ -40,6 +40,8 @@ class IncidentReportVersion(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     report_id: Mapped[str] = mapped_column(ForeignKey("incident_reports.id"), nullable=False)
     version_number: Mapped[int] = mapped_column(nullable=False)
+    title: Mapped[str] = mapped_column(String(180), nullable=False)
+    recipient: Mapped[str | None] = mapped_column(String(180))
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     created_by_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
