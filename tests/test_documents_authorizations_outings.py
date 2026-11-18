@@ -292,3 +292,44 @@ def test_any_educator_can_edit_authorization_and_audit_previous_values():
         assert audit is not None
         assert "Visita autorizada" in audit.details
         assert "Visita con horario limitado" in audit.details
+
+
+
+def test_any_educator_can_edit_planned_outing_details_with_audit():
+    from gestion_centro.auth.models import Professional, UserAccount, AccessAudit
+    with make_session() as session:
+        actor, stay = setup_stay(session)
+        authorization = record_authorization(
+            session, actor_account_id=actor.id, stay_id=stay.id,
+            authorization_type="activity", scope="Actividad exterior",
+            issuer="Representante legal", valid_from=date(2026, 1, 1),
+        )
+        start = datetime(2026, 5, 4, 9, tzinfo=timezone.utc)
+        outing = create_outing(
+            session, actor_account_id=actor.id, kind="activity",
+            destination="Destino inicial", purpose="Finalidad inicial",
+            planned_departure=start, planned_return=datetime(2026, 5, 4, 12, tzinfo=timezone.utc),
+            responsible_account_id=actor.id, stay_ids=[stay.id],
+            authorization_ids=[authorization.id], restrictions_checked=True,
+        )
+        professional = Professional(display_name="Segundo educador")
+        session.add(professional); session.flush()
+        other = UserAccount(professional_id=professional.id, username="outing-editor",
+            password_hash="x", role="educator", health_access=False)
+        session.add(other); session.flush()
+        from gestion_centro.domain.documents_service import update_outing_details
+        updated = update_outing_details(
+            session, actor_account_id=other.id, outing_id=outing.id, kind="activity",
+            destination="Destino corregido", purpose="Finalidad revisada",
+            planned_departure=datetime(2026, 5, 4, 10, tzinfo=timezone.utc),
+            planned_return=datetime(2026, 5, 4, 13, tzinfo=timezone.utc),
+            restrictions_checked=True,
+        )
+        assert updated.destination == "Destino corregido"
+        assert updated.actual_departure is None
+        audit = session.scalar(select(AccessAudit).where(
+            AccessAudit.event == "outing_details_updated"
+        ))
+        assert audit is not None
+        assert "Destino inicial" in audit.details
+        assert "Destino corregido" in audit.details
