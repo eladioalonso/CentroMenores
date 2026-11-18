@@ -2,7 +2,7 @@
 from datetime import date, datetime, timezone
 import json
 
-from PySide6.QtCore import Qt, QDate
+from PySide6.QtCore import Qt, QDate, QDateTime
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QComboBox, QLineEdit, QTextEdit,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
@@ -26,6 +26,7 @@ from gestion_centro.domain.health_service import (
     record_medication_administration, add_vaccine_record, list_medication_plans, list_medication_plan_versions,
     set_medication_schedules, update_medication_plan, list_daily_medication_schedule, record_vaccine_dose_review, list_vaccine_dose_reviews, list_vaccine_calendar_items,
     update_vaccine_record, list_vaccine_record_versions,
+    update_medication_administration, list_medication_administration_versions,
 )
 
 
@@ -656,7 +657,13 @@ class HealthDialog(StaySelectorDialog):
         administration_layout.addWidget(self.administrations)
         administer_button = QPushButton("Registrar resultado de administración")
         administer_button.clicked.connect(self.administer)
+        edit_administration_button = QPushButton("Rectificar administración seleccionada")
+        edit_administration_button.clicked.connect(self.edit_administration)
+        administration_history_button = QPushButton("Historial de administración")
+        administration_history_button.clicked.connect(self.show_administration_history)
         administration_layout.addWidget(administer_button)
+        administration_layout.addWidget(edit_administration_button)
+        administration_layout.addWidget(administration_history_button)
         self.tabs.addTab(administration_tab, "Administraciones")
 
         vaccine_tab = QWidget()
@@ -1185,6 +1192,97 @@ class HealthDialog(StaySelectorDialog):
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo registrar", str(exc))
 
+
+    def edit_administration(self):
+        row = self.administrations.currentRow()
+        cell = self.administrations.item(row, 0) if row >= 0 else None
+        data = cell.data(Qt.ItemDataRole.UserRole) if cell else None
+        if not data or not data[3]:
+            QMessageBox.information(self, "Selecciona administración", "Selecciona un registro de administración ya guardado.")
+            return
+        administration_id = data[3]
+        with session_scope(self.factory) as session:
+            record = session.get(MedicationAdministration, administration_id)
+            if record is None:
+                QMessageBox.warning(self, "No disponible", "El registro ya no existe.")
+                return
+            values = (record.scheduled_at, record.status, record.shift, record.note or "")
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Rectificar administración de medicación")
+        form = QFormLayout(dialog)
+        scheduled = QDateTimeEdit(QDateTime.fromPython(values[0].astimezone()))
+        scheduled.setCalendarPopup(True)
+        scheduled.setDisplayFormat("dd/MM/yyyy HH:mm")
+        status = QComboBox()
+        for label, key in [("Administrada", "administered"),
+                           ("Rechazada", "refused"), ("No disponible", "not_available")]:
+            status.addItem(label, key)
+        status.setCurrentIndex(max(0, status.findData(values[1])))
+        shift = QComboBox()
+        for label, key in [("Mañana", "morning"), ("Tarde", "afternoon"),
+                           ("Noche", "night"), ("Sin especificar", "unspecified")]:
+            shift.addItem(label, key)
+        shift.setCurrentIndex(max(0, shift.findData(values[2])))
+        note = QTextEdit()
+        note.setPlainText(values[3])
+        form.addRow("Fecha y hora prevista", scheduled)
+        form.addRow("Resultado", status)
+        form.addRow("Turno", shift)
+        form.addRow("Motivo / nota", note)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        moment = scheduled.dateTime().toPython()
+        moment = moment.astimezone(timezone.utc) if moment.tzinfo else moment.astimezone().astimezone(timezone.utc)
+        try:
+            with session_scope(self.factory) as session:
+                update_medication_administration(
+                    session, actor_account_id=self.actor_id,
+                    administration_id=administration_id, scheduled_at=moment,
+                    status=status.currentData(), shift=shift.currentData(),
+                    note=note.toPlainText(),
+                )
+            self.refresh()
+            QMessageBox.information(self, "Administración rectificada", "Se ha guardado la nueva versión y se conserva el registro anterior.")
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo rectificar", str(exc))
+
+    def show_administration_history(self):
+        row = self.administrations.currentRow()
+        cell = self.administrations.item(row, 0) if row >= 0 else None
+        data = cell.data(Qt.ItemDataRole.UserRole) if cell else None
+        if not data or not data[3]:
+            QMessageBox.information(self, "Selecciona administración", "Selecciona un registro guardado.")
+            return
+        with session_scope(self.factory) as session:
+            versions = list_medication_administration_versions(
+                session, actor_account_id=self.actor_id, administration_id=data[3]
+            )
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Historial de administraciones")
+        dialog.resize(900, 500)
+        layout = QVBoxLayout(dialog)
+        table = QTableWidget(len(versions), 4)
+        table.setHorizontalHeaderLabels(["Fecha", "Profesional", "Datos anteriores", "Datos nuevos"])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        for index, version in enumerate(versions):
+            values = [
+                version.changed_at.astimezone().strftime("%d/%m/%Y %H:%M"),
+                version.changed_by_name_snapshot,
+                json.dumps(version.old_values, ensure_ascii=False, indent=2),
+                json.dumps(version.new_values, ensure_ascii=False, indent=2),
+            ]
+            for col, value in enumerate(values):
+                table.setItem(index, col, QTableWidgetItem(value))
+        layout.addWidget(table)
+        close = QPushButton("Cerrar")
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close)
+        dialog.exec()
 
     def show_vaccine_catalog(self):
         """Consulta las ediciones documentales sin convertirlas en pautas automáticas."""
