@@ -139,16 +139,14 @@ def list_school_records(session: Session, *, actor_account_id: str, placement_id
 def revise_education_update(session: Session, *, actor_account_id: str, update_id: str,
                             objective_description: str, actions_taken: str,
                             response_observed: str, follow_up: str | None = None):
-    """Registra una rectificación propia como nueva actualización, sin alterar el original."""
+    """Registra una rectificación compartida como nueva actualización, sin alterar el original."""
     actor = _actor(session, actor_account_id)
     original = session.get(EducationUpdate, update_id)
     if original is None:
         raise ValueError("La actualización educativa original no existe")
-    if original.author_account_id != actor.id:
-        raise PermissionError("Solo puedes rectificar tus propias actualizaciones")
     goal = session.get(EducationGoal, original.goal_id)
-    if goal is None or goal.status == "closed":
-        raise ValueError("El seguimiento está cerrado y no admite rectificaciones ordinarias")
+    if goal is None:
+        raise ValueError("El seguimiento original ya no existe")
     if not all(value.strip() for value in (objective_description, actions_taken, response_observed)):
         raise ValueError("Completa observación, actuación y respuesta")
     correction = EducationUpdate(
@@ -161,5 +159,6 @@ def revise_education_update(session: Session, *, actor_account_id: str, update_i
     session.add(correction)
     session.flush()
     _audit(session, actor, "education_update_revised",
-           f"Original:{original.id}; rectificación:{correction.id}")
+           f"Original:{original.id}; rectificación:{correction.id}; "
+           f"autor original:{original.author_name_snapshot}; modificado por:{actor.professional.display_name}")
     return correction
