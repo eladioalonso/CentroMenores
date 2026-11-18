@@ -576,9 +576,27 @@ class HealthDialog(StaySelectorDialog):
         profile_tab = QWidget()
         profile_layout = QVBoxLayout(profile_tab)
         form = QFormLayout()
-        self.allergies = QTextEdit(); self.allergies.setMinimumHeight(100)
-        self.conditions = QTextEdit(); self.conditions.setMinimumHeight(100)
-        self.emergency = QTextEdit(); self.emergency.setMinimumHeight(100)
+        self.cip = QLineEdit()
+        self.health_center = QLineEdit()
+        self.physician = QLineEdit()
+        self.nurse = QLineEdit()
+        self.health_card_expiry = QDateEdit(QDate.currentDate())
+        self.health_card_expiry.setCalendarPopup(True)
+        self.no_health_card_expiry = QCheckBox("Sin fecha de caducidad indicada")
+        self.health_card_expiry.setEnabled(False)
+        self.no_health_card_expiry.setChecked(True)
+        self.no_health_card_expiry.toggled.connect(lambda checked: self.health_card_expiry.setEnabled(not checked))
+        self.clinical_history = QTextEdit(); self.clinical_history.setMinimumHeight(90)
+        self.allergies = QTextEdit(); self.allergies.setMinimumHeight(80)
+        self.conditions = QTextEdit(); self.conditions.setMinimumHeight(80)
+        self.emergency = QTextEdit(); self.emergency.setMinimumHeight(80)
+        form.addRow("CIP", self.cip)
+        form.addRow("Centro de salud", self.health_center)
+        form.addRow("Facultativo", self.physician)
+        form.addRow("Enfermería", self.nurse)
+        form.addRow("Caducidad tarjeta sanitaria", self.health_card_expiry)
+        form.addRow("", self.no_health_card_expiry)
+        form.addRow("Historial clínico", self.clinical_history)
         form.addRow("Alergias", self.allergies)
         form.addRow("Condiciones relevantes", self.conditions)
         form.addRow("Instrucciones de emergencia", self.emergency)
@@ -695,7 +713,9 @@ class HealthDialog(StaySelectorDialog):
         minor_id = self.stay.currentData()
         if not minor_id:
             self.resident_context.setText("Selecciona un residente para consultar su información sanitaria.")
-            self.allergies.clear(); self.conditions.clear(); self.emergency.clear()
+            self.cip.clear(); self.health_center.clear(); self.physician.clear(); self.nurse.clear()
+            self.clinical_history.clear(); self.allergies.clear(); self.conditions.clear(); self.emergency.clear()
+            self.no_health_card_expiry.setChecked(True)
             self.plans.setRowCount(0); self.administrations.setRowCount(0); self.vaccines.setRowCount(0); self.vaccine_reviews.setRowCount(0)
             return
         with session_scope(self.factory) as session:
@@ -755,6 +775,17 @@ class HealthDialog(StaySelectorDialog):
                 f"{resident_name}  |  Sin ingreso activo  |  Consulta histórica disponible; "
                 "no se pueden registrar administraciones de medicación."
             )
+        self.cip.setText((profile.cip or "") if profile else "")
+        self.health_center.setText((profile.health_center or "") if profile else "")
+        self.physician.setText((profile.physician or "") if profile else "")
+        self.nurse.setText((profile.nurse or "") if profile else "")
+        self.clinical_history.setPlainText((profile.clinical_history or "") if profile else "")
+        if profile and profile.health_card_expires_on:
+            expiry = profile.health_card_expires_on
+            self.health_card_expiry.setDate(QDate(expiry.year, expiry.month, expiry.day))
+            self.no_health_card_expiry.setChecked(False)
+        else:
+            self.no_health_card_expiry.setChecked(True)
         self.allergies.setPlainText((profile.allergies or "") if profile else "")
         self.conditions.setPlainText((profile.relevant_conditions or "") if profile else "")
         self.emergency.setPlainText((profile.emergency_instructions or "") if profile else "")
@@ -890,6 +921,13 @@ class HealthDialog(StaySelectorDialog):
                     allergies=self.allergies.toPlainText(),
                     relevant_conditions=self.conditions.toPlainText(),
                     emergency_instructions=self.emergency.toPlainText(),
+                    cip=self.cip.text(), health_center=self.health_center.text(),
+                    physician=self.physician.text(), nurse=self.nurse.text(),
+                    health_card_expires_on=(
+                        None if self.no_health_card_expiry.isChecked()
+                        else self.health_card_expiry.date().toPython()
+                    ),
+                    clinical_history=self.clinical_history.toPlainText(),
                 )
             QMessageBox.information(self, "Ficha sanitaria", "Datos guardados y auditados.")
         except (ValueError, PermissionError) as exc:
