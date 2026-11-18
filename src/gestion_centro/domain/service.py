@@ -225,7 +225,7 @@ def _audit(session: Session, actor: UserAccount, event: str, details: str) -> No
     ))
 
 
-VALID_SHIFTS = {"morning", "afternoon", "night"}
+VALID_SHIFTS = {"morning", "afternoon", "night", "unspecified"}
 VALID_CATEGORIES = {"general", "activity", "health", "observation", "positive", "negative", "maintenance", "other"}
 VALID_SEVERITIES = {"low", "medium", "high", "critical"}
 VALID_INCIDENT_TYPES = {"behavior", "health", "safety", "conflict", "escape", "damage", "other"}
