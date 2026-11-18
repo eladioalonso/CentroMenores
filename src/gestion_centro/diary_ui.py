@@ -53,7 +53,6 @@ class DiaryDialog(QDialog):
         for label, key in self.CATEGORIES.items():
             if key != "health" or self.health_access:
                 self.category.addItem(label, key)
-        self.shift.hide()
         self.content = QTextEdit()
         self.content.setMinimumHeight(130)
         self.content.setPlaceholderText("Describe los hechos con claridad. El texto se ajustará automáticamente al ancho del cuadro.")
@@ -61,6 +60,7 @@ class DiaryDialog(QDialog):
         self.participant_hint.setReadOnly(True)
         self.selected_stay_ids = []
         form.addRow("Fecha del parte", self.day)
+        form.addRow("Turno", self.shift)
         form.addRow("Apartado", self.category)
         form.addRow("Contenido", self.content)
         select_stays = QPushButton("Vincular menores / estancias…")
