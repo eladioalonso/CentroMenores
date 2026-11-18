@@ -12,7 +12,7 @@ La estructura de perfiles confirmada inicialmente por el centro es sencilla: tod
 
 Todos los educadores utilizarán el mismo perfil y dispondrán de las mismas funciones ordinarias, de acuerdo con las autorizaciones y reglas generales de protección de datos del centro.
 
-Las funciones ordinarias previstas incluyen el trabajo con menores y estancias, diario profesional, incidencias, salidas y visitas, actividades, seguimiento educativo, escolaridad, tareas y traspasos, y consulta de la documentación necesaria para su trabajo.
+Las funciones ordinarias se organizan exclusivamente en cuatro módulos: expediente principal del menor, expediente sanitario del menor, parte diario e informes de incidencias generados desde el parte. Las herramientas de agenda, documentación, salidas, visitas, seguimiento educativo y escolaridad se integran dentro del expediente o del trabajo diario, sin constituir módulos adicionales.
 
 No habrá categorías de educadores ni niveles diferentes de permisos entre ellos en esta primera definición.
 
@@ -31,7 +31,7 @@ Entre las funciones adicionales previstas:
 
 Los permisos de administración son aditivos: no sustituyen ni eliminan las funciones ordinarias de educador.
 
-La administración técnica no concede automáticamente acceso al contenido sanitario. El administrador puede asignar o retirar expresamente el permiso sanitario a una cuenta; cada cambio queda auditado. Al tratarse de una aplicación local, habrá que analizar las limitaciones de separación frente a quien tenga control administrativo del ordenador y de los archivos.
+La ficha sanitaria está disponible para todos los educadores activos, de acuerdo con la decisión funcional vigente. El administrador conserva además sus funciones técnicas. Al tratarse de una aplicación local, habrá que analizar las limitaciones de separación frente a quien tenga control administrativo del ordenador y de los archivos.
 
 ## 3. Permisos por operación
 
@@ -85,7 +85,7 @@ La decisión funcional más reciente permite que todos los educadores activos co
 - El perfil Educador no obtiene por ello funciones de administración técnica, copias o restauración.
 - La autorización institucional, la minimización de datos, la revisión de roles y la aprobación de protección de datos siguen siendo requisitos previos a cualquier uso con información real.
 
-La separación de permisos por operación (consulta, alta, modificación, exportación e impresión) podrá definirse en una fase posterior si el centro la solicita y aprueba.
+La interfaz y los servicios aplicarán las mismas capacidades ordinarias a todos los educadores activos. No se restringirá la edición por autoría, turno o cierre del parte. Las operaciones técnicas de administración, copias y restauración permanecen reservadas al administrador.
 ## 6. Identificación y sesión
 
 - Cada profesional tendrá una cuenta individual.
