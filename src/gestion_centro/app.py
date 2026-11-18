@@ -35,8 +35,7 @@ from gestion_centro.domain.service import (
     close_expired_diary_days, create_agenda_item, list_agenda_items,
     set_agenda_item_status, has_health_access,
 )
-from gestion_centro.domain.models import Stay
-from gestion_centro.domain.models import AgendaItem, Incident
+from gestion_centro.domain.models import Stay, DiaryEntry, AgendaItem
 from gestion_centro.domain.documents import Outing, OutingStay
 from gestion_centro.domain.documents import PersonalDocument
 from gestion_centro.domain.documents_service import register_document, list_documents, list_document_stays
@@ -967,11 +966,10 @@ class MainWindow(QMainWindow):
                             Outing.status == "in_progress", Outing.planned_return < now,
                         )
                     ) or 0))
-                    incident_query = select(func.count()).select_from(Incident).where(
-                        Incident.status == "open")
-                    if not has_health_access(session, actor_account_id=account_id):
-                        incident_query = incident_query.where(Incident.incident_type != "health")
-                    counters["incidents"].setText(str(session.scalar(incident_query) or 0))
+                    relevant_entries = select(func.count()).select_from(DiaryEntry).where(
+                        DiaryEntry.category.in_(("negative", "observation"))
+                    )
+                    counters["incidents"].setText(str(session.scalar(relevant_entries) or 0))
                     counters["tasks"].setText(str(session.scalar(
                         select(func.count()).select_from(AgendaItem).where(
                             AgendaItem.kind == "task", AgendaItem.status.in_(("pending", "in_progress")),
