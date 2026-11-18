@@ -310,3 +310,33 @@ def test_educators_can_consult_health_records_without_special_permission(health_
  account.health_access=False
  assert read_health_profile(s,actor_account_id=actor,minor_id=s.get(Stay,stay).minor_id) is None
  assert any(row.event == "health_profile_accessed" for row in s.scalars(select(AccessAudit)).all())
+
+
+
+def test_any_educator_can_edit_any_medication_plan_and_preserve_versions(health_case):
+ s,actor,stay=health_case
+ plan=add_medication_plan(s,actor_account_id=actor,stay_id=stay,
+  medication_name="Tratamiento inicial",prescribed_dose="1 unidad",
+  schedule_text="Una vez al día",prescriber_reference="Prescripción inicial",
+  starts_on=date(2026,1,1),schedules=[("08:00","morning")])
+ professional=Professional(display_name="Segundo educador")
+ s.add(professional); s.flush()
+ second=UserAccount(professional_id=professional.id,username="health-editor",
+  password_hash="x",role="educator",health_access=False)
+ s.add(second); s.flush()
+ from gestion_centro.domain.health_service import update_medication_plan
+ updated=update_medication_plan(s,actor_account_id=second.id,plan_id=plan.id,
+  medication_name="Tratamiento corregido",prescribed_dose="2 unidades",
+  schedule_text="Dos veces al día",prescriber_reference="Nueva prescripción",
+  starts_on=date(2026,1,2),ends_on=date(2026,2,1),
+  instructions="Instrucciones revisadas",
+  schedules=[("09:00","morning"),("21:00","night")],active=True)
+ assert updated.medication_name=="Tratamiento corregido"
+ assert updated.prescribed_dose=="2 unidades"
+ assert updated.recorded_by_name_snapshot=="Educador"
+ versions=list_medication_plan_versions(s,actor_account_id=actor,plan_id=plan.id)
+ assert len(versions)==2
+ assert versions[0].changed_by_name_snapshot=="Segundo educador"
+ assert versions[0].old_values["medication_name"]=="Tratamiento inicial"
+ assert versions[0].new_values["medication_name"]=="Tratamiento corregido"
+ assert versions[0].new_values["instructions"]=="Instrucciones revisadas"
