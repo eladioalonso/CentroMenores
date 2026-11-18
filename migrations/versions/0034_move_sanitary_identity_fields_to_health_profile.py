@@ -125,6 +125,15 @@ def upgrade():
 
 
 def downgrade():
+    connection = op.get_bind()
+    connection.execute(sa.text(
+        "DELETE FROM health_profile_versions "
+        "WHERE changed_by_account_id IS NULL AND changed_by_name_snapshot='Migración histórica'"
+    ))
+    connection.execute(sa.text(
+        "DELETE FROM health_profiles "
+        "WHERE updated_by_account_id IS NULL AND updated_by_name_snapshot='Migración histórica'"
+    ))
     with op.batch_alter_table("health_profile_versions") as batch:
         batch.alter_column(
             "changed_by_account_id",
