@@ -20,6 +20,8 @@ def _audit(session: Session, actor: UserAccount, event: str, details: str):
 
 def _next_version_timestamp(session: Session, version_model, owner_column, owner_id: str) -> datetime:
     """Garantiza orden temporal estricto entre versiones del mismo registro."""
+    # Incluye las versiones añadidas antes dentro de la misma transacción.
+    session.flush()
     previous = session.scalar(
         select(version_model.changed_at)
         .where(owner_column == owner_id)
