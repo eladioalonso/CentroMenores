@@ -264,6 +264,7 @@ class IncidentReportsDialog(QDialog):
                 self.title.text(), self.recipient.text(), self.preview.toPlainText()
             )
             self.rectifying = False
+            self.issue_button.setEnabled(status == "draft")
             self.refresh_saved_reports(select_id=self.current_report_id)
             QMessageBox.information(
                 self, "Informe emitido" if issue else "Borrador guardado",
@@ -333,6 +334,7 @@ class IncidentReportsDialog(QDialog):
             issued = details[2] in {"issued", "rectified"}
             self.save_button.setEnabled(not issued)
             self.issue_button.setText("Emitir rectificación" if issued else "Emitir versión")
+            self.issue_button.setEnabled(not issued)
             self.rectifying = False
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo abrir el informe", str(exc))
@@ -380,6 +382,7 @@ class IncidentReportsDialog(QDialog):
         self.rectifying = True
         self.save_button.setEnabled(False)
         self.issue_button.setText("Emitir rectificación")
+        self.issue_button.setEnabled(True)
         QMessageBox.information(
             self, "Rectificación",
             "Modifica el contenido y la selección de hechos. Al emitir, se creará una nueva versión "
@@ -399,6 +402,7 @@ class IncidentReportsDialog(QDialog):
         self.preview.clear()
         self.save_button.setEnabled(True)
         self.issue_button.setText("Emitir versión")
+        self.issue_button.setEnabled(True)
         for row in range(self.table.rowCount()):
             item = self.table.item(row, 0)
             if item:
