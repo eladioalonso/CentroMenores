@@ -1,4 +1,9 @@
-from sqlalchemy import create_engine, inspect
+from datetime import date, datetime, timezone
+from pathlib import Path
+
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import create_engine, inspect, text
 
 from gestion_centro.persistence.migrations import upgrade_database
 
@@ -99,3 +104,76 @@ def test_migration_root_uses_pyinstaller_bundle_when_frozen(monkeypatch, tmp_pat
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path), raising=False)
     assert migration_root() == tmp_path
+
+
+
+def test_legacy_incidents_are_migrated_into_diary_with_minor_links(tmp_path):
+    engine = create_engine(f"sqlite:///{(tmp_path / 'legacy.db').as_posix()}")
+    root = Path(__file__).resolve().parents[1]
+    config = Config(str(root / "alembic.ini"))
+    config.set_main_option("script_location", str(root / "migrations"))
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.upgrade(config, "0031_incident_report_version_metadata")
+
+    now = datetime(2026, 6, 1, 12, tzinfo=timezone.utc)
+    with engine.begin() as connection:
+        connection.execute(text(
+            "INSERT INTO professionals (id, display_name, active, created_at) "
+            "VALUES ('professional-1', 'Educador histórico', 1, :now)"
+        ), {"now": now})
+        connection.execute(text(
+            "INSERT INTO user_accounts (id, professional_id, username, password_hash, role, "
+            "active, health_access, failed_attempts, created_at, updated_at) "
+            "VALUES ('account-1', 'professional-1', 'historical', 'hash', 'educator', "
+            "1, 0, 0, :now, :now)"
+        ), {"now": now})
+        connection.execute(text(
+            "INSERT INTO minors (id, internal_code, given_names, family_names, active, "
+            "created_at, updated_at) VALUES ('minor-1', 'legacy-code', 'Caso', 'Histórico', "
+            "1, :now, :now)"
+        ), {"now": now})
+        connection.execute(text(
+            "INSERT INTO stays (id, minor_id, sequence_number, started_on, status, created_at) "
+            "VALUES ('stay-1', 'minor-1', 1, '2026-01-01', 'active', :now)"
+        ), {"now": now})
+        connection.execute(text(
+            "INSERT INTO diary_days (id, diary_date, created_at) "
+            "VALUES ('day-1', '2026-06-01', :now)"
+        ), {"now": now})
+        connection.execute(text(
+            "INSERT INTO incidents (id, diary_day_id, title, description, incident_type, "
+            "severity, happened_at, recorded_at, status, author_account_id, "
+            "author_name_snapshot) VALUES ('incident-1', 'day-1', 'Hecho histórico', "
+            "'Descripción conservada', 'behavior', 'high', :now, :now, 'open', "
+            "'account-1', 'Educador histórico')"
+        ), {"now": now})
+        connection.execute(text(
+            "INSERT INTO incident_participants (id, incident_id, stay_id, role, "
+            "minor_code_snapshot, minor_name_snapshot) VALUES ('participant-1', "
+            "'incident-1', 'stay-1', 'affected', 'X1234567A', 'Caso Histórico')"
+        ))
+
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.upgrade(config, "head")
+    with engine.connect() as connection:
+        entry = connection.execute(text(
+            "SELECT shift, category, content, author_name_snapshot "
+            "FROM diary_entries WHERE content LIKE '%Hecho histórico%'"
+        )).mappings().one()
+        link = connection.execute(text(
+            "SELECT stay_id, minor_code_snapshot, minor_name_snapshot "
+            "FROM diary_entry_stay_links WHERE entry_id = ("
+            "SELECT id FROM diary_entries WHERE content LIKE '%Hecho histórico%')"
+        )).mappings().one()
+    assert entry["shift"] == "unspecified"
+    assert entry["category"] == "negative"
+    assert "Descripción conservada" in entry["content"]
+    assert entry["author_name_snapshot"] == "Educador histórico"
+    assert dict(link) == {
+        "stay_id": "stay-1",
+        "minor_code_snapshot": "X1234567A",
+        "minor_name_snapshot": "Caso Histórico",
+    }
+    engine.dispose()
