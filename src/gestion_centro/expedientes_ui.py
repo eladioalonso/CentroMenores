@@ -1,11 +1,11 @@
 """Consulta y gestión básica de expedientes y estancias."""
 from datetime import date, datetime, timezone
 
-from PySide6.QtCore import Qt, QDate
+from PySide6.QtCore import Qt, QDate, QDateTime
 from PySide6.QtWidgets import (
     QDialog, QDialogButtonBox, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QInputDialog,
-    QLabel, QDateEdit, QTabWidget, QWidget, QTextEdit, QScrollArea, QComboBox,
+    QLabel, QDateEdit, QTabWidget, QWidget, QTextEdit, QScrollArea, QComboBox, QDateTimeEdit, QDialogButtonBox,
 )
 from sqlalchemy import select
 
@@ -13,7 +13,7 @@ from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import Minor, Stay, Event, EventStayLink, MinorPersonalDataVersion
 from gestion_centro.domain.documents_service import list_documents
 from gestion_centro.domain.service import (
-    create_minor, open_stay, close_stay, record_event,
+    create_minor, open_stay, close_stay, record_event, update_stay, revise_event,
     has_health_access, HEALTH_PERSONAL_FIELDS,
 )
 
@@ -105,12 +105,16 @@ class MinorWorkspaceDialog(QDialog):
         self.personal = QWidget()
         self.personal_form = QFormLayout(self.personal)
         self.tabs.addTab(self.personal, 'Datos personales')
-        self.stays = QTableWidget(0, 4)
-        self.stays.setHorizontalHeaderLabels(['Ingreso', 'Salida', 'Estado', 'Motivo'])
+        self.stays = QTableWidget(0, 5)
+        self.stays.setHorizontalHeaderLabels(['ID', 'Ingreso', 'Salida', 'Estado', 'Motivo'])
+        self.stays.setColumnHidden(0, True)
+        self.stays.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.stays.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.tabs.addTab(self.stays, 'Estancias')
-        self.events = QTableWidget(0, 4)
-        self.events.setHorizontalHeaderLabels(['Fecha', 'Acontecimiento', 'Descripción', 'Autor'])
+        self.events = QTableWidget(0, 5)
+        self.events.setHorizontalHeaderLabels(['ID', 'Fecha', 'Acontecimiento', 'Descripción', 'Autor'])
+        self.events.setColumnHidden(0, True)
+        self.events.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.events.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.tabs.addTab(self.events, 'Acontecimientos')
         documents_tab = QWidget()
@@ -130,7 +134,7 @@ class MinorWorkspaceDialog(QDialog):
         documents_layout.addStretch(1)
         self.tabs.addTab(documents_tab, 'Documentación')
         actions = QHBoxLayout()
-        for label, callback in [('Nuevo ingreso / reingreso', self.new_stay), ('Cerrar estancia', self.close_stay), ('Registrar acontecimiento', self.add_event), ('Historial completo', lambda: self.tabs.setCurrentWidget(self.events))]:
+        for label, callback in [('Nuevo ingreso / reingreso', self.new_stay), ('Cerrar estancia', self.close_stay), ('Modificar estancia', self.edit_stay), ('Registrar acontecimiento', self.add_event), ('Rectificar acontecimiento', self.edit_event), ('Historial completo', lambda: self.tabs.setCurrentWidget(self.events))]:
             button = QPushButton(label)
             button.clicked.connect(callback)
             actions.addWidget(button)
@@ -179,18 +183,141 @@ class MinorWorkspaceDialog(QDialog):
                     self.documents_table.setItem(row, col, QTableWidgetItem(value))
             self.stays.setRowCount(len(stays))
             for row, stay in enumerate(stays):
-                vals = [str(stay.started_on), str(stay.ended_on or '—'), 'Activa' if stay.status == 'active' else 'Cerrada', stay.closure_reason or '—']
+                vals = [stay.id, str(stay.started_on), str(stay.ended_on or '—'),
+                        'Activa' if stay.status == 'active' else 'Cerrada', stay.closure_reason or '—']
                 for col, value in enumerate(vals):
-                    self.stays.setItem(row, col, QTableWidgetItem(value))
+                    cell = QTableWidgetItem(str(value))
+                    if col == 0:
+                        cell.setData(Qt.ItemDataRole.UserRole, stay.id)
+                    self.stays.setItem(row, col, cell)
             links = session.scalars(select(EventStayLink).join(Stay).where(Stay.minor_id == minor.id)).all()
-            events = [session.get(Event, link.event_id) for link in links]
+            event_map = {event.id: event for event in (
+                session.get(Event, link.event_id) for link in links
+            ) if event is not None}
+            superseded_events = {event.correction_of_id for event in event_map.values() if event.correction_of_id}
+            events = [event for event in event_map.values() if event.id not in superseded_events]
             events.sort(key=lambda item: item.happened_at, reverse=True)
             self.events.setRowCount(len(events))
             for row, event in enumerate(events):
-                vals = [event.happened_at.astimezone().strftime('%d/%m/%Y %H:%M'), event.title, event.description, event.author_name_snapshot]
+                vals = [event.id, event.happened_at.astimezone().strftime('%d/%m/%Y %H:%M'),
+                        event.title, event.description, event.author_name_snapshot]
                 for col, value in enumerate(vals):
-                    self.events.setItem(row, col, QTableWidgetItem(value))
+                    cell = QTableWidgetItem(str(value))
+                    if col == 0:
+                        cell.setData(Qt.ItemDataRole.UserRole, event.id)
+                    self.events.setItem(row, col, cell)
 
+
+    def edit_stay(self):
+        row = self.stays.currentRow()
+        cell = self.stays.item(row, 0) if row >= 0 else None
+        if cell is None:
+            QMessageBox.information(self, 'Selecciona estancia', 'Selecciona primero una estancia.')
+            return
+        stay_id = cell.data(Qt.ItemDataRole.UserRole)
+        with session_scope(self.factory) as session:
+            stay = session.get(Stay, stay_id)
+            if stay is None:
+                QMessageBox.warning(self, 'No disponible', 'La estancia ya no existe.')
+                return
+            values = (stay.started_on, stay.ended_on, stay.status, stay.closure_reason or '')
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Modificar estancia')
+        form = QFormLayout(dialog)
+        started = QDateEdit(QDate(values[0].year, values[0].month, values[0].day))
+        started.setCalendarPopup(True)
+        status = QComboBox()
+        status.addItem('Activa', 'active')
+        status.addItem('Cerrada', 'closed')
+        status.setCurrentIndex(max(0, status.findData(values[2])))
+        ended = QDateEdit(QDate.currentDate())
+        ended.setCalendarPopup(True)
+        no_end = QCheckBox('Sin fecha de salida')
+        if values[1]:
+            ended.setDate(QDate(values[1].year, values[1].month, values[1].day))
+        else:
+            no_end.setChecked(True)
+        reason = QTextEdit()
+        reason.setPlainText(values[3])
+        def update_state():
+            closed = status.currentData() == 'closed'
+            no_end.setEnabled(not closed)
+            ended.setEnabled(closed)
+            reason.setEnabled(closed)
+        status.currentIndexChanged.connect(update_state)
+        update_state()
+        form.addRow('Fecha de ingreso', started)
+        form.addRow('Estado', status)
+        form.addRow('Fecha de salida', ended)
+        form.addRow('', no_end)
+        form.addRow('Motivo de cierre', reason)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        final_status = status.currentData()
+        try:
+            with session_scope(self.factory) as session:
+                update_stay(
+                    session, actor_account_id=self.actor_id, stay_id=stay_id,
+                    started_on=started.date().toPython(), status=final_status,
+                    ended_on=ended.date().toPython() if final_status == 'closed' else None,
+                    closure_reason=reason.toPlainText() if final_status == 'closed' else None,
+                )
+            self.refresh()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, 'No se pudo modificar la estancia', str(exc))
+
+    def edit_event(self):
+        row = self.events.currentRow()
+        cell = self.events.item(row, 0) if row >= 0 else None
+        if cell is None:
+            QMessageBox.information(self, 'Selecciona acontecimiento', 'Selecciona primero un acontecimiento.')
+            return
+        event_id = cell.data(Qt.ItemDataRole.UserRole)
+        with session_scope(self.factory) as session:
+            event = session.get(Event, event_id)
+            if event is None:
+                QMessageBox.warning(self, 'No disponible', 'El acontecimiento ya no existe.')
+                return
+            values = (event.title, event.description, event.happened_at)
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Rectificar acontecimiento')
+        dialog.resize(600, 460)
+        form = QFormLayout(dialog)
+        title = QLineEdit(values[0])
+        description = QTextEdit()
+        description.setPlainText(values[1])
+        happened = QDateTimeEdit(QDateTime.fromPython(values[2].astimezone()))
+        happened.setCalendarPopup(True)
+        happened.setDisplayFormat('dd/MM/yyyy HH:mm')
+        reason = QLineEdit()
+        reason.setPlaceholderText('Motivo de la corrección')
+        form.addRow('Título', title)
+        form.addRow('Descripción', description)
+        form.addRow('Fecha y hora', happened)
+        form.addRow('Motivo', reason)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        moment = happened.dateTime().toPython()
+        moment = moment.astimezone(timezone.utc) if moment.tzinfo else moment.astimezone().astimezone(timezone.utc)
+        try:
+            with session_scope(self.factory) as session:
+                revise_event(
+                    session, actor_account_id=self.actor_id, event_id=event_id,
+                    title=title.text(), description=description.toPlainText(),
+                    happened_at=moment, reason=reason.text(),
+                )
+            self.refresh()
+            QMessageBox.information(self, 'Acontecimiento rectificado', 'Se ha creado una nueva versión y se conserva la original.')
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, 'No se pudo rectificar', str(exc))
 
     def current_stay(self):
         with session_scope(self.factory) as session:
