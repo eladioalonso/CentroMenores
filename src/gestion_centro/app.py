@@ -49,6 +49,7 @@ from gestion_centro.maintenance_ui import MaintenanceDialog
 from gestion_centro.reports_ui import ReportsDialog
 from gestion_centro.external_reports_ui import ExternalReportsDialog
 from gestion_centro.diary_ui import DiaryDialog
+from gestion_centro.incident_reports_ui import IncidentReportsDialog
 from gestion_centro.calendar_ui import CalendarDialog
 from gestion_centro.help_ui import HelpDialog
 from gestion_centro.domain.communications_service import (
@@ -1085,7 +1086,15 @@ class MainWindow(QMainWindow):
             daily = QWidget()
             tabs.addTab(daily, "Parte diario")
             daily_layout = QVBoxLayout(daily)
-            daily_layout.setContentsMargins(0, 0, 0, 0)
+            daily_actions = QHBoxLayout()
+            agenda_button = QPushButton("Agenda y tareas del equipo")
+            agenda_button.clicked.connect(lambda: AgendaDialog(factory, account_id).exec())
+            calendar_button = QPushButton("Calendario de actividades y citas")
+            calendar_button.clicked.connect(lambda: CalendarDialog(factory, account_id).exec())
+            daily_actions.addWidget(agenda_button)
+            daily_actions.addWidget(calendar_button)
+            daily_actions.addStretch(1)
+            daily_layout.addLayout(daily_actions)
             if callable(factory):
                 diary_panel = DiaryDialog(factory, account_id)
                 diary_panel.setParent(daily)
@@ -1095,29 +1104,38 @@ class MainWindow(QMainWindow):
             else:
                 daily_layout.addWidget(QLabel("El parte diario estará disponible al iniciar una sesión de trabajo."))
 
-            minors_page = QWidget()
-            tabs.addTab(minors_page, "Menores")
-            add_actions(minors_page, [
-                ("Expedientes", "Consulta menores, estancias e historial personal.", lambda: ExpedientesDialog(factory, account_id, documents_opener=lambda minor_id: DocumentsDialog(factory, account_id, paths, minor_id=minor_id).exec()).exec()),
-                ("Seguimiento educativo", "Consulta y registra la evolución educativa y escolar.", lambda: EducationDialog(factory, account_id).exec()),
-                ("Ficha sanitaria y medicación", "Consulta información sanitaria, tratamientos y medicación.", lambda: open_health_dialog()),
-                ("Salidas", "Registra salidas y controla los retornos.", lambda: OutingsDialog(factory, account_id).exec()),
-                ("Autorizaciones", "Consulta y gestiona autorizaciones y consentimientos.", lambda: AuthorizationsDialog(factory, account_id).exec()),
+            main_file_page = QWidget()
+            tabs.addTab(main_file_page, "Expediente principal")
+            add_actions(main_file_page, [
+                ("Expedientes de menores", "Consulta y actualiza la ficha principal, estancias e historial personal.", lambda: ExpedientesDialog(factory, account_id, documents_opener=lambda minor_id: DocumentsDialog(factory, account_id, paths, minor_id=minor_id).exec()).exec()),
+                ("Seguimiento educativo y escolar", "Consulta y modifica objetivos, evolución educativa y escolaridad.", lambda: EducationDialog(factory, account_id).exec()),
+                ("Documentación del menor", "Añade y consulta documentos personales y administrativos vinculados al expediente.", lambda: DocumentsDialog(factory, account_id, paths).exec()),
+                ("Salidas y retornos", "Registra salidas y controla los retornos de los menores.", lambda: OutingsDialog(factory, account_id).exec()),
+                ("Autorizaciones y visitas", "Consulta y gestiona autorizaciones, consentimientos y restricciones.", lambda: AuthorizationsDialog(factory, account_id).exec()),
+                ("Informes externos", "Prepara documentación autorizada para organismos externos.", lambda: ExternalReportsDialog(factory, account_id).exec()),
             ])
 
-            documents_page = QWidget()
-            tabs.addTab(documents_page, "Documentación")
-            add_actions(documents_page, [
-                ("Documentos de menores", "Añade y consulta documentación vinculada a cada expediente.", lambda: DocumentsDialog(factory, account_id, paths).exec()),
-                ("Informes externos", "Prepara y consulta informes y documentación para organismos externos.", lambda: ExternalReportsDialog(factory, account_id).exec()),
+            health_page = QWidget()
+            tabs.addTab(health_page, "Expediente sanitario")
+            add_actions(health_page, [
+                ("Abrir expediente sanitario", "Consulta y modifica historial clínico, tratamientos, medicación y vacunación del menor.", open_health_dialog),
             ])
 
-            calendar_page = QWidget()
-            tabs.addTab(calendar_page, "Calendario")
-            add_actions(calendar_page, [
-                ("Calendario y agenda común", "Consulta citas, actividades, tareas y fechas relevantes por día, semana, mes o año.", lambda: CalendarDialog(factory, account_id).exec()),
-                ("Organizar tareas", "Añade tareas, citas y actividades para todo el equipo.", lambda: AgendaDialog(factory, account_id).exec()),
+            incident_reports_page = QWidget()
+            tabs.addTab(incident_reports_page, "Informes de incidencias")
+            add_actions(incident_reports_page, [
+                ("Crear informe desde el parte diario", "Selecciona anotaciones del diario, revisa el texto cronológico y exporta el informe.", lambda: IncidentReportsDialog(factory, account_id).exec()),
             ])
+        else:
+            for label in ("Parte diario", "Expediente principal", "Expediente sanitario", "Informes de incidencias"):
+                placeholder = QWidget()
+                tabs.addTab(placeholder, label)
+                placeholder_layout = QVBoxLayout(placeholder)
+                placeholder_layout.addWidget(QLabel(
+                    f"{label} estará disponible al iniciar una sesión de trabajo."
+                ))
+                placeholder_layout.addStretch(1)
+
         if role is Role.ADMIN and factory is not None and account_id is not None:
             administration = QWidget()
             tabs.addTab(administration, "Administración")
@@ -1133,9 +1151,9 @@ class MainWindow(QMainWindow):
         sidebar_items = [
             ("Inicio", 0),
             ("Parte diario", 1),
-            ("Menores", 2),
-            ("Documentación", 3),
-            ("Calendario", 4),
+            ("Expediente principal", 2),
+            ("Expediente sanitario", 3),
+            ("Informes de incidencias", 4),
         ]
         if role is Role.ADMIN and tabs.count() > 5:
             sidebar_items.append(("Administración", 5))
