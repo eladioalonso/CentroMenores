@@ -343,6 +343,8 @@ class IncidentReportsDialog(QDialog):
                 for version in versions:
                     history.extend([
                         f"VERSIÓN {version.version_number} · {STATUS_LABELS.get(version.status, version.status)}",
+                        f"Título: {version.title}",
+                        f"Destinatario: {version.recipient or 'No especificado'}",
                         f"Fecha: {version.created_at.astimezone().strftime('%d/%m/%Y %H:%M')}",
                         f"Realizada por: {version.created_by_name_snapshot}",
                         f"Hechos vinculados: {len(version.entries)}",
