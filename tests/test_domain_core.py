@@ -487,3 +487,30 @@ def test_any_educator_can_revise_event_and_preserve_participant_links():
                 title="Otra corrección", description="Otra descripción",
                 happened_at=datetime(2026, 2, 1, 12, tzinfo=timezone.utc),
                 reason="No crear una rama")
+
+
+
+def test_diary_revision_can_correct_linked_minor_and_stay():
+    from gestion_centro.domain.models import DiaryEntryStayLink
+    from gestion_centro.domain.service import record_diary_entry, revise_diary_entry
+    with make_session() as session:
+        actor=create_professional_account(session,display_name="Educador",
+            username="diary-links",password="contraseña de prueba segura",role=Role.EDUCATOR)
+        minor=create_minor(session,actor_account_id=actor.id,given_names="Caso",family_names="Vínculos")
+        first=open_stay(session,actor_account_id=actor.id,minor_id=minor.id,started_on=date(2026,1,1))
+        close_stay(session,actor_account_id=actor.id,stay_id=first.id,
+            ended_on=date(2026,2,1),reason="Fin ficticio")
+        second=open_stay(session,actor_account_id=actor.id,minor_id=minor.id,started_on=date(2026,2,2))
+        moment=datetime(2026,2,3,10,tzinfo=timezone.utc)
+        original=record_diary_entry(session,actor_account_id=actor.id,
+            diary_date=date(2026,2,3),shift="morning",category="observation",
+            content="Hecho ficticio",happened_at=moment,stay_ids=[first.id])
+        revised=revise_diary_entry(session,actor_account_id=actor.id,
+            original_entry_id=original.id,content="Hecho vinculado correctamente",
+            reason="Corrección de participantes",stay_ids=[second.id])
+        links=session.scalars(select(DiaryEntryStayLink).where(
+            DiaryEntryStayLink.entry_id==revised.id)).all()
+        assert [link.stay_id for link in links]==[second.id]
+        old_links=session.scalars(select(DiaryEntryStayLink).where(
+            DiaryEntryStayLink.entry_id==original.id)).all()
+        assert [link.stay_id for link in old_links]==[first.id]
