@@ -70,6 +70,7 @@ def save_incident_report(session: Session, *, actor_account_id: str,
     version_status = "rectified" if report.status == "rectified" else ("issued" if issue else "draft")
     version = IncidentReportVersion(
         report=report, version_number=latest_number + 1,
+        title=clean_title, recipient=clean_recipient,
         status=version_status, content=clean_content,
         created_by_account_id=actor.id,
         created_by_name_snapshot=actor.professional.display_name,
