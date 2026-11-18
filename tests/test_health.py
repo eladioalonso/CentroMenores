@@ -340,3 +340,30 @@ def test_any_educator_can_edit_any_medication_plan_and_preserve_versions(health_
  assert versions[0].old_values["medication_name"]=="Tratamiento inicial"
  assert versions[0].new_values["medication_name"]=="Tratamiento corregido"
  assert versions[0].new_values["instructions"]=="Instrucciones revisadas"
+
+
+
+def test_any_educator_can_rectify_vaccine_record_and_keep_history(health_case):
+ s,actor,stay=health_case
+ minor=s.get(Stay,stay).minor
+ record=add_vaccine_record(s,actor_account_id=actor,minor_id=minor.id,
+  vaccine_name="Vacuna inicial",administered_on=date(2026,1,10),
+  dose_reference="Dosis 1",manufacturer="Fabricante inicial")
+ professional=Professional(display_name="Segundo educador")
+ s.add(professional); s.flush()
+ second=UserAccount(professional_id=professional.id,username="vaccine-editor",
+  password_hash="x",role="educator",health_access=False)
+ s.add(second); s.flush()
+ from gestion_centro.domain.health_service import update_vaccine_record, list_vaccine_record_versions
+ updated=update_vaccine_record(s,actor_account_id=second.id,record_id=record.id,
+  vaccine_name="Vacuna corregida",administered_on=date(2026,1,11),
+  dose_reference="Dosis 2",manufacturer="Fabricante actualizado",
+  product_name="Producto actualizado",batch_number="LOTE-001",
+  administration_center="Centro de salud",administering_professional="Profesional")
+ assert updated.vaccine_name=="Vacuna corregida"
+ assert updated.recorded_by_name_snapshot=="Educador"
+ versions=list_vaccine_record_versions(s,actor_account_id=actor,record_id=record.id)
+ assert len(versions)==1
+ assert versions[0].changed_by_name_snapshot=="Segundo educador"
+ assert versions[0].old_values["vaccine_name"]=="Vacuna inicial"
+ assert versions[0].new_values["vaccine_name"]=="Vacuna corregida"
