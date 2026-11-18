@@ -43,7 +43,7 @@ def upgrade():
             SELECT stay_id, role, factual_note, minor_code_snapshot, minor_name_snapshot
             FROM incident_participants WHERE incident_id = :incident_id
         """), {"incident_id": incident["id"]}).mappings().all()
-        participant_text = "\\n".join(
+        participant_text = "\n".join(
             f"Participante ({item['role']}): {item['minor_name_snapshot']} "
             f"{'· ' + item['factual_note'] if item['factual_note'] else ''}"
             for item in participants
@@ -53,10 +53,10 @@ def upgrade():
             if incident["closure_note"] else f"Estado histórico: {incident['status']}"
         )
         content = (
-            f"Incidencia histórica: {incident['title']}\\n"
-            f"Tipo: {incident['incident_type']} · Gravedad: {incident['severity']}\\n"
-            f"{incident['description']}\\n{closure_text}"
-            f"{'\\n' + participant_text if participant_text else ''}"
+            f"Incidencia histórica: {incident['title']}\n"
+            f"Tipo: {incident['incident_type']} · Gravedad: {incident['severity']}\n"
+            f"{incident['description']}\n{closure_text}"
+            f"{'\n' + participant_text if participant_text else ''}"
         )
         connection.execute(sa.text("""
             INSERT INTO diary_entries (
