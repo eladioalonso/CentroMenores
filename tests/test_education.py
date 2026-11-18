@@ -54,7 +54,7 @@ def test_author_can_rectify_own_education_update_without_overwriting_original(ed
 
 
 
-def test_other_professional_cannot_rectify_education_update(edu):
+def test_any_educator_can_rectify_closed_education_update_without_overwriting_original(edu):
  s,actor,stay=edu
  goal=create_education_goal(s,actor_account_id=actor,stay_id=stay,title="Convivencia",description="Objetivo ficticio")
  original=add_education_update(s,actor_account_id=actor,goal_id=goal.id,category="coexistence",
@@ -63,11 +63,13 @@ def test_other_professional_cannot_rectify_education_update(edu):
  s.add(other_prof); s.flush()
  other_account=UserAccount(professional_id=other_prof.id,username="otro",password_hash="x",role="educator")
  s.add(other_account); s.flush()
- from gestion_centro.domain.education_service import revise_education_update
- with pytest.raises(PermissionError):
-  revise_education_update(s,actor_account_id=other_account.id,update_id=original.id,
-   objective_description="Intento ajeno",actions_taken="Cambio",response_observed="Cambio")
+ from gestion_centro.domain.education_service import revise_education_update, set_education_goal_status
+ set_education_goal_status(s,actor_account_id=actor,goal_id=goal.id,status="closed")
+ correction=revise_education_update(s,actor_account_id=other_account.id,update_id=original.id,
+  objective_description="Observación revisada",actions_taken="Cambio",response_observed="Respuesta revisada")
  assert original.objective_description=="Observación original"
+ assert correction.author_account_id==other_account.id
+ assert correction.objective_description.startswith(f"RECTIFICACIÓN de la actualización {original.id}:")
 
 
 
