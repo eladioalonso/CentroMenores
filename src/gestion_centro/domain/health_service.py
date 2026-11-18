@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from gestion_centro.auth.models import AccessAudit, UserAccount
 from gestion_centro.domain.models import Minor, Stay
-from gestion_centro.domain.health import HealthProfile, HealthProfileVersion, MedicationPlan, MedicationPlanVersion, MedicationSchedule, MedicationAdministration, VaccineRecord, VaccineRecordVersion
+from gestion_centro.domain.health import HealthProfile, HealthProfileVersion, MedicationPlan, MedicationPlanVersion, MedicationSchedule, MedicationAdministration, MedicationAdministrationVersion, VaccineRecord, VaccineRecordVersion
 
 MEDICATION_RESULTS={"administered","refused","not_available"}
 
@@ -345,6 +345,76 @@ def record_medication_administration(session: Session, *, actor_account_id: str,
     session.add(record); session.flush()
     _audit(session,actor,"medication_administration_recorded",f"{plan.id}:{record.id}:{status}")
     return record
+
+def update_medication_administration(session: Session, *, actor_account_id: str,
+                                   administration_id: str, scheduled_at: datetime,
+                                   status: str, shift: str, note: str | None = None):
+    """Corrige un registro de administración y conserva los valores anteriores."""
+    actor = _actor(session, actor_account_id)
+    record = session.get(MedicationAdministration, administration_id)
+    if record is None:
+        raise ValueError("El registro de administración no existe")
+    plan = session.get(MedicationPlan, record.plan_id)
+    if plan is None:
+        raise ValueError("La pauta asociada ya no existe")
+    if status not in MEDICATION_RESULTS:
+        raise ValueError("Resultado de administración no válido")
+    if shift not in {"morning", "afternoon", "night", "unspecified"}:
+        raise ValueError("Turno no válido")
+    if status != "administered" and not (note and note.strip()):
+        raise ValueError("Indica el motivo si no se administra")
+    target_local = scheduled_at.astimezone()
+    if target_local.date() < plan.starts_on or (plan.ends_on and target_local.date() > plan.ends_on):
+        raise ValueError("La fecha queda fuera de la vigencia de la pauta")
+    local_time = target_local.strftime("%H:%M")
+    if plan.schedules and not any(
+        item.time_of_day == local_time and item.shift == shift for item in plan.schedules
+    ):
+        raise ValueError("La hora y el turno no coinciden con un horario de la pauta")
+    other_records = session.scalars(select(MedicationAdministration).where(
+        MedicationAdministration.plan_id == plan.id,
+        MedicationAdministration.id != record.id,
+    )).all()
+    for other in other_records:
+        other_local = other.scheduled_at.astimezone()
+        if other_local.date() == target_local.date() and other_local.strftime("%H:%M") == local_time:
+            raise ValueError("Ya existe otro registro para esta dosis prevista")
+    old_values = {
+        "scheduled_at": record.scheduled_at.isoformat(), "status": record.status,
+        "shift": record.shift, "note": record.note,
+    }
+    new_values = {
+        "scheduled_at": scheduled_at.isoformat(), "status": status,
+        "shift": shift, "note": note.strip() if note else None,
+    }
+    if old_values == new_values:
+        return record
+    record.scheduled_at = scheduled_at
+    record.status = status
+    record.shift = shift
+    record.note = note.strip() if note else None
+    session.add(MedicationAdministrationVersion(
+        administration_id=record.id, changed_by_account_id=actor.id,
+        changed_by_name_snapshot=actor.professional.display_name,
+        changed_at=datetime.now(timezone.utc), old_values=old_values,
+        new_values=new_values,
+    ))
+    _audit(session, actor, "medication_administration_updated",
+           f"{record.id}; anterior:{old_values}; nuevo:{new_values}")
+    return record
+
+
+def list_medication_administration_versions(session: Session, *, actor_account_id: str,
+                                            administration_id: str):
+    actor = _actor(session, actor_account_id)
+    record = session.get(MedicationAdministration, administration_id)
+    if record is None:
+        raise ValueError("El registro de administración no existe")
+    _audit(session, actor, "medication_administration_history_accessed", record.id)
+    return session.scalars(select(MedicationAdministrationVersion).where(
+        MedicationAdministrationVersion.administration_id == record.id
+    ).order_by(MedicationAdministrationVersion.changed_at.desc())).all()
+
 
 def add_vaccine_record(session: Session, *, actor_account_id: str, vaccine_name: str,
                        administered_on: date, minor_id: str | None = None, stay_id: str | None = None,
