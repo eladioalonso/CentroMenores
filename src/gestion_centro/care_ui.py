@@ -763,6 +763,7 @@ class HealthDialog(StaySelectorDialog):
                         "starts_on": existing.starts_on,
                         "ends_on": existing.ends_on,
                         "active": existing.active,
+                        "instructions": existing.instructions or "",
                     }
             except (ValueError, PermissionError) as exc:
                 QMessageBox.warning(self, "No se puede editar la pauta", str(exc))
@@ -775,6 +776,7 @@ class HealthDialog(StaySelectorDialog):
         medication = QLineEdit()
         dose = QLineEdit()
         instructions = QTextEdit(); instructions.setMaximumHeight(75)
+        extra_instructions = QTextEdit(); extra_instructions.setMaximumHeight(60)
         reference = QLineEdit()
         schedules = QTextEdit()
         schedules.setPlaceholderText("Una por línea: 08:00|morning")
@@ -783,25 +785,27 @@ class HealthDialog(StaySelectorDialog):
         ends = QDateEdit(QDate.currentDate())
         ends.setCalendarPopup(True)
         no_end = QCheckBox("Sin fecha final")
+        no_end.setChecked(True)
         active = QCheckBox("Pauta activa")
         active.setChecked(True)
         if existing:
             medication.setText(values["medication_name"])
             dose.setText(values["prescribed_dose"])
             instructions.setPlainText(values["schedule_text"])
+            extra_instructions.setPlainText(values["instructions"])
             reference.setText(values["prescriber_reference"])
             starts.setDate(QDate(values["starts_on"].year, values["starts_on"].month, values["starts_on"].day))
             if values["ends_on"]:
                 ends.setDate(QDate(values["ends_on"].year, values["ends_on"].month, values["ends_on"].day))
-            else:
-                no_end.setChecked(True)
+                no_end.setChecked(False)
             active.setChecked(values["active"])
             schedules.setPlainText("\\n".join(f"{time_text}|{shift}" for time_text, shift in schedule_rows))
         no_end.toggled.connect(lambda checked: ends.setEnabled(not checked))
         ends.setEnabled(not no_end.isChecked())
         form.addRow("Medicamento", medication)
         form.addRow("Dosis prescrita", dose)
-        form.addRow("Pauta / instrucciones", instructions)
+        form.addRow("Pauta / frecuencia prescrita", instructions)
+        form.addRow("Instrucciones adicionales", extra_instructions)
         form.addRow("Referencia de prescripción", reference)
         form.addRow("Inicio de vigencia", starts)
         form.addRow("Fin de vigencia", ends)
@@ -837,7 +841,8 @@ class HealthDialog(StaySelectorDialog):
                         prescriber_reference=reference.text().strip(),
                         starts_on=starts.date().toPython(),
                         ends_on=None if no_end.isChecked() else ends.date().toPython(),
-                        instructions=None, schedules=parsed_schedules,
+                        instructions=extra_instructions.toPlainText(),
+                        schedules=parsed_schedules,
                         active=active.isChecked(),
                     )
                 else:
@@ -848,6 +853,7 @@ class HealthDialog(StaySelectorDialog):
                         prescriber_reference=reference.text().strip(),
                         starts_on=starts.date().toPython(),
                         ends_on=None if no_end.isChecked() else ends.date().toPython(),
+                        instructions=extra_instructions.toPlainText(),
                         schedules=parsed_schedules,
                     )
             self.refresh()
