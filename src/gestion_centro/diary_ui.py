@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 from sqlalchemy import select, or_
 
 from gestion_centro.persistence.database import session_scope
-from gestion_centro.domain.models import DiaryDay, DiaryEntry, Stay
+from gestion_centro.domain.models import DiaryDay, DiaryEntry, DiaryEntryStayLink, Stay
 from gestion_centro.domain.service import (
     record_diary_entry, close_diary_day, revise_diary_entry,
     has_health_access, list_diary_records,
