@@ -116,7 +116,7 @@ Disponer de un registro cronológico general y único de la actividad cotidiana 
 - Las consultas podrán filtrarse, como mínimo, por intervalo de fechas, menor relacionado, profesional autor y categoría, siempre respetando los permisos.
 - Una anotación no debe confundirse automáticamente con una incidencia.
 - Si el contenido requiere abrir una incidencia formal, la aplicación podrá ofrecer iniciar ese flujo y mantener la relación entre ambos registros, evitando duplicar innecesariamente la información.
-- Las anotaciones guardadas no se modificarán de forma silenciosa. El autor solo podrá corregir sus propias anotaciones mientras siga abierto el turno completo al que pertenecen. El ciclo ordinario comunicado por el centro comprende tarde (15:00–22:00), mañana (08:00–15:00 del día siguiente) y noche (22:00–08:00 del día posterior). Como puede haber prolongaciones excepcionales por falta de sustitución, el turno podrá cerrarse manualmente cuando el educador termine realmente el servicio; si nadie lo cierra, la aplicación lo cerrará automáticamente al cumplirse 48 horas desde su inicio. Las 48 horas son un límite absoluto. Todas las anotaciones asociadas al turno se bloquearán al cerrarlo, incluidas las creadas poco antes del cierre. Después del bloqueo, cualquier corrección deberá registrarse como rectificación independiente vinculada al original, con autor, fecha/hora y motivo; el contenido original permanecerá intacto.
+- Las anotaciones guardadas no se modificarán de forma silenciosa. Todos los educadores activos podrán revisar y corregir cualquier anotación, aunque la haya creado otro profesional o el parte esté cerrado. Cada modificación generará una nueva versión vinculada al original, conservando su contenido, autoría y fecha iniciales, e identificando al educador que realiza el cambio, la fecha/hora y el motivo. El cierre del parte impide añadir nuevas anotaciones ordinarias a esa fecha, pero no bloquea la corrección de las ya existentes.
 - Se definirán permisos diferenciados para consultar, crear, rectificar y exportar anotaciones.
 
 ## 7. Registro y seguimiento de una incidencia
@@ -134,7 +134,7 @@ Documentar un acontecimiento, las personas implicadas y las actuaciones de segui
 5. Identifica a los profesionales intervinientes, según los permisos y datos disponibles.
 6. Añade las actuaciones realizadas y la información complementaria que corresponda.
 7. Adjunta documentos si está autorizado.
-8. Guarda la incidencia.
+8. Guarda el borrador del informe, que mantiene los vínculos con las anotaciones originales.
 9. La aplicación crea las relaciones con todos los menores y profesionales seleccionados.
 10. Si procede, el usuario crea tareas de seguimiento relacionadas con la incidencia.
 11. Los profesionales autorizados consultan su evolución.
@@ -221,8 +221,8 @@ Conocer qué salidas están previstas, cuáles están en curso y cuándo se ha p
 
 ## 12. Área sanitaria
 
-1. El usuario con permiso sanitario accede al módulo específico.
-2. Busca al menor y consulta su información sanitaria autorizada.
+1. Cualquier educador activo accede al expediente sanitario del menor.
+2. Busca al menor y consulta o modifica la información sanitaria necesaria para su trabajo.
 3. Registra o actualiza cobertura, CIP, tipo de documento, vigencia y referencias sanitarias según los campos aprobados.
 4. Añade un centro o profesional sanitario al catálogo reutilizable si tiene permiso.
 5. Adjunta documentación sanitaria en el repositorio protegido.
@@ -386,3 +386,17 @@ Las respuestas se incorporarán a este documento antes de cerrar el diseño func
 
 
 > **Especificación vigente:** consultar [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md). Este documento reúne las decisiones aprobadas más recientes y prevalece sobre cualquier apartado anterior que las contradiga.
+
+
+## Organización funcional aprobada: cuatro módulos
+
+La navegación de trabajo se limita a cuatro módulos principales:
+
+1. **Expediente principal del menor:** identificación, estancias, seguimiento educativo y escolar, documentación, autorizaciones, visitas y salidas.
+2. **Expediente sanitario del menor:** historial clínico, consultas, tratamientos, medicación, vacunación, administraciones y revisiones.
+3. **Parte diario:** registro cronológico compartido de los turnos, actividades, observaciones, comportamientos y hechos relevantes.
+4. **Informes de incidencias:** selección de anotaciones del parte diario, elaboración, revisión, emisión y rectificación de informes.
+
+Los informes de incidencias se preparan a partir de los hechos registrados en el parte diario. La aplicación no debe obligar a introducir de nuevo los mismos hechos en un segundo registro independiente. Los datos complementarios del informe se vincularán a las anotaciones de origen.
+
+Los cuatro módulos comparten una política de edición: cualquier educador activo puede consultar, crear y modificar sus registros, así como los creados por otros educadores. La autoría original se conserva y toda modificación queda versionada y auditada. Las funciones de administración técnica permanecen fuera de estos cuatro módulos.
