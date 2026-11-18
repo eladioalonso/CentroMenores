@@ -198,7 +198,7 @@ class IncidentReportsDialog(QDialog):
         for index, entry in enumerate(rows):
             include = QTableWidgetItem()
             include.setFlags(include.flags() | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-            include.setCheckState(Qt.CheckState.Checked)
+            include.setCheckState(Qt.CheckState.Unchecked)
             include.setData(Qt.ItemDataRole.UserRole, entry["id"])
             happened = _local_datetime(entry["happened_at"])
             values = [
@@ -294,6 +294,7 @@ class IncidentReportsDialog(QDialog):
     def open_selected_report(self, _index):
         report_id = self.saved_reports.currentData()
         if not report_id:
+            self.new_report()
             return
         try:
             with session_scope(self.factory) as session:
@@ -401,7 +402,7 @@ class IncidentReportsDialog(QDialog):
         for row in range(self.table.rowCount()):
             item = self.table.item(row, 0)
             if item:
-                item.setCheckState(Qt.CheckState.Checked)
+                item.setCheckState(Qt.CheckState.Unchecked)
 
     def export_docx(self):
         content = self.preview.toPlainText().strip()
