@@ -37,6 +37,31 @@ def create_education_goal(session: Session, *, actor_account_id: str, stay_id: s
     _audit(session,actor,"education_goal_created",goal.id)
     return goal
 
+def update_education_goal(session: Session, *, actor_account_id: str, goal_id: str,
+                        title: str, description: str, target_date: date | None,
+                        status: str):
+    actor = _actor(session, actor_account_id)
+    goal = session.get(EducationGoal, goal_id)
+    if goal is None:
+        raise ValueError("El objetivo educativo no existe")
+    if not title.strip() or not description.strip():
+        raise ValueError("El objetivo y su descripción son obligatorios")
+    if status not in GOAL_STATUSES:
+        raise ValueError("Estado de objetivo no válido")
+    old_values = {"title": goal.title, "description": goal.description,
+                  "target_date": goal.target_date.isoformat() if goal.target_date else None,
+                  "status": goal.status}
+    new_values = {"title": title.strip(), "description": description.strip(),
+                  "target_date": target_date.isoformat() if target_date else None,
+                  "status": status}
+    goal.title, goal.description, goal.target_date, goal.status = (
+        title.strip(), description.strip(), target_date, status
+    )
+    _audit(session, actor, "education_goal_updated",
+           f"{goal.id}; anterior:{old_values}; nuevo:{new_values}")
+    return goal
+
+
 def add_education_update(session: Session, *, actor_account_id: str, goal_id: str,
                          category: str, objective_description: str, actions_taken: str,
                          response_observed: str, follow_up: str | None = None):
@@ -89,6 +114,33 @@ def end_school_placement(session: Session, *, actor_account_id: str,
     return placement
 
 
+def update_school_placement(session: Session, *, actor_account_id: str,
+                            placement_id: str, school_name: str, course: str,
+                            started_on: date, ended_on: date | None, notes: str | None):
+    actor = _actor(session, actor_account_id)
+    placement = session.get(SchoolPlacement, placement_id)
+    if placement is None:
+        raise ValueError("La escolarización no existe")
+    if not school_name.strip() or not course.strip():
+        raise ValueError("Centro y curso son obligatorios")
+    if ended_on and ended_on < started_on:
+        raise ValueError("La fecha de finalización no puede preceder al inicio")
+    old_values = {"school_name": placement.school_name, "course": placement.course,
+                  "started_on": placement.started_on.isoformat(),
+                  "ended_on": placement.ended_on.isoformat() if placement.ended_on else None,
+                  "notes": placement.notes}
+    new_values = {"school_name": school_name.strip(), "course": course.strip(),
+                  "started_on": started_on.isoformat(),
+                  "ended_on": ended_on.isoformat() if ended_on else None,
+                  "notes": notes.strip() if notes else None}
+    placement.school_name, placement.course = school_name.strip(), course.strip()
+    placement.started_on, placement.ended_on = started_on, ended_on
+    placement.notes = notes.strip() if notes else None
+    _audit(session, actor, "school_placement_updated",
+           f"{placement.id}; anterior:{old_values}; nuevo:{new_values}")
+    return placement
+
+
 def add_school_record(session: Session, *, actor_account_id: str, placement_id: str,
                       record_type: str, occurred_on: date, description: str):
     actor=_actor(session,actor_account_id); placement=session.get(SchoolPlacement,placement_id)
@@ -103,6 +155,32 @@ def add_school_record(session: Session, *, actor_account_id: str, placement_id: 
     session.add(record); session.flush()
     _audit(session,actor,"school_record_added",f"{placement.id}:{record.id}")
     return record
+
+def update_school_record(session: Session, *, actor_account_id: str,
+                         record_id: str, record_type: str,
+                         occurred_on: date, description: str):
+    actor = _actor(session, actor_account_id)
+    record = session.get(SchoolRecord, record_id)
+    if record is None:
+        raise ValueError("El registro escolar no existe")
+    if record_type not in SCHOOL_RECORD_TYPES or not description.strip():
+        raise ValueError("Tipo y descripción del registro son obligatorios")
+    placement = session.get(SchoolPlacement, record.placement_id)
+    if placement is None or occurred_on < placement.started_on or (
+        placement.ended_on and occurred_on > placement.ended_on
+    ):
+        raise ValueError("La fecha queda fuera del periodo de escolarización")
+    old_values = {"record_type": record.record_type,
+                  "occurred_on": record.occurred_on.isoformat(),
+                  "description": record.description}
+    new_values = {"record_type": record_type, "occurred_on": occurred_on.isoformat(),
+                  "description": description.strip()}
+    record.record_type, record.occurred_on = record_type, occurred_on
+    record.description = description.strip()
+    _audit(session, actor, "school_record_updated",
+           f"{record.id}; anterior:{old_values}; nuevo:{new_values}")
+    return record
+
 
 def list_education_goals(session: Session, *, actor_account_id: str, stay_id: str):
     actor = _actor(session, actor_account_id)
