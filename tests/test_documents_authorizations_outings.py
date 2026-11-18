@@ -259,3 +259,36 @@ def test_any_educator_can_edit_document_metadata_with_before_after_audit():
         assert audit is not None
         assert "Documento inicial" in audit.details
         assert "Documento corregido" in audit.details
+
+
+
+def test_any_educator_can_edit_authorization_and_audit_previous_values():
+    from gestion_centro.auth.models import Professional, UserAccount, AccessAudit
+    with make_session() as session:
+        actor, stay = setup_stay(session)
+        authorization = record_authorization(
+            session, actor_account_id=actor.id, stay_id=stay.id,
+            authorization_type="family_visit", scope="Visita autorizada",
+            issuer="Representante inicial", valid_from=date(2026, 1, 1),
+            conditions="Condición inicial",
+        )
+        professional = Professional(display_name="Segundo educador")
+        session.add(professional); session.flush()
+        other = UserAccount(professional_id=professional.id, username="auth-editor",
+            password_hash="x", role="educator", health_access=False)
+        session.add(other); session.flush()
+        from gestion_centro.domain.documents_service import update_authorization
+        updated = update_authorization(
+            session, actor_account_id=other.id, authorization_id=authorization.id,
+            authorization_type="family_visit", scope="Visita con horario limitado",
+            issuer="Representante actualizado", valid_from=date(2026, 2, 1),
+            valid_until=date(2026, 3, 1), conditions="Condición revisada",
+        )
+        assert updated.scope == "Visita con horario limitado"
+        assert updated.recorded_by_name_snapshot == "Profesional ficticio"
+        audit = session.scalar(select(AccessAudit).where(
+            AccessAudit.event == "authorization_updated"
+        ))
+        assert audit is not None
+        assert "Visita autorizada" in audit.details
+        assert "Visita con horario limitado" in audit.details
