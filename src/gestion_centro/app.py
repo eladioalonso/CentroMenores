@@ -38,7 +38,7 @@ from gestion_centro.domain.service import (
 from gestion_centro.domain.models import Stay, DiaryEntry, AgendaItem
 from gestion_centro.domain.documents import Outing, OutingStay
 from gestion_centro.domain.documents import PersonalDocument
-from gestion_centro.domain.documents_service import register_document, list_documents, list_document_stays
+from gestion_centro.domain.documents_service import register_document, list_documents, list_document_stays, update_document_metadata
 from gestion_centro.operations_ui import AuthorizationsDialog, OutingsDialog
 from gestion_centro.backups_ui import BackupDialog
 from gestion_centro.persistence.backups import create_backup
@@ -701,7 +701,10 @@ class DocumentsDialog(QDialog):
         actions = QHBoxLayout()
         open_button = QPushButton("Abrir documento seleccionado")
         open_button.clicked.connect(self.open_selected)
+        edit_button = QPushButton("Editar datos del documento")
+        edit_button.clicked.connect(self.edit_metadata)
         actions.addWidget(open_button)
+        actions.addWidget(edit_button)
         layout.addLayout(actions)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.stay.currentIndexChanged.connect(self.refresh)
@@ -789,6 +792,82 @@ class DocumentsDialog(QDialog):
                 raise OSError("Windows no ha podido abrir el documento.")
         except Exception as exc:
             QMessageBox.warning(self, "No se pudo abrir", str(exc))
+
+    def edit_metadata(self):
+        row = self.table.currentRow()
+        cell = self.table.item(row, 0) if row >= 0 else None
+        if cell is None:
+            QMessageBox.information(self, "Selecciona documento", "Selecciona primero un documento.")
+            return
+        document_id = cell.data(Qt.ItemDataRole.UserRole)
+        try:
+            with session_scope(self.factory) as session:
+                document = session.get(PersonalDocument, document_id)
+                if document is None:
+                    raise ValueError("El documento ya no existe.")
+                values = {
+                    "category": document.category, "title": document.title,
+                    "document_date": document.document_date, "expires_on": document.expires_on,
+                    "notes": document.notes or "",
+                }
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Editar datos del documento")
+            dialog.resize(540, 420)
+            form = QFormLayout(dialog)
+            category = QComboBox()
+            for label, key in self.CATEGORIES.items():
+                category.addItem(label, key)
+            category.setCurrentIndex(max(0, category.findData(values["category"])))
+            title = QLineEdit(values["title"])
+            document_date = QDateEdit(QDate.currentDate())
+            document_date.setCalendarPopup(True)
+            no_document_date = QCheckBox("Sin fecha documental")
+            if values["document_date"]:
+                day = values["document_date"]
+                document_date.setDate(QDate(day.year, day.month, day.day))
+            else:
+                no_document_date.setChecked(True)
+            document_date.setEnabled(not no_document_date.isChecked())
+            no_document_date.toggled.connect(lambda checked: document_date.setEnabled(not checked))
+            expires = QDateEdit(QDate.currentDate())
+            expires.setCalendarPopup(True)
+            no_expiry = QCheckBox("Sin caducidad")
+            if values["expires_on"]:
+                day = values["expires_on"]
+                expires.setDate(QDate(day.year, day.month, day.day))
+            else:
+                no_expiry.setChecked(True)
+            expires.setEnabled(not no_expiry.isChecked())
+            no_expiry.toggled.connect(lambda checked: expires.setEnabled(not checked))
+            notes = QTextEdit()
+            notes.setPlainText(values["notes"])
+            form.addRow("Categoría", category)
+            form.addRow("Título", title)
+            form.addRow("Fecha del documento", document_date)
+            form.addRow("", no_document_date)
+            form.addRow("Caducidad", expires)
+            form.addRow("", no_expiry)
+            form.addRow("Notas", notes)
+            buttons = QDialogButtonBox(
+                QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+            )
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            form.addRow(buttons)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+            with session_scope(self.factory) as session:
+                update_document_metadata(
+                    session, actor_account_id=self.actor_id, document_id=document_id,
+                    category=category.currentData(), title=title.text(),
+                    document_date=None if no_document_date.isChecked() else document_date.date().toPython(),
+                    expires_on=None if no_expiry.isChecked() else expires.date().toPython(),
+                    notes=notes.toPlainText(),
+                )
+            self.refresh()
+            QMessageBox.information(self, "Documento actualizado", "Los metadatos se han actualizado y el archivo original se conserva.")
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo editar", str(exc))
 
     def save_document(self):
         stay_id = self.stay.currentData()
