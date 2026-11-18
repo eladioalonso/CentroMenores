@@ -18,9 +18,15 @@ class HealthProfile(Base):
     allergies: Mapped[str | None] = mapped_column(Text)
     relevant_conditions: Mapped[str | None] = mapped_column(Text)
     emergency_instructions: Mapped[str | None] = mapped_column(Text)
-    updated_by_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
+    updated_by_account_id: Mapped[str | None] = mapped_column(ForeignKey("user_accounts.id"), nullable=True)
     updated_by_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    cip: Mapped[str | None] = mapped_column(String(40))
+    health_center: Mapped[str | None] = mapped_column(String(180))
+    physician: Mapped[str | None] = mapped_column(String(160))
+    nurse: Mapped[str | None] = mapped_column(String(160))
+    health_card_expires_on: Mapped[date | None] = mapped_column(Date)
+    clinical_history: Mapped[str | None] = mapped_column(Text)
 
 
 class HealthProfileVersion(Base):
