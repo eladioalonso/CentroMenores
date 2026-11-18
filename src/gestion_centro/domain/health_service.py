@@ -179,6 +179,55 @@ def add_medication_plan(session: Session, *, actor_account_id: str, medication_n
     _audit(session,actor,"medication_plan_recorded",f"{minor.id}:{plan.id}")
     return plan
 
+def update_medication_plan(session: Session, *, actor_account_id: str, plan_id: str,
+                           medication_name: str, prescribed_dose: str,
+                           schedule_text: str, prescriber_reference: str,
+                           starts_on: date, ends_on: date | None,
+                           instructions: str | None,
+                           schedules: list[tuple[str, str]], active: bool = True):
+    """Actualiza una pauta compartida y conserva instantánea anterior/nueva."""
+    actor = _actor(session, actor_account_id)
+    plan = session.get(MedicationPlan, plan_id)
+    if plan is None:
+        raise ValueError("La pauta no existe")
+    if not all(value.strip() for value in (
+        medication_name, prescribed_dose, schedule_text, prescriber_reference
+    )):
+        raise ValueError("Medicamento, dosis, pauta y prescriptor son obligatorios")
+    if ends_on and ends_on < starts_on:
+        raise ValueError("La fecha final precede al inicio")
+    if not schedules:
+        raise ValueError("Indica al menos un horario prescrito")
+    normalized = []
+    for time_text, shift in schedules:
+        if not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", time_text):
+            raise ValueError(f"Hora no válida: {time_text}. Usa HH:MM")
+        if shift not in {"morning", "afternoon", "night"}:
+            raise ValueError("Turno no válido")
+        if any(existing[0] == time_text for existing in normalized):
+            raise ValueError("No repitas una hora dentro de la misma pauta")
+        normalized.append((time_text, shift))
+    old_values = _medication_plan_values(plan)
+    plan.medication_name = medication_name.strip()
+    plan.prescribed_dose = prescribed_dose.strip()
+    plan.schedule_text = schedule_text.strip()
+    plan.prescriber_reference = prescriber_reference.strip()
+    plan.starts_on = starts_on
+    plan.ends_on = ends_on
+    plan.instructions = instructions.strip() if instructions else None
+    plan.active = bool(active)
+    plan.schedules.clear()
+    for time_text, shift in normalized:
+        plan.schedules.append(MedicationSchedule(time_of_day=time_text, shift=shift))
+    session.flush()
+    new_values = _medication_plan_values(plan)
+    _record_medication_plan_version(session, plan, actor, old_values, new_values)
+    _audit(session, actor, "medication_plan_updated",
+           f"{plan.id}; autor original:{plan.recorded_by_name_snapshot}; "
+           f"modificado por:{actor.professional.display_name}")
+    return plan
+
+
 def set_medication_schedules(session: Session, *, actor_account_id: str, plan_id: str,
                              schedules: list[tuple[str, str]]):
     actor = _actor(session, actor_account_id)
