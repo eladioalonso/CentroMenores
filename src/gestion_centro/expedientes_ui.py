@@ -134,7 +134,7 @@ class MinorWorkspaceDialog(QDialog):
         documents_layout.addStretch(1)
         self.tabs.addTab(documents_tab, 'Documentación')
         actions = QHBoxLayout()
-        for label, callback in [('Nuevo ingreso / reingreso', self.new_stay), ('Cerrar estancia', self.close_stay), ('Modificar estancia', self.edit_stay), ('Registrar acontecimiento', self.add_event), ('Rectificar acontecimiento', self.edit_event), ('Historial completo', lambda: self.tabs.setCurrentWidget(self.events))]:
+        for label, callback in [('Nuevo ingreso / reingreso', self.new_stay), ('Cerrar estancia', self.close_stay), ('Modificar estancia', self.edit_stay), ('Registrar acontecimiento', self.add_event), ('Rectificar acontecimiento', self.edit_event), ('Historial acontecimiento', self.show_event_history), ('Historial completo', lambda: self.tabs.setCurrentWidget(self.events))]:
             button = QPushButton(label)
             button.clicked.connect(callback)
             actions.addWidget(button)
@@ -318,6 +318,48 @@ class MinorWorkspaceDialog(QDialog):
             QMessageBox.information(self, 'Acontecimiento rectificado', 'Se ha creado una nueva versión y se conserva la original.')
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, 'No se pudo rectificar', str(exc))
+
+    def show_event_history(self):
+        row = self.events.currentRow()
+        cell = self.events.item(row, 0) if row >= 0 else None
+        if cell is None:
+            QMessageBox.information(self, 'Selecciona acontecimiento', 'Selecciona primero un acontecimiento.')
+            return
+        event_id = cell.data(Qt.ItemDataRole.UserRole)
+        with session_scope(self.factory) as session:
+            current = session.get(Event, event_id)
+            if current is None:
+                QMessageBox.warning(self, 'No disponible', 'El acontecimiento ya no existe.')
+                return
+            versions = [current]
+            parent_id = current.correction_of_id
+            while parent_id:
+                parent = session.get(Event, parent_id)
+                if parent is None:
+                    break
+                versions.append(parent)
+                parent_id = parent.correction_of_id
+            versions.reverse()
+            lines = []
+            for number, version in enumerate(versions, start=1):
+                lines.extend([
+                    f"VERSIÓN {number} · {version.recorded_at.astimezone().strftime('%d/%m/%Y %H:%M')}",
+                    f"Registrada por: {version.author_name_snapshot}",
+                    f"Fecha del hecho: {version.happened_at.astimezone().strftime('%d/%m/%Y %H:%M')}",
+                    version.title, version.description, "",
+                ])
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Historial del acontecimiento')
+        dialog.resize(760, 560)
+        layout = QVBoxLayout(dialog)
+        viewer = QTextEdit()
+        viewer.setReadOnly(True)
+        viewer.setPlainText("\\n".join(lines))
+        layout.addWidget(viewer)
+        close = QPushButton('Cerrar')
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close)
+        dialog.exec()
 
     def current_stay(self):
         with session_scope(self.factory) as session:
