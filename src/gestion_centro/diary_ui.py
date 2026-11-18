@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 from sqlalchemy import select, or_
 
 from gestion_centro.persistence.database import session_scope
-from gestion_centro.domain.models import DiaryDay, DiaryEntry, Incident, Stay
+from gestion_centro.domain.models import DiaryDay, DiaryEntry, Stay
 from gestion_centro.domain.service import (
     record_diary_entry, close_diary_day, revise_diary_entry,
     has_health_access, list_diary_records,
@@ -285,7 +285,7 @@ class DiaryDialog(QDialog):
     def refresh(self):
         selected = self.day.date().toPython()
         with session_scope(self.factory) as session:
-            day, entries, incidents = list_diary_records(
+            day, entries, _legacy_incidents = list_diary_records(
                 session, actor_account_id=self.actor_id, diary_date=selected)
             # El parte muestra la última versión de cada anotación; las anteriores
             # se conservan y pueden consultarse desde el historial.
