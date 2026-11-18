@@ -366,7 +366,10 @@ def test_incident_report_drafts_issue_and_rectification_are_versioned_and_shared
         assert report.status == "issued"
         assert [version.version_number for version in report.versions] == [1, 2]
         assert report.versions[0].content == "Versión inicial"
+        assert report.versions[0].title == "Informe de prueba"
+        assert report.versions[0].recipient == "Organismo de prueba"
         assert report.versions[1].content == "Versión definitiva"
+        assert report.versions[1].title == "Informe revisado"
         assert report.versions[1].created_by_name_snapshot == "Segundo educador"
         assert [link.entry_id for link in report.versions[1].entries] == [entry.id]
         with pytest.raises(ValueError, match="no se modifica"):
@@ -383,7 +386,9 @@ def test_incident_report_drafts_issue_and_rectification_are_versioned_and_shared
             "draft", "issued", "rectified"
         ]
         assert report.versions[1].content == "Versión definitiva"
+        assert report.versions[1].title == "Informe revisado"
         assert report.versions[2].content == "Versión rectificada"
+        assert report.versions[2].title == "Informe rectificado"
         assert len(list_incident_reports(session, actor_account_id=editor.id)) == 1
 
 
