@@ -13,7 +13,7 @@ from sqlalchemy import select
 from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import Minor, Stay
 from gestion_centro.domain.documents import PersonalDocument
-from gestion_centro.domain.education import EducationGoal, EducationUpdate, SchoolPlacement
+from gestion_centro.domain.education import EducationGoal, EducationUpdate, SchoolPlacement, SchoolRecord
 from gestion_centro.domain.education_service import (
     create_education_goal, add_education_update, set_education_goal_status,
     create_school_placement, add_school_record, list_education_goals, list_school_placements, list_school_records,
