@@ -315,6 +315,67 @@ def create_outing(session: Session, *, actor_account_id: str, kind: str, destina
     return outing
 
 
+def update_outing_details(session: Session, *, actor_account_id: str,
+                         outing_id: str, kind: str, destination: str,
+                         purpose: str, planned_departure: datetime,
+                         planned_return: datetime, restrictions_checked: bool):
+    """Corrige los datos previstos de una salida sin alterar las horas reales."""
+    actor = _actor(session, actor_account_id)
+    outing = session.get(Outing, outing_id)
+    if outing is None:
+        raise ValueError("La salida no existe")
+    if kind not in OUTING_KINDS or not destination.strip() or not purpose.strip():
+        raise ValueError("Tipo, destino y finalidad son obligatorios")
+    if planned_return <= planned_departure:
+        raise ValueError("La vuelta prevista debe ser posterior a la salida")
+    if not restrictions_checked:
+        raise ValueError("Debes confirmar de nuevo la revisión de restricciones individuales")
+    stays = session.scalars(select(Stay).join(
+        OutingStay, OutingStay.stay_id == Stay.id
+    ).where(OutingStay.outing_id == outing.id)).all()
+    auths = session.scalars(select(Authorization).join(
+        OutingAuthorization, OutingAuthorization.authorization_id == Authorization.id
+    ).where(OutingAuthorization.outing_id == outing.id)).all()
+    stay_ids = {stay.id for stay in stays}
+    outing_date = planned_departure.date()
+    required_type = {"family": "family_visit", "activity": "activity", "health": "medical",
+                     "school": "general", "administrative": "general"}.get(kind)
+    if kind != "health" and any(item.authorization_type == "medical" for item in auths):
+        raise ValueError("Las autorizaciones médicas solo pueden vincularse a salidas sanitarias")
+    if any(item.status != "valid" or item.valid_from > outing_date
+           or (item.valid_until is not None and item.valid_until < outing_date)
+           for item in auths):
+        raise ValueError("Una autorización vinculada ya no está vigente para la nueva fecha")
+    if required_type:
+        authorized_stays = {
+            item.stay_id for item in auths
+            if item.authorization_type in {required_type, "general"}
+        }
+        if not stay_ids.issubset(authorized_stays):
+            raise ValueError("La salida no conserva autorización vigente para todas las estancias")
+    old_values = {
+        "kind": outing.kind, "destination": outing.destination,
+        "purpose": outing.purpose,
+        "planned_departure": outing.planned_departure.isoformat(),
+        "planned_return": outing.planned_return.isoformat(),
+        "restrictions_checked": outing.restrictions_checked,
+    }
+    new_values = {
+        "kind": kind, "destination": destination.strip(), "purpose": purpose.strip(),
+        "planned_departure": planned_departure.isoformat(),
+        "planned_return": planned_return.isoformat(), "restrictions_checked": True,
+    }
+    outing.kind = kind
+    outing.destination = destination.strip()
+    outing.purpose = purpose.strip()
+    outing.planned_departure = planned_departure
+    outing.planned_return = planned_return
+    outing.restrictions_checked = True
+    _audit(session, actor, "outing_details_updated",
+           f"{outing.id}; anterior:{old_values}; nuevo:{new_values}")
+    return outing
+
+
 def set_outing_status(session: Session, *, actor_account_id: str, outing_id: str,
                       status: str, actual_at: datetime | None = None):
     outing = session.get(Outing, outing_id)
