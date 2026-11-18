@@ -46,6 +46,7 @@ class IncidentReportsDialog(QDialog):
         self.factory, self.actor_id = factory, actor_id
         self.entries_by_id = {}
         self.current_report_id = None
+        self.current_report_status = None
         self.rectifying = False
         self.setWindowTitle("Informes de incidencias")
         self.resize(1180, 800)
@@ -252,6 +253,7 @@ class IncidentReportsDialog(QDialog):
                 )
                 self.current_report_id = report.id
                 status = report.status
+            self.current_report_status = status
             self.rectifying = False
             self.refresh_saved_reports(select_id=self.current_report_id)
             QMessageBox.information(
@@ -290,10 +292,21 @@ class IncidentReportsDialog(QDialog):
                     session, actor_account_id=self.actor_id, report_id=report_id
                 )
                 version = report.versions[-1] if report.versions else None
+                entry_ids = [item.entry_id for item in version.entries] if version else []
+                linked_entries = session.scalars(
+                    select(DiaryEntry).where(DiaryEntry.id.in_(entry_ids))
+                ).all() if entry_ids else []
+                linked_dates = [entry.diary_day.diary_date for entry in linked_entries]
                 details = (report.title, report.recipient, report.status,
-                           version.content if version else "",
-                           [item.entry_id for item in version.entries] if version else [])
+                           version.content if version else "", entry_ids,
+                           min(linked_dates) if linked_dates else None,
+                           max(linked_dates) if linked_dates else None)
             self.current_report_id = report_id
+            self.current_report_status = details[2]
+            if details[5] and details[6]:
+                self.start.setDate(QDate(details[5].year, details[5].month, details[5].day))
+                self.end.setDate(QDate(details[6].year, details[6].month, details[6].day))
+                self.load_entries()
             self.title.setText(details[0])
             self.recipient.setText(details[1] or "")
             self.preview.setPlainText(details[3])
@@ -325,6 +338,7 @@ class IncidentReportsDialog(QDialog):
 
     def new_report(self):
         self.current_report_id = None
+        self.current_report_status = None
         self.rectifying = False
         self.saved_reports.blockSignals(True)
         self.saved_reports.setCurrentIndex(0)
@@ -344,8 +358,8 @@ class IncidentReportsDialog(QDialog):
         if not content:
             QMessageBox.information(self, "Informe vacío", "Prepara o abre un informe antes de exportarlo.")
             return
-        if not self.current_report_id:
-            QMessageBox.information(self, "Guarda primero", "Guarda el borrador o emite el informe antes de exportar.")
+        if not self.current_report_id or self.current_report_status not in {"issued", "rectified"}:
+            QMessageBox.information(self, "Informe no emitido", "Emite el informe antes de exportar la versión oficial.")
             return
         filename, _ = QFileDialog.getSaveFileName(
             self, "Guardar informe de incidencias",
