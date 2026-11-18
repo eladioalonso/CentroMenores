@@ -105,7 +105,11 @@ def test_health_profile_changes_keep_immutable_versions_with_actor_and_before_af
  assert latest.new_values["allergies"]=="Alergia actualizada"
  assert latest.new_values["emergency_instructions"]=="Instrucción nueva"
  initial=versions[1]
- assert initial.old_values=={"allergies":None,"relevant_conditions":None,"emergency_instructions":None}
+ assert initial.old_values=={
+  "allergies":None,"relevant_conditions":None,"emergency_instructions":None,
+  "cip":None,"health_center":None,"physician":None,"nurse":None,
+  "health_card_expires_on":None,"clinical_history":None,
+ }
  assert initial.new_values["allergies"]=="Alergia inicial"
  # Guardar exactamente los mismos datos no crea una versión artificial.
  save_health_profile(s,actor_account_id=actor,minor_id=profile.minor_id,
@@ -367,3 +371,26 @@ def test_any_educator_can_rectify_vaccine_record_and_keep_history(health_case):
  assert versions[0].changed_by_name_snapshot=="Segundo educador"
  assert versions[0].old_values["vaccine_name"]=="Vacuna inicial"
  assert versions[0].new_values["vaccine_name"]=="Vacuna corregida"
+
+
+
+def test_health_profile_contains_sanitary_identity_fields_and_versions_them(health_case):
+ s,actor,stay=health_case
+ profile=save_health_profile(s,actor_account_id=actor,stay_id=stay,
+  allergies="Alergia",relevant_conditions="Antecedente",emergency_instructions="Aviso",
+  cip="CIP-123",health_center="Centro sanitario",physician="Facultativo",
+  nurse="Enfermería",health_card_expires_on=date(2027,1,1),
+  clinical_history="Historial sanitario")
+ assert profile.cip=="CIP-123"
+ assert profile.health_center=="Centro sanitario"
+ assert profile.health_card_expires_on==date(2027,1,1)
+ save_health_profile(s,actor_account_id=actor,minor_id=profile.minor_id,
+  allergies="Alergia",relevant_conditions="Antecedente",emergency_instructions="Aviso",
+  cip="CIP-456",health_center="Centro actualizado",physician="Facultativo",
+  nurse="Enfermería",health_card_expires_on=date(2028,1,1),
+  clinical_history="Historial actualizado")
+ versions=list_health_profile_versions(s,actor_account_id=actor,minor_id=profile.minor_id)
+ assert len(versions)==2
+ assert versions[0].old_values["cip"]=="CIP-123"
+ assert versions[0].new_values["cip"]=="CIP-456"
+ assert versions[0].new_values["clinical_history"]=="Historial actualizado"
