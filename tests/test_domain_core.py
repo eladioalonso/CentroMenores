@@ -426,3 +426,64 @@ def test_incident_report_rejects_superseded_diary_entry_and_uses_latest_revision
             title="Informe", recipient=None, content="Informe correcto",
             entry_ids=[latest.id])
         assert report.versions[0].entries[0].entry_id == latest.id
+
+
+
+def test_any_educator_can_correct_stay_dates_and_keep_overlap_rules():
+    from gestion_centro.domain.service import update_stay
+    with make_session() as session:
+        author = create_professional_account(session, display_name="Autora",
+            username="stay-author", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        other = create_professional_account(session, display_name="Segundo educador",
+            username="stay-editor", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        minor = create_minor(session, actor_account_id=author.id,
+            given_names="Caso", family_names="Estancias")
+        stay = open_stay(session, actor_account_id=author.id, minor_id=minor.id,
+            started_on=date(2026, 1, 1))
+        updated = update_stay(session, actor_account_id=other.id, stay_id=stay.id,
+            started_on=date(2026, 1, 2), status="closed",
+            ended_on=date(2026, 2, 1), closure_reason="Cierre corregido")
+        assert updated.started_on == date(2026, 1, 2)
+        assert updated.ended_on == date(2026, 2, 1)
+        assert updated.status == "closed"
+        with pytest.raises(ValueError, match="fecha final"):
+            update_stay(session, actor_account_id=other.id, stay_id=stay.id,
+                started_on=date(2026, 1, 2), status="closed",
+                ended_on=None, closure_reason="")
+        next_stay = open_stay(session, actor_account_id=author.id, minor_id=minor.id,
+            started_on=date(2026, 2, 2))
+        assert next_stay.sequence_number == 2
+
+
+def test_any_educator_can_revise_event_and_preserve_participant_links():
+    from gestion_centro.domain.models import EventStayLink
+    from gestion_centro.domain.service import record_event, revise_event
+    with make_session() as session:
+        author = create_professional_account(session, display_name="Autora",
+            username="event-author", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        other = create_professional_account(session, display_name="Segundo educador",
+            username="event-editor", password="contraseña de prueba segura", role=Role.EDUCATOR)
+        minor = create_minor(session, actor_account_id=author.id,
+            given_names="Caso", family_names="Acontecimiento")
+        stay = open_stay(session, actor_account_id=author.id, minor_id=minor.id,
+            started_on=date(2026, 1, 1))
+        original = record_event(session, author_account_id=author.id,
+            title="Acontecimiento inicial", description="Descripción inicial",
+            happened_at=datetime(2026, 2, 1, 10, tzinfo=timezone.utc),
+            stay_ids=[stay.id])
+        revised = revise_event(session, actor_account_id=other.id, event_id=original.id,
+            title="Acontecimiento corregido", description="Descripción revisada",
+            happened_at=datetime(2026, 2, 1, 11, tzinfo=timezone.utc),
+            reason="Corrección factual")
+        assert revised.correction_of_id == original.id
+        assert revised.author_name_snapshot == "Segundo educador"
+        assert revised.title == "Acontecimiento corregido"
+        assert len(session.scalars(select(EventStayLink).where(
+            EventStayLink.event_id == revised.id
+        )).all()) == 1
+        assert original.title == "Acontecimiento inicial"
+        with pytest.raises(ValueError, match="versión posterior"):
+            revise_event(session, actor_account_id=author.id, event_id=original.id,
+                title="Otra corrección", description="Otra descripción",
+                happened_at=datetime(2026, 2, 1, 12, tzinfo=timezone.utc),
+                reason="No crear una rama")
