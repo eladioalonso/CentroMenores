@@ -14,7 +14,7 @@ from gestion_centro.domain.models import Minor, Stay, Event, EventStayLink, Mino
 from gestion_centro.domain.documents_service import list_documents
 from gestion_centro.domain.service import (
     create_minor, open_stay, close_stay, record_event,
-    has_health_access, audit_minor_health_access, HEALTH_PERSONAL_FIELDS,
+    has_health_access, HEALTH_PERSONAL_FIELDS,
 )
 
 
@@ -61,30 +61,6 @@ class NewMinorDialog(QDialog):
             personal_form.addRow(label, widget)
         tabs.addTab(personal, "Datos personales")
 
-        health = QWidget()
-        health_form = QFormLayout(health)
-        self.cip = QLineEdit()
-        self.health_center = QLineEdit()
-        self.physician = QLineEdit()
-        self.nurse = QLineEdit()
-        self.card_expiry = QDateEdit()
-        self.card_expiry.setCalendarPopup(True)
-        self.card_expiry.setDisplayFormat("dd/MM/yyyy")
-        self.card_expiry.setMinimumDate(QDate(1900, 1, 1))
-        self.card_expiry.setSpecialValueText("No indicada")
-        self.card_expiry.setDate(self.card_expiry.minimumDate())
-        self.clinical_history = QTextEdit()
-        self.clinical_history.setMinimumHeight(150)
-        for label, widget in [
-            ("CIP", self.cip), ("Centro de Salud", self.health_center),
-            ("Facultativo", self.physician), ("Enfermera", self.nurse),
-            ("Caducidad tarjeta sanitaria", self.card_expiry),
-            ("Historial clínico", self.clinical_history),
-        ]:
-            health_form.addRow(label, widget)
-        if self.health_access:
-            tabs.addTab(health, "Datos sanitarios")
-
         buttons = QHBoxLayout()
         save = QPushButton("Crear expediente")
         cancel = QPushButton("Cancelar")
@@ -105,17 +81,13 @@ class NewMinorDialog(QDialog):
 
     def values(self):
         birth = self.birth_date.date().toPython() if self.birth_date.date() > self.birth_date.minimumDate() else None
-        expiry = self.card_expiry.date().toPython() if self.card_expiry.date() > self.card_expiry.minimumDate() else None
         return {
             "given_names": self.given.text(),
             "family_names": self.family.text(), "birth_country": self.birth_country.text(),
             "locality": self.locality.text(), "nationality": self.nationality.text(),
             "birth_date": birth, "nif_nie": self.nif_nie.text(),
-            "passport_number": self.passport.text(), "cip": self.cip.text(),
-            "address": self.address.toPlainText(), "health_center": self.health_center.text(),
-            "physician": self.physician.text(), "nurse": self.nurse.text(),
-            "health_card_expires_on": expiry, "clinical_history": self.clinical_history.toPlainText(),
-            "email": self.email.text(),
+            "passport_number": self.passport.text(),
+            "address": self.address.toPlainText(), "email": self.email.text(),
         }
 
 
@@ -282,13 +254,11 @@ class MinorWorkspaceDialog(QDialog):
                 .where(MinorPersonalDataVersion.minor_id == self.minor_id)
                 .order_by(MinorPersonalDataVersion.changed_at.desc())
             ).all()
-            if self.health_access:
-                audit_minor_health_access(session, actor_account_id=self.actor_id, minor_id=self.minor_id)
             rows = []
             for version in versions:
                 visible_fields = [
                     field for field in version.new_values
-                    if self.health_access or field not in HEALTH_PERSONAL_FIELDS
+                    if field not in HEALTH_PERSONAL_FIELDS
                 ]
                 if visible_fields:
                     rows.append(
