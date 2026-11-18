@@ -94,9 +94,11 @@ class DiaryDialog(QDialog):
         self.close_button.clicked.connect(self.close_day)
         self.revise_button = QPushButton("Editar anotación seleccionada")
         self.revise_button.clicked.connect(self.revise_entry)
+        self.history_button = QPushButton("Historial de versiones")
+        self.history_button.clicked.connect(self.view_entry_history)
         refresh = QPushButton("Actualizar")
         refresh.clicked.connect(self.refresh)
-        for b in (self.add_button, self.close_button, self.revise_button, refresh): actions.addWidget(b)
+        for b in (self.add_button, self.close_button, self.revise_button, self.history_button, refresh): actions.addWidget(b)
         layout.addLayout(actions)
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["Hora", "Apartado / tipo", "Contenido", "Autor"])
@@ -183,6 +185,40 @@ class DiaryDialog(QDialog):
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo modificar", str(exc))
 
+    def view_entry_history(self):
+        row = self.table.currentRow()
+        cell = self.table.item(row, 0) if row >= 0 else None
+        metadata = cell.data(Qt.ItemDataRole.UserRole) if cell else None
+        if not metadata or metadata.get("kind") != "entry":
+            QMessageBox.information(self, "Selecciona una anotación", "Selecciona primero una anotación del parte.")
+            return
+        try:
+            with session_scope(self.factory) as session:
+                current = session.get(DiaryEntry, metadata["id"])
+                if current is None:
+                    raise ValueError("La anotación ya no existe.")
+                versions = [current]
+                parent_id = current.correction_of_id
+                while parent_id:
+                    parent = session.get(DiaryEntry, parent_id)
+                    if parent is None:
+                        break
+                    versions.append(parent)
+                    parent_id = parent.correction_of_id
+                versions.reverse()
+                lines = []
+                for number, version in enumerate(versions, start=1):
+                    lines.append(
+                        f"Versión {number} · {version.recorded_at.astimezone().strftime('%d/%m/%Y %H:%M')} "
+                        f"· {version.author_name_snapshot}"
+                    )
+                    lines.append(version.content)
+                    lines.append("")
+                history = "\\n".join(lines)
+            QMessageBox.information(self, "Historial de la anotación", history)
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo consultar el historial", str(exc))
+
     def add_incident(self):
         title, ok = QInputDialog.getText(self, "Incidencia", "Título:")
         if not ok or not title.strip(): return
@@ -224,6 +260,10 @@ class DiaryDialog(QDialog):
         with session_scope(self.factory) as session:
             day, entries, incidents = list_diary_records(
                 session, actor_account_id=self.actor_id, diary_date=selected)
+            # El parte muestra la última versión de cada anotación; las anteriores
+            # se conservan y pueden consultarse desde el historial.
+            superseded_ids = {entry.correction_of_id for entry in entries if entry.correction_of_id}
+            entries = [entry for entry in entries if entry.id not in superseded_ids]
             category_labels = {
                 "activity": "Actividades realizadas",
                 "positive": "Comportamientos positivos",
@@ -282,7 +322,13 @@ class DiaryDialog(QDialog):
         self.content.setReadOnly(is_closed)
         self.add_button.setEnabled(not is_closed)
         self.close_button.setEnabled(not is_closed)
+        has_selected_entry = bool(
+            self.table.currentRow() >= 0
+            and self.table.item(self.table.currentRow(), 0)
+            and (self.table.item(self.table.currentRow(), 0).data(Qt.ItemDataRole.UserRole) or {}).get("kind") == "entry"
+        )
         self.revise_button.setEnabled(any(row[4].get("kind") == "entry" for row in rows))
+        self.history_button.setEnabled(any(row[4].get("kind") == "entry" for row in rows))
         self.day_state.setText("PARTE CERRADO · No admite nuevas anotaciones; puedes revisar las existentes" if is_closed else "PARTE ABIERTO · Puedes completar y revisar anotaciones")
         self.day_state.setProperty("closed", is_closed)
         self.day_state.style().unpolish(self.day_state)
