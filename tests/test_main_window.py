@@ -53,7 +53,7 @@ def test_educator_sees_all_ordinary_modules():
             "Inicio", "Parte diario", "Expediente principal", "Expediente sanitario",
             "Informes de incidencias", "Expedientes de menores",
             "Seguimiento educativo y escolar", "Documentación del menor",
-            "Salidas y retornos", "Autorizaciones y visitas", "Informes externos",
+            "Salidas y retornos", "Autorizaciones y visitas",
             "Abrir expediente sanitario", "Crear informe desde el parte diario",
             "Agenda y tareas del equipo", "Calendario de actividades y citas",
         }
