@@ -415,7 +415,7 @@ def update_medication_administration(session: Session, *, actor_account_id: str,
     session.add(MedicationAdministrationVersion(
         administration_id=record.id, changed_by_account_id=actor.id,
         changed_by_name_snapshot=actor.professional.display_name,
-        changed_at=_next_version_timestamp(session, MedicationAdministrationVersion, MedicationAdministrationVersion.administration_id, administration.id), old_values=old_values,
+        changed_at=_next_version_timestamp(session, MedicationAdministrationVersion, MedicationAdministrationVersion.administration_id, record.id), old_values=old_values,
         new_values=new_values,
     ))
     _audit(session, actor, "medication_administration_updated",
