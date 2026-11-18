@@ -100,6 +100,19 @@ class MedicationAdministration(Base):
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
     plan: Mapped[MedicationPlan] = relationship(back_populates="administrations")
 
+class MedicationAdministrationVersion(Base):
+    """Historial de rectificaciones de administraciones registradas."""
+    __tablename__ = "medication_administration_versions"
+    __table_args__ = (Index("ix_medication_administration_versions_record_changed", "administration_id", "changed_at"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    administration_id: Mapped[str] = mapped_column(ForeignKey("medication_administrations.id"), nullable=False)
+    changed_by_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
+    changed_by_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    old_values: Mapped[dict] = mapped_column(JSON, nullable=False)
+    new_values: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+
 class VaccineRecord(Base):
     __tablename__ = "vaccine_records"
     __table_args__ = (Index("ix_vaccine_records_minor_date", "minor_id", "administered_on"),)
