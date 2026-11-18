@@ -115,6 +115,19 @@ class VaccineRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
 
 
+class VaccineRecordVersion(Base):
+    """Instantánea inmutable de cambios en un registro de vacunación."""
+    __tablename__ = "vaccine_record_versions"
+    __table_args__ = (Index("ix_vaccine_record_versions_record_changed", "vaccine_record_id", "changed_at"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    vaccine_record_id: Mapped[str] = mapped_column(ForeignKey("vaccine_records.id"), nullable=False)
+    changed_by_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
+    changed_by_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    old_values: Mapped[dict] = mapped_column(JSON, nullable=False)
+    new_values: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+
 class VaccineCalendarEdition(Base):
     """Edición documental de un calendario; no contiene prescripción ejecutable."""
     __tablename__ = "vaccine_calendar_editions"
