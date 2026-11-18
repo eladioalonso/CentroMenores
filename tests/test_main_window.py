@@ -1,6 +1,7 @@
 """Pruebas de humo de la navegación principal de escritorio."""
 
 from PySide6.QtWidgets import QApplication, QPushButton, QTabWidget
+from PySide6.QtCore import Qt
 
 from gestion_centro.app import MainWindow, CredentialsDialog
 from gestion_centro.expedientes_ui import MinorWorkspaceDialog
@@ -286,11 +287,17 @@ def test_incident_report_builder_uses_selected_diary_entries():
     dialog = IncidentReportsDialog(factory, actor_id)
     try:
         assert dialog.table.rowCount() == 1
+        checkbox = dialog.table.item(0, 0)
+        assert checkbox.checkState() == Qt.CheckState.Unchecked
+        checkbox.setCheckState(Qt.CheckState.Checked)
         dialog.prepare_draft()
         draft = dialog.preview.toPlainText()
         assert "Hecho ficticio registrado en el parte diario" in draft
         assert "Caso Informe ficticio" in draft
         assert "Educadora de prueba" in draft
+        dialog.new_report()
+        assert dialog.current_report_id is None
+        assert dialog.table.item(0, 0).checkState() == Qt.CheckState.Unchecked
     finally:
         dialog.close()
         engine.dispose()
