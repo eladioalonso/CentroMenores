@@ -160,6 +160,19 @@ def test_legacy_incidents_are_migrated_into_diary_with_minor_links(tmp_path):
             "'account-1', 'Educador histórico')"
         ), {"now": now})
         connection.execute(text(
+            "INSERT INTO diary_entries (id, diary_day_id, shift, category, content, "
+            "happened_at, recorded_at, author_account_id, author_name_snapshot) "
+            "VALUES ('entry-existing', 'day-1', 'morning', 'observation', "
+            "'Hecho duplicado · ya anotado', :now, :now, 'account-1', 'Educador histórico')"
+        ), {"now": now})
+        connection.execute(text(
+            "INSERT INTO incidents (id, diary_day_id, title, description, incident_type, "
+            "severity, happened_at, recorded_at, status, author_account_id, "
+            "author_name_snapshot) VALUES ('incident-duplicate', 'day-1', 'Hecho duplicado', "
+            "'ya anotado', 'behavior', 'low', :now, :now, 'open', "
+            "'account-1', 'Educador histórico')"
+        ), {"now": now})
+        connection.execute(text(
             "INSERT INTO incident_participants (id, incident_id, stay_id, role, "
             "minor_code_snapshot, minor_name_snapshot) VALUES ('participant-1', "
             "'incident-1', 'stay-1', 'affected', 'X1234567A', 'Caso Histórico')"
@@ -186,6 +199,9 @@ def test_legacy_incidents_are_migrated_into_diary_with_minor_links(tmp_path):
             "SELECT changed_by_account_id, changed_by_name_snapshot, new_values "
             "FROM health_profile_versions WHERE minor_id='minor-1'"
         )).mappings().one()
+        diary_count = connection.execute(text(
+            "SELECT COUNT(*) FROM diary_entries WHERE diary_day_id='day-1'"
+        )).scalar_one()
     assert entry["shift"] == "unspecified"
     assert entry["category"] == "negative"
     assert "Descripción conservada" in entry["content"]
@@ -204,4 +220,5 @@ def test_legacy_incidents_are_migrated_into_diary_with_minor_links(tmp_path):
     assert health_version["changed_by_account_id"] is None
     assert health_version["changed_by_name_snapshot"] == "Migración histórica"
     assert "CIP-LEGACY" in health_version["new_values"]
+    assert diary_count == 2
     engine.dispose()
