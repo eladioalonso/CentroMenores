@@ -1281,7 +1281,7 @@ def main() -> int:
         QWidget {
             color: #243247;
             font-family: "Segoe UI";
-            font-size: 10pt;
+            font-size: 11pt;
         }
         QMainWindow, QDialog, QWidget#centralwidget {
             background: #F4F7FB;
@@ -1321,7 +1321,7 @@ def main() -> int:
         }
         QLabel#navigationUser {
             color: #65768A;
-            font-size: 9pt;
+            font-size: 10pt;
             padding: 8px;
         }
         QFrame#dashboardCard {
@@ -1346,6 +1346,7 @@ def main() -> int:
         }
         QLabel#moduleIntro {
             color: #65768A;
+            font-size: 10pt;
             padding: 4px 2px 8px 2px;
         }
         QFrame#moduleActionCard {
@@ -1360,7 +1361,7 @@ def main() -> int:
         }
         QLabel#moduleActionDescription {
             color: #65768A;
-            font-size: 9pt;
+            font-size: 10pt;
         }
         QPushButton#moduleActionButton {
             background: #EAF2F8;
