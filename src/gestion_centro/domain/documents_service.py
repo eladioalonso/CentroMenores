@@ -200,6 +200,50 @@ def record_authorization(session: Session, *, actor_account_id: str, stay_id: st
     return item
 
 
+def update_authorization(session: Session, *, actor_account_id: str,
+                         authorization_id: str, authorization_type: str,
+                         scope: str, issuer: str, valid_from: date,
+                         valid_until: date | None = None, conditions: str | None = None,
+                         document_id: str | None = None):
+    """Corrige los datos de cualquier autorización y registra los valores anteriores."""
+    actor = _actor(session, actor_account_id)
+    authorization = session.get(Authorization, authorization_id)
+    if authorization is None:
+        raise ValueError("La autorización no existe")
+    if authorization_type not in AUTHORIZATION_TYPES or not scope.strip() or not issuer.strip():
+        raise ValueError("Tipo, alcance y emisor son obligatorios")
+    if valid_until and valid_until < valid_from:
+        raise ValueError("La vigencia final precede al inicio")
+    if document_id:
+        document = session.get(PersonalDocument, document_id)
+        if document is None or document.stay_id != authorization.stay_id:
+            raise ValueError("El documento justificativo no corresponde a esta estancia")
+    old_values = {
+        "authorization_type": authorization.authorization_type,
+        "scope": authorization.scope, "issuer": authorization.issuer,
+        "valid_from": authorization.valid_from.isoformat(),
+        "valid_until": authorization.valid_until.isoformat() if authorization.valid_until else None,
+        "conditions": authorization.conditions, "document_id": authorization.document_id,
+    }
+    new_values = {
+        "authorization_type": authorization_type, "scope": scope.strip(),
+        "issuer": issuer.strip(), "valid_from": valid_from.isoformat(),
+        "valid_until": valid_until.isoformat() if valid_until else None,
+        "conditions": conditions.strip() if conditions else None,
+        "document_id": document_id,
+    }
+    authorization.authorization_type = authorization_type
+    authorization.scope = scope.strip()
+    authorization.issuer = issuer.strip()
+    authorization.valid_from = valid_from
+    authorization.valid_until = valid_until
+    authorization.conditions = conditions.strip() if conditions else None
+    authorization.document_id = document_id
+    _audit(session, actor, "authorization_updated",
+           f"{authorization.id}; anterior:{old_values}; nuevo:{new_values}")
+    return authorization
+
+
 def check_authorization(session: Session, *, actor_account_id: str, stay_id: str,
                         authorization_type: str, on_date: date, required_scope: str | None = None):
     actor = _actor(session, actor_account_id)
