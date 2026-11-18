@@ -94,3 +94,35 @@ def test_education_and_school_read_services_require_actor_and_audit(edu):
   list_education_goals(s,actor_account_id="cuenta-inexistente",stay_id=stay)
  with pytest.raises(PermissionError):
   list_school_records(s,actor_account_id="cuenta-inexistente",placement_id=placement.id)
+
+
+
+def test_any_educator_can_edit_education_and_school_records_with_audit(edu):
+ s,actor,stay=edu
+ from gestion_centro.auth.models import AccessAudit
+ from gestion_centro.domain.education_service import (
+  update_education_goal, update_school_placement, update_school_record,
+ )
+ goal=create_education_goal(s,actor_account_id=actor,stay_id=stay,
+  title="Objetivo inicial",description="Descripción inicial")
+ placement=create_school_placement(s,actor_account_id=actor,stay_id=stay,
+  school_name="Centro inicial",course="2025/26",started_on=date(2026,1,1))
+ record=add_school_record(s,actor_account_id=actor,placement_id=placement.id,
+  record_type="meeting",occurred_on=date(2026,2,1),description="Registro inicial")
+ professional=Professional(display_name="Segundo educador")
+ s.add(professional); s.flush()
+ other=UserAccount(professional_id=professional.id,username="edu-editor",
+  password_hash="x",role="educator"); s.add(other); s.flush()
+ updated_goal=update_education_goal(s,actor_account_id=other.id,goal_id=goal.id,
+  title="Objetivo actualizado",description="Descripción revisada",
+  target_date=date(2026,6,1),status="active")
+ updated_placement=update_school_placement(s,actor_account_id=other.id,
+  placement_id=placement.id,school_name="Centro actualizado",course="2026/27",
+  started_on=date(2026,1,1),ended_on=None,notes="Notas revisadas")
+ updated_record=update_school_record(s,actor_account_id=other.id,record_id=record.id,
+  record_type="achievement",occurred_on=date(2026,2,2),description="Logro corregido")
+ assert updated_goal.title=="Objetivo actualizado"
+ assert updated_placement.school_name=="Centro actualizado"
+ assert updated_record.description=="Logro corregido"
+ events={event.event for event in s.scalars(select(AccessAudit)).all()}
+ assert {"education_goal_updated","school_placement_updated","school_record_updated"} <= events
