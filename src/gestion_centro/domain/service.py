@@ -397,7 +397,7 @@ def revise_diary_entry(
     session: Session, *, actor_account_id: str, original_entry_id: str, content: str,
     reason: str | None = None, happened_at: datetime | None = None,
     shift: str | None = None, category: str | None = None,
-    now: datetime | None = None,
+    stay_ids: list[str] | None = None, now: datetime | None = None,
 ):
     """Crea una nueva versión de cualquier anotación, incluso de otro educador o de un día cerrado.
 
@@ -431,15 +431,28 @@ def revise_diary_entry(
     )
     session.add(revised)
     session.flush()
-    links = session.scalars(select(DiaryEntryStayLink).where(
-        DiaryEntryStayLink.entry_id == original.id
-    )).all()
-    for link in links:
-        session.add(DiaryEntryStayLink(
-            entry_id=revised.id, stay_id=link.stay_id,
-            minor_code_snapshot=link.minor_code_snapshot,
-            minor_name_snapshot=link.minor_name_snapshot,
-        ))
+    if stay_ids is None:
+        links = session.scalars(select(DiaryEntryStayLink).where(
+            DiaryEntryStayLink.entry_id == original.id
+        )).all()
+        for link in links:
+            session.add(DiaryEntryStayLink(
+                entry_id=revised.id, stay_id=link.stay_id,
+                minor_code_snapshot=link.minor_code_snapshot,
+                minor_name_snapshot=link.minor_name_snapshot,
+            ))
+    else:
+        if len(stay_ids) != len(set(stay_ids)):
+            raise ValueError("No se puede asociar dos veces la misma estancia")
+        stays = [session.get(Stay, stay_id) for stay_id in stay_ids]
+        if any(stay is None for stay in stays):
+            raise ValueError("Una estancia vinculada ya no existe")
+        for stay in stays:
+            session.add(DiaryEntryStayLink(
+                entry_id=revised.id, stay_id=stay.id,
+                minor_code_snapshot=(stay.minor.nif_nie or stay.minor.passport_number or ""),
+                minor_name_snapshot=f"{stay.minor.given_names} {stay.minor.family_names}",
+            ))
     detail = (
         f"Versión anterior: {original.id}; nueva versión: {revised.id}; "
         f"autor original: {original.author_name_snapshot}; "
