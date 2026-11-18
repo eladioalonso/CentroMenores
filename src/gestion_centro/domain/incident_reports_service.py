@@ -35,6 +35,11 @@ def save_incident_report(session: Session, *, actor_account_id: str,
     entries = session.scalars(select(DiaryEntry).where(DiaryEntry.id.in_(ids))).all()
     if len(entries) != len(ids):
         raise ValueError("Una o varias anotaciones seleccionadas ya no existen")
+    superseded = session.scalars(select(DiaryEntry.correction_of_id).where(
+        DiaryEntry.correction_of_id.in_(ids)
+    )).all()
+    if superseded:
+        raise ValueError("Has seleccionado una versión sustituida. Actualiza la búsqueda y elige la última versión.")
     entries_by_id = {entry.id: entry for entry in entries}
     ordered_ids = sorted(ids, key=lambda item: (
         entries_by_id[item].happened_at, entries_by_id[item].recorded_at, item
