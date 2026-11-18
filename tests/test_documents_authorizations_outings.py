@@ -8,7 +8,7 @@ from gestion_centro.domain.service import create_minor, open_stay, close_stay
 from gestion_centro.domain.documents import PersonalDocument, Authorization, Outing
 from gestion_centro.domain.documents_service import (
     register_document, record_authorization, check_authorization,
-    create_outing, set_outing_status, set_authorization_status,
+    create_outing, set_outing_status, set_authorization_status, update_document_metadata,
 )
 from gestion_centro.persistence.base import Base
 
@@ -225,3 +225,37 @@ def test_closed_stay_documents_remain_available_and_can_be_added():
             item.id for item in list_documents(
                 session, actor_account_id=actor.id, stay_id=stay.id)
         }
+
+
+
+def test_any_educator_can_edit_document_metadata_with_before_after_audit():
+    from gestion_centro.auth.models import Professional, UserAccount, AccessAudit
+    with make_session() as session:
+        actor, stay = setup_stay(session)
+        document = register_document(
+            session, actor_account_id=actor.id, stay_id=stay.id,
+            category="administrative", title="Documento inicial",
+            original_filename="original.pdf", relative_path="documentos/original.pdf",
+            mime_type="application/pdf", size_bytes=100, sha256="c" * 64,
+            document_date=date(2026, 1, 2),
+        )
+        professional = Professional(display_name="Segundo educador")
+        session.add(professional); session.flush()
+        other = UserAccount(professional_id=professional.id, username="docs-editor",
+            password_hash="x", role="educator", health_access=False)
+        session.add(other); session.flush()
+        updated = update_document_metadata(
+            session, actor_account_id=other.id, document_id=document.id,
+            category="education", title="Documento corregido",
+            document_date=date(2026, 1, 3), expires_on=date(2027, 1, 3),
+            notes="Metadatos revisados",
+        )
+        assert updated.title == "Documento corregido"
+        assert updated.category == "education"
+        assert updated.uploaded_by_name_snapshot == "Profesional ficticio"
+        audit = session.scalar(select(AccessAudit).where(
+            AccessAudit.event == "personal_document_metadata_updated"
+        ))
+        assert audit is not None
+        assert "Documento inicial" in audit.details
+        assert "Documento corregido" in audit.details
