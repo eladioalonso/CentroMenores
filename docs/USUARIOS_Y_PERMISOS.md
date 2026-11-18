@@ -47,30 +47,32 @@ Aunque todos los educadores compartan el mismo perfil, los permisos se definirá
 
 La autorización se comprobará en los servicios de aplicación antes de ejecutar la operación y acceder a los datos protegidos. Las restricciones legales o de confidencialidad se aplicarán con independencia de que los educadores compartan perfil.
 
-## 4. Diario profesional: autoría, consulta y rectificaciones
+## 4. Parte diario: edición compartida y trazabilidad
 
-El diario profesional será visible para todos los educadores autorizados, pero la autoría de cada anotación debe quedar protegida.
+Todos los educadores activos pueden consultar, crear y modificar cualquier anotación del parte diario, con independencia de quién la haya registrado y de que el día esté cerrado.
 
-- **Consulta:** todos los educadores pueden consultar las anotaciones del diario, respetando las restricciones de acceso que se definan para información especialmente sensible.
-- **Anotación propia:** el autor podrá corregir sus propias anotaciones únicamente mientras permanezca abierto el turno completo al que pertenecen. El turno ordinario descrito por el centro comprende una tarde (15:00–22:00), la mañana siguiente (08:00–15:00) y la noche siguiente (22:00–08:00 del día posterior). Para permitir prolongaciones excepcionales por falta de sustitución, el cierre podrá realizarse manualmente al terminar realmente el servicio o, si no se realiza, se ejecutará automáticamente al cumplirse 48 horas desde el inicio del turno. Ese plazo es un límite absoluto. Las correcciones realizadas antes del cierre serán trazables y nunca sobrescribirán silenciosamente el contenido original.
-- **Anotación ajena:** otro educador no podrá editar ni sustituir el texto original.
-- **Matización:** cualquier educador autorizado podrá añadir una matización o comentario vinculado a una anotación ajena. La matización será un registro independiente, con su propio autor, fecha y hora; el texto original permanecerá intacto.
-- **Rectificación posterior al cierre o de una anotación ajena:** si se detecta un error una vez finalizado el turno de 48 horas, el autor tampoco podrá modificar la anotación original. Deberá añadir una rectificación vinculada, indicando quién la realiza, cuándo y el motivo. La rectificación no borrará el texto original.
-- **Historial:** la consulta de una anotación permitirá distinguir el texto original, sus correcciones por el autor y las matizaciones o rectificaciones añadidas por otros profesionales.
-- **Trazabilidad:** todas las operaciones conservarán identidad del usuario, fecha/hora y relación con la anotación afectada. El sistema deberá asociar cada anotación al turno completo correspondiente. El turno podrá cerrarse mediante una acción expresa del educador responsable o de un administrador autorizado cuando el servicio haya terminado realmente; si nadie lo cierra, el sistema lo cerrará automáticamente al cumplirse 48 horas desde su inicio. El cierre manual podrá adelantar el bloqueo, pero nunca ampliar el límite absoluto.
+- La autoría original de cada versión se conserva como dato histórico.
+- Una modificación crea una nueva versión vinculada a la anotación anterior; nunca sobrescribe silenciosamente el contenido previo.
+- Cada modificación registra el educador que la realiza, fecha y hora, registro afectado y motivo indicado por el usuario.
+- El cierre del día impide añadir nuevas anotaciones ordinarias a esa fecha, pero no impide revisar o corregir anotaciones ya existentes.
+- Las rectificaciones posteriores se conservan vinculadas al original y pueden ser realizadas por cualquier educador activo.
+- La consulta debe permitir distinguir el contenido original y sus versiones posteriores, identificando quién realizó cada cambio.
+- Las incidencias y los informes generados desde el parte diario seguirán las mismas reglas de edición compartida, con conservación de versiones emitidas oficialmente.
 
-La aplicación deberá distinguir claramente una matización (información complementaria) de una rectificación (señalar o corregir un dato erróneo). Los permisos para exportar o imprimir el diario se definirán por separado.
+El cierre de un parte diario es una regla de organización del registro, no una restricción de autoría ni un bloqueo de corrección. El administrador no será intermediario obligatorio para modificar información.
 
-## 4 bis. Edición de registros propios y rectificaciones
+## 4 bis. Edición compartida en los cuatro módulos
 
-Como regla general, el profesional que crea un registro podrá corregirlo directamente, sin esperar al administrador, mientras el registro esté en estado editable y no exista una restricción específica del módulo.
+Todos los educadores activos tienen las mismas capacidades ordinarias en los cuatro módulos funcionales:
 
-- La edición de un registro propio no cambia su autoría original.
-- Cada modificación registrará usuario, fecha/hora, registro afectado y versión o diferencias necesarias para reconstruir el contenido anterior.
-- Otro educador no podrá sobrescribir el contenido original de un registro ajeno. Podrá incorporar una aportación, matización o rectificación vinculada, según las funciones del módulo.
-- Los registros cerrados, validados, firmados o enviados oficialmente se corregirán mediante una rectificación vinculada, con el motivo requerido y conservación íntegra del original.
-- El administrador no tendrá que autorizar ni ejecutar las correcciones ordinarias del autor. La administración y supervisión se mantendrán separadas de la autoría.
-- Cada módulo concretará sus estados editables y excepciones. Para el diario se mantiene la regla específica: el autor corrige durante el periodo de apertura del turno, hasta un máximo absoluto de 48 horas; después se incorpora una rectificación vinculada.
+1. Expediente principal del menor.
+2. Expediente sanitario del menor.
+3. Parte diario.
+4. Informes de incidencias.
+
+Pueden consultar, crear y modificar información de cualquiera de esos módulos, incluidos registros creados por otros educadores. La aplicación conservará la autoría de cada versión y la trazabilidad de las modificaciones.
+
+Las excepciones se limitan a funciones técnicas de administración y a la conservación de documentos oficialmente emitidos: un informe ya remitido no se altera retroactivamente; se genera una versión rectificada que mantiene la anterior.
 
 ## 5. Acceso al área sanitaria: implementación vigente
 
@@ -134,10 +136,10 @@ Antes de implementar el sistema se deberá confirmar:
 > **Especificación vigente:** consultar [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md). Este documento reúne las decisiones aprobadas más recientes y prevalece sobre cualquier apartado anterior que las contradiga.
 
 
-## Acceso de lectura a módulos compartidos
+## Aplicación uniforme de permisos en los módulos
 
-Las consultas de agenda, comunicaciones, aportaciones, objetivos educativos, historial escolar y registros escolares requieren una cuenta activa desde sus servicios de dominio. Las lecturas quedan registradas en la auditoría de acceso. La consulta del historial educativo admite estancias cerradas para preservar el acceso autorizado a antecedentes; las operaciones de alta siguen exigiendo estancia activa cuando corresponde.
+Los servicios de aplicación deben comprobar que la cuenta y el profesional estén activos, pero no deben limitar la consulta o edición ordinaria según el autor del registro, el turno o el cierre del día. Esta regla se aplica a expedientes principales, expedientes sanitarios, parte diario e informes de incidencias.
 
-Las consultas de expedientes, diario, autorizaciones, salidas y calendario aplican además el permiso sanitario cuando el contenido corresponde a información de salud. Las lecturas sanitarias autorizadas quedan registradas; las lecturas generales filtran anotaciones de salud, autorizaciones médicas, salidas sanitarias y citas de vacunación.
+La administración técnica (usuarios, configuración, copias y restauraciones) continúa reservada al administrador. Los permisos administrativos no son necesarios para que un educador consulte o modifique información ordinaria de los cuatro módulos.
 
-Las estadísticas agregadas también excluyen, para cuentas sin permiso sanitario, el número de anotaciones e incidencias de salud y sus desgloses por categoría o gravedad. El circuito actual de informes externos solo admite autorizaciones no médicas, registra la previsualización y vuelve a comprobar la vigencia de la autorización justo antes de registrar la entrega. No sustituye la revisión institucional del contenido ni la autorización formal para comunicar datos.
+Toda modificación debe generar una nueva versión o una rectificación vinculada y registrar usuario, fecha/hora, registro afectado y motivo cuando corresponda. Las consultas sanitarias protegidas y las exportaciones seguirán registrándose en auditoría.
