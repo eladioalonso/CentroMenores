@@ -1,216 +1,81 @@
-# Módulos funcionales
+# Organización funcional de la aplicación
 
-Este documento describe la responsabilidad de cada módulo y sus relaciones. Es una especificación inicial: los campos concretos, pantallas y flujos se detallarán con el usuario antes de implementarlos.
+La aplicación se organiza en **cuatro módulos de trabajo**, tal como se aprobó en las decisiones consolidadas. La pantalla de Inicio es únicamente un panel de entrada y Administración es un área técnica reservada al administrador; ninguno constituye un quinto módulo funcional.
 
-## 1. Menores y expedientes
+Las herramientas que antes podían aparecer como apartados independientes —documentación, seguimiento educativo, escolaridad, salidas, visitas, autorizaciones, agenda y calendario— quedan integradas en el expediente principal o en el parte diario según su finalidad.
 
-Es el punto de entrada a la información individual.
+## 1. Expediente principal del menor
 
-- Ficha personal única con datos identificativos y datos de contacto relevantes para la actividad interna.
-- Personas de referencia y contactos autorizados, según el procedimiento del centro.
-- Situación actual y acceso al historial.
-- Relaciones con estancias, diario, incidencias, salidas, PEI, escolaridad, actividades y documentos.
+Es la ficha individual de referencia y el punto de consulta de la trayectoria personal y educativa.
 
-Los datos personales no se volverán a introducir en cada módulo. Se consultarán desde la ficha del menor mediante relaciones.
+Incluye:
 
-## 2. Estancias
+- Identificación: nombre y apellidos, lugar y país de nacimiento, nacionalidad, fecha de nacimiento y edad calculada, NIF/NIE, pasaporte, domicilio y correo.
+- Historial de ingresos, reingresos y bajas, manteniendo cada estancia como un periodo independiente.
+- Seguimiento educativo, objetivos, evolución, PEI y escolaridad.
+- Documentación personal y administrativa vinculada al menor o a una estancia.
+- Salidas y retornos, responsables, destinos y situación de cada movimiento.
+- Autorizaciones, consentimientos, visitas y restricciones de contacto.
+- Historial de acontecimientos del menor, con acceso a los hechos del parte diario relacionados.
 
-Gestiona cada periodo de permanencia en el centro.
+Los datos identificativos se mantienen en este expediente. La información clínica y los identificadores sanitarios se gestionan en el expediente sanitario, evitando que existan dos fichas clínicas independientes.
 
-- Ingreso, reingreso y baja.
-- Fechas y situación de la estancia.
-- Observaciones y datos operativos propios de ese periodo.
-- Historial de la estancia y registros asociados.
+## 2. Expediente sanitario del menor
 
-Un menor puede tener varias estancias. Una estancia cerrada se conserva y no se reutiliza para un ingreso posterior.
+Es el registro sanitario permanente vinculado directamente al expediente principal, no a una única estancia. Debe permitir consultar la trayectoria sanitaria aunque el menor haya causado baja y posteriormente haya reingresado.
 
-## 3. Área sanitaria
+Incluye:
 
-Módulo con control de acceso reforzado.
+- Perfil sanitario: CIP, centro de salud, facultativo, enfermería, vigencia de tarjeta sanitaria, antecedentes, alergias, condiciones relevantes e instrucciones de emergencia.
+- Historial de consultas, incidencias sanitarias, urgencias y actuaciones registradas por el centro.
+- Medicación y tratamientos prescritos, con pauta, duración, horarios, administraciones y seguimiento.
+- Vacunación individual: administraciones documentadas, identificación de vacuna y dosis, fecha, centro/profesional, lote y justificante cuando consten.
+- Revisiones de calendario y seguimiento de dosis, diferenciando calendario infantil, acelerado, adulto, grupos de riesgo, campañas e inmunización pasiva.
+- Versiones y trazabilidad de las modificaciones.
 
-- Identificadores y cobertura sanitaria, incluido CIP cuando proceda.
-- Tipo y vigencia de tarjeta sanitaria o documento especial de asistencia.
-- Centro sanitario y profesionales de referencia.
-- Caducidades, alertas e histórico de cambios.
-- Documentos sanitarios relacionados.
-- Información y seguimiento sanitario que el centro esté autorizado a registrar.
+Los catálogos vacunales son referencias documentales versionadas. No diagnostican, prescriben ni sustituyen la valoración del profesional sanitario. La falta de un registro de administración no se interpretará por sí sola como confirmación de una dosis pendiente.
 
-Los datos de identidad se consultan desde la ficha personal; no se crea una segunda ficha del menor. El acceso a este módulo y a sus documentos se limitará expresamente a usuarios autorizados.
+Todos los educadores activos pueden consultar y actualizar los datos ordinarios del expediente sanitario, dejando auditoría de los accesos y cambios conforme a las reglas del centro.
 
-### Vacunación individual
+## 3. Parte diario
 
-La vacunación forma parte de la ficha sanitaria del expediente principal de cada menor, con independencia de sus ingresos y estancias.
+Es la fuente cronológica única de los acontecimientos y de la actividad cotidiana del centro.
 
-- Calendario oficial de Melilla vigente y sus versiones históricas, con referencia al calendario común del SNS.
-- Vista individual por menor con vacuna, enfermedad prevenible, dosis, edad/fecha recomendada, estado y próximas actuaciones orientativas.
-- Historial de administraciones con fecha real, número/identificación de dosis, profesional o centro sanitario, lote/fabricante cuando consten, documento justificativo y autor del asiento.
-- Registro de vacunas recibidas antes del ingreso o fuera del centro, sin exigir estancia activa.
-- Seguimiento diferenciado de calendario sistemático, campañas estacionales y recomendaciones para grupos de riesgo.
-- Dosis pendientes o atrasadas señaladas como avisos para revisión sanitaria, nunca como prescripción automática.
-- Historial y auditoría: no se borran administraciones; cualquier corrección queda vinculada al asiento original.
-- Las reglas de calendario se versionan por vigencia y cohorte. Un cambio del calendario no altera retrospectivamente las pautas históricas.
+Incluye:
 
-## 4. Diario profesional
+- Fecha y organización por turnos (mañana, tarde y noche), con identificación de los educadores.
+- Altas, reingresos, bajas y salidas que deban reflejarse en el registro diario.
+- Actividades, tareas y asuntos relevantes para la continuidad entre turnos.
+- Observaciones generales y hechos relacionados con uno o varios menores.
+- Actuaciones y acontecimientos sanitarios que deban constar en la cronología, sin sustituir el expediente sanitario.
+- Conductas positivas y negativas.
+- Rectificaciones vinculadas a la anotación original.
 
-Registro cronológico de observaciones y acontecimientos cotidianos.
+Las incidencias no se duplican en un segundo registro factual independiente: se documentan en el parte diario y desde allí se seleccionan los hechos que deban formar parte de un informe. Una rectificación conserva el texto anterior, autoría, fecha y motivo cuando corresponda.
 
-- Fecha y hora.
-- Autor profesional.
-- Menor y, cuando proceda, estancia relacionada.
-- Categoría y contenido.
-- Búsqueda por menor, estancia, autor, categoría y periodo.
-- Rectificaciones o ampliaciones conservando la anotación original y su trazabilidad.
+## 4. Informes de incidencias
 
-Se definirán criterios para diferenciar observaciones ordinarias, información sensible y anotaciones que deban registrarse como incidencia formal.
+Permite elaborar documentos a partir de una o varias anotaciones ya existentes en el parte diario.
 
-## 5. Incidencias
+Flujo de trabajo:
 
-Registro y seguimiento de acontecimientos que requieren tratamiento específico.
+1. Buscar anotaciones por periodo y, cuando proceda, por menor.
+2. Seleccionar los hechos que se incorporarán al informe.
+3. Preparar una relación cronológica con fecha, menores vinculados, categoría, contenido y autoría original.
+4. Revisar y completar título, destinatario y redacción.
+5. Guardar un borrador compartido para continuarlo desde otra sesión de educador.
+6. Emitir una versión oficial y exportarla a Word.
+7. Si se detecta un error en una versión emitida, generar una rectificación versionada sin sobrescribir el documento anterior.
 
-- Tipo, fecha, hora, lugar y descripción.
-- Gravedad o prioridad, según catálogo acordado.
-- Uno o varios menores implicados.
-- Profesionales intervinientes.
-- Actuaciones realizadas, seguimiento y estado de resolución.
-- Documentos asociados.
-- Autoría, cambios y cierre.
+Cada versión conserva el texto, autor, fecha y vínculos con las anotaciones del parte diario que la sustentan. El mismo hecho puede incorporarse a más de un informe. El informe no reemplaza ni modifica la anotación original.
 
-La relación entre incidencias y menores será de muchos a muchos: una incidencia puede implicar a varios menores y un menor puede aparecer en numerosas incidencias.
+## Reglas comunes de funcionamiento
 
-## 6. Salidas, visitas y retornos
+- Cualquier educador activo puede consultar, crear y modificar información de los cuatro módulos, independientemente de quién creó el registro.
+- Las modificaciones relevantes quedan auditadas y, cuando corresponda, versionadas o vinculadas como rectificación.
+- Los registros originales y las versiones emitidas oficialmente no se sobrescriben.
+- La información se introduce una sola vez y se reutiliza mediante vínculos entre expedientes, parte diario e informes.
+- Las herramientas de administración técnica —cuentas, configuración, copias, restauración y diagnóstico— permanecen fuera de los cuatro módulos.
+- La pantalla de Inicio resume la actividad y facilita el acceso; no crea una fuente de datos paralela.
 
-Control operativo de movimientos fuera del centro.
-
-- Tipo de salida o visita.
-- Menor o grupo de menores.
-- Fecha y hora previstas y reales de salida y regreso.
-- Destino, acompañantes y profesional responsable.
-- Autorización y observaciones internas.
-- Estado: prevista, en curso, finalizada, cancelada o con incidencia, según reglas que se acuerden.
-- Avisos de retornos pendientes o retrasados.
-
-Se deberá poder consultar rápidamente qué menores están fuera del centro.
-
-## 7. Seguimiento educativo y PEI
-
-Organiza los objetivos y la evolución educativa individual.
-
-- PEI y sus versiones.
-- Áreas de intervención.
-- Objetivos generales y específicos.
-- Actuaciones y actividades relacionadas.
-- Evaluaciones, revisiones y fechas.
-- Profesionales responsables.
-- Documentos asociados e histórico.
-
-Las revisiones conservarán las versiones anteriores para poder reconstruir la evolución.
-
-## 8. Escolaridad y formación
-
-Registra la trayectoria formativa relevante para el seguimiento interno.
-
-- Centro, curso, nivel y tutoría.
-- Situación de matrícula.
-- Asistencia y seguimiento, cuando se gestione en el centro.
-- Evolución académica y observaciones autorizadas.
-- Formación complementaria.
-
-Se estudiará si los cambios de centro o curso deben tener historial propio en lugar de sobrescribir el dato vigente.
-
-## 9. Actividades
-
-Planifica y registra actividades educativas, recreativas y de otra naturaleza.
-
-- Catálogo de actividades.
-- Programación, fecha, horario, espacio y responsable.
-- Participantes múltiples.
-- Asistencia y observaciones.
-- Relación opcional con objetivos del PEI.
-
-La participación se guardará mediante relaciones estructuradas, no como una lista de nombres en un campo de texto.
-
-## 10. Tareas, turnos y traspasos
-
-Facilita la continuidad del trabajo entre equipos.
-
-- Tareas con descripción, prioridad, responsable, estado y vencimiento.
-- Asignación y seguimiento.
-- Turnos y calendario, si se confirma que deben gestionarse en la aplicación.
-- Traspasos entre profesionales o equipos.
-- Asuntos pendientes y confirmación de lectura cuando proceda.
-
-Debe quedar claro quién comunica, quién recibe y qué tareas siguen abiertas.
-
-## 11. Documentación
-
-Repositorio documental único dentro de la carpeta de datos de la aplicación.
-
-- Categorías y metadatos del documento.
-- Archivo, nombre, formato, tamaño y fechas relevantes.
-- Autor o responsable de incorporación.
-- Relaciones con menores, estancias, incidencias, PEI u otros registros.
-- Control de acceso y, si se requiere, versiones.
-
-El mismo archivo no se duplicará para asociarlo a varios registros: se almacenará una vez y se crearán las relaciones necesarias. Los documentos sanitarios tendrán restricciones reforzadas.
-
-## 12. Panel de control
-
-Vista resumida calculada a partir de los módulos.
-
-- Menores presentes.
-- Ingresos y bajas recientes.
-- Salidas en curso y retornos pendientes.
-- Incidencias abiertas.
-- Tareas pendientes.
-- Actividades previstas.
-- Caducidades y avisos configurados.
-
-El panel no será una fuente de datos independiente: cada indicador procederá de los registros originales y respetará los permisos del usuario.
-
-## 13. Informes y estadísticas
-
-- Informes individuales e informes por estancia.
-- Listados de incidencias y actuaciones.
-- Actividades y participación.
-- Seguimiento educativo.
-- Ocupación y movimientos.
-- Filtros por fecha, categoría y otros criterios autorizados.
-- Vista imprimible y exportación en formatos que se determinen.
-
-Los informes deberán respetar los permisos y evitar mostrar datos sensibles a usuarios no autorizados.
-
-## 14. Administración, usuarios y auditoría
-
-- Alta, baja y bloqueo de cuentas.
-- Roles y permisos por módulo y operación.
-- Configuración de bloqueo por inactividad.
-- Catálogos y parámetros.
-- Registro de inicio y cierre de sesión y de operaciones relevantes.
-- Copias de seguridad, restauración y comprobaciones.
-- Herramientas de mantenimiento.
-
-La eliminación lógica o física de registros, los plazos de conservación y las operaciones administrativas deberán definirse expresamente; no se habilitará un borrado indiscriminado como comportamiento predeterminado.
-
-## 15. Relaciones transversales
-
-- Un menor tiene una ficha y puede tener varias estancias.
-- Los registros profesionales se relacionan con el menor y, cuando corresponda, con la estancia en la que sucedieron.
-- Una incidencia puede involucrar a varios menores y profesionales.
-- Una actividad puede tener varios participantes.
-- Un documento se almacena una vez y puede relacionarse con varios registros.
-- Una tarea puede originarse en una incidencia, un traspaso u otra necesidad.
-- El panel y los informes consultan las relaciones existentes, sin duplicar la información.
-
-
-> **Especificación vigente:** consultar [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md). Este documento reúne las decisiones aprobadas más recientes y prevalece sobre cualquier apartado anterior que las contradiga.
-
-
-## Revisión individual de vacunación en la ficha sanitaria
-
-La pestaña **Vacunas** del expediente permanente muestra por separado:
-- Administraciones registradas, con fecha real y referencia de dosis.
-- Revisiones profesionales individuales, con categoría, estado, fecha orientativa, profesional y fundamento.
-
-La ausencia de una administración no equivale a una dosis pendiente. El estado «Pendiente confirmado» exige una revisión profesional documentada. El catálogo de calendario es documental y versionado; no genera indicaciones clínicas ni pautas de rescate automáticamente.
-
-Las categorías disponibles separan calendario sistemático, vacunación acelerada, grupos de riesgo, campañas e inmunización pasiva. La administración de vacunas se sigue registrando como un hecho histórico inmutable. Las revisiones no sustituyen el registro de administración ni la validación del profesional sanitario.
+Para reglas detalladas de permisos, cierres, conservación y flujos, prevalecen [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md), [Usuarios y permisos](USUARIOS_Y_PERMISOS.md) y [Flujos de trabajo](FLUJOS_DE_TRABAJO.md).
