@@ -120,19 +120,21 @@ La consulta de auditoría está disponible solo para administradores, con filtro
 - No permitir que un educador ordinario se otorgue privilegios administrativos.
 - Mantener separadas, en la medida técnicamente viable, las funciones de administración del sistema y el acceso a información especialmente sensible.
 
-## 9. Decisiones pendientes
+## 9. Validaciones institucionales pendientes
 
-Antes de implementar el sistema se deberá confirmar:
+Las decisiones funcionales sobre perfiles ya están aprobadas: Educadores y Administrador. Todos los educadores activos tienen las mismas capacidades ordinarias en los cuatro módulos, incluida la consulta y edición del expediente sanitario. No está pendiente decidir si los educadores pueden acceder a salud ni si pueden corregir registros de otros autores.
 
-1. Si existen otros perfiles profesionales que deban tener acceso a la aplicación, además de educadores y administrador del sistema.
-2. Qué autorizaciones concretas tendrá cada educador sobre los distintos módulos y registros.
-3. Qué personas estarán autorizadas para acceder al área sanitaria y con qué alcance.
-4. Si el administrador del sistema podrá consultar información operativa o si sus permisos se limitarán a la administración técnica, salvo que también actúe como educador.
-5. Quién puede consultar, modificar, exportar y cerrar cada tipo de registro, incluida la autorización para cerrar manualmente un turno.
-6. Qué eventos se auditan y durante cuánto tiempo se conservan.
-7. Cómo se gestionan las ausencias, sustituciones y bajas de usuarios.
+Antes de usar datos reales, la entidad responsable debe validar:
+1. Qué profesionales, además de educadores y administrador técnico, deben tener cuenta.
+2. Qué protocolos institucionales regulan el acceso a información personal y sanitaria.
+3. Qué operaciones requieren autorización institucional específica, por ejemplo exportaciones, impresiones o recuperación de copias.
+4. Qué eventos se auditan, quién puede consultar la auditoría y durante cuánto tiempo se conserva.
+5. Cómo se gestionan altas, bajas, sustituciones y revisiones periódicas de cuentas.
+6. Quién custodia el equipo, la carpeta de datos y los soportes de copia.
+7. La adecuación de perfiles y permisos a la normativa y a las instrucciones de la Administración competente.
 
-
+Estas validaciones no deben reintroducir restricciones de edición por autor, turno o cierre del parte, salvo que exista una nueva decisión expresa y documentada del centro.
+ 
 > **Especificación vigente:** consultar [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md). Este documento reúne las decisiones aprobadas más recientes y prevalece sobre cualquier apartado anterior que las contradiga.
 
 
