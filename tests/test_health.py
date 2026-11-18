@@ -99,6 +99,7 @@ def test_health_profile_changes_keep_immutable_versions_with_actor_and_before_af
  assert first.id==profile.id
  versions=list_health_profile_versions(s,actor_account_id=actor,minor_id=profile.minor_id)
  assert len(versions)==2
+ assert versions[0].changed_at > versions[1].changed_at
  latest=versions[0]
  assert latest.changed_by_account_id==actor
  assert latest.old_values["allergies"]=="Alergia inicial"
