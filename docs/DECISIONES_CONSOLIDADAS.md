@@ -1,10 +1,10 @@
 # Decisiones consolidadas del diseño
 
-**Estado:** especificación funcional consolidada para revisión.  
+**Estado:** especificación funcional aprobada y en implementación.  
 **Ámbito:** aplicación local de gestión interna de un centro de menores.  
-**Rama documental:** `documentacion/planteamiento-inicial`.
+**Rama de implementación:** `desarrollo/nucleo-aplicacion`.
 
-Este documento reúne las decisiones aprobadas durante el diseño y prevalece sobre cualquier descripción anterior que las contradiga. No autoriza todavía el inicio de la programación. Las cuestiones marcadas como pendientes requieren validación antes de utilizar datos reales.
+Este documento reúne las decisiones aprobadas durante el diseño y prevalece sobre cualquier descripción anterior que las contradiga. La programación ha sido autorizada por el usuario en la rama de implementación. Las cuestiones marcadas como pendientes requieren validación antes de utilizar datos reales.
 
 ## 1. Alcance, despliegue y uso
 
@@ -128,52 +128,35 @@ Todos los educadores podrán activar el procedimiento excepcional (*break glass*
 - Diagnóstico automático y completo manual por el administrador: base de datos, relaciones, carpetas, permisos, adjuntos, copias, espacio y estado general.
 - Los informes técnicos no contendrán datos identificativos, sanitarios ni contenido de menores. Si se necesitara soporte con datos reales, deberá autorizarse y minimizarse separadamente.
 
-## 9. Módulos funcionales acordados
+## 9. Módulos funcionales definitivos
 
-La aplicación incluye:
-1. Panel general.
-2. Usuarios, permisos, sesiones y administración.
-3. Menores, ficha única, expedientes y estancias independientes.
-4. Familiares, contactos y restricciones.
-5. Diario profesional único por fecha, dividido en mañana/tarde/noche.
-6. Comunicaciones internas, incluidas comunicaciones confidenciales.
-7. Borradores compartidos y recuperación de formularios interrumpidos.
-8. Seguimiento educativo, objetivos, logros e informes.
-9. Área sanitaria, episodios, medicación, vacunación, citas e informes.
-10. Escolaridad y reuniones/seguimiento escolar.
-11. Actividades grupales e individuales.
-12. Agenda única, tareas y avisos.
-13. Salidas, visitas, contactos y retornos.
-14. Documentación y autorizaciones.
-15. Informes oficiales y solicitudes externas, con verificación de autorización.
-16. Estadísticas y memorias para administrador.
-17. Recepción y consulta de archivos desde móviles por navegador y Wi-Fi local.
-18. Auditoría, alertas y acceso de emergencia.
-19. Copias, restauración, migración, mantenimiento y diagnóstico.
-20. Ayuda integrada y modo de demostración con datos ficticios y restablecimiento independiente.
+La aplicación tendrá exactamente cuatro módulos de trabajo:
 
-No se incluye módulo de Servicios Generales/mantenimiento del edificio. El libro de mantenimiento del centro queda fuera de la aplicación.
+1. **Expediente principal del menor.** Ficha identificativa, estancias e ingresos/reingresos, seguimiento educativo, escolaridad, documentación personal y administrativa, familiares y restricciones, visitas, salidas y autorizaciones.
+2. **Expediente sanitario del menor.** Ficha sanitaria, antecedentes, consultas y urgencias, tratamientos, medicación, administraciones, vacunas, dosis, revisiones y documentación sanitaria. Se vincula al expediente principal y no duplica la identidad del menor.
+3. **Parte diario.** Registro cronológico único por fecha y turnos, con educadores, altas/bajas, actividades, observaciones, comportamientos e incidencias. Es la fuente de los hechos que se utilizarán en los informes.
+4. **Informes de incidencias.** Selección de hechos ya registrados en el parte diario, elaboración cronológica, revisión, emisión y rectificación versionada. Cada hecho seleccionado mantiene su vínculo con el registro original.
+
+El inicio/panel general puede existir como pantalla de entrada, pero no es un módulo funcional adicional. Usuarios, permisos, auditoría, copias, restauración, mantenimiento y configuración son herramientas técnicas reservadas al administrador y no módulos de trabajo para educadores.
 
 ### Reglas transversales
-### Autoría, edición y rectificación de registros
-- Como regla general, el profesional que crea un registro podrá corregir y modificar sus propios registros directamente, sin necesitar la intervención del administrador, mientras el registro permanezca editable y no exista una restricción específica.
-- La autoría no se transfiere por el hecho de que otro profesional consulte el registro. Otro educador no podrá sobrescribir el contenido original de un registro ajeno; podrá añadir una aportación, matización o rectificación vinculada cuando el módulo lo permita.
-- Toda modificación conservará trazabilidad: usuario que la realiza, fecha y hora, registro afectado y diferencias o versión anterior suficiente para reconstruir qué se modificó. Nunca se sobrescribirá silenciosamente información ya registrada.
-- Cuando un registro esté cerrado, validado, firmado, enviado oficialmente o sujeto a una regla específica de inalterabilidad, no se reabrirá para editarlo ordinariamente. Se añadirá una rectificación vinculada, con motivo obligatorio cuando corresponda, conservando íntegro el original.
-- El administrador no será intermediario obligatorio para las correcciones ordinarias de los autores. Sus facultades de supervisión y administración no sustituyen la autoría ni eliminan la trazabilidad.
-- Cada módulo deberá definir sus estados editables, los límites temporales y los procedimientos de rectificación. Se mantienen las reglas especiales ya acordadas para el diario profesional (autoría propia y ventana de corrección limitada al cierre del turno, con máximo absoluto de 48 horas).
-- Antes de habilitar la edición de un tipo de registro se comprobarán conflictos de edición, permisos, historial de versiones, auditoría y recuperación ante fallos.
-
-- Ficha única por menor; cada reingreso crea nueva estancia.
-- No duplicar información: el módulo de origen es el registro principal; otros módulos enlazan o muestran resúmenes.
+- La información se registra una sola vez en su módulo de origen. Los demás módulos la consultan o enlazan, sin crear duplicados innecesarios.
+- El expediente principal y el sanitario comparten la identidad única del menor; los datos sanitarios se mantienen en el expediente sanitario.
+- El parte diario es la fuente cronológica de hechos. Un informe selecciona y referencia anotaciones existentes; no obliga a registrar de nuevo el mismo acontecimiento como una segunda incidencia independiente.
+- Un informe puede agrupar hechos de varios días y menores; un mismo hecho puede formar parte de más de un informe.
+- Los borradores de informe se pueden editar. Las versiones emitidas oficialmente se conservan y cualquier rectificación genera una nueva versión vinculada, sin alterar la entregada.
 - Diferenciar fecha/hora del hecho y fecha/hora de registro.
-- Correcciones, matizaciones y rectificaciones conservan el original y su trazabilidad.
-- No registrar como definitivo un borrador ni una recuperación temporal sin confirmación expresa.
-- El diario es un libro único compartido por fecha y tres turnos; cierre manual o automático a las 48 horas desde el inicio del turno, límite absoluto.
-- Los borradores compartidos no se asignan a una persona; cualquier educador puede continuar y cerrar/reabrir con trazabilidad. Papelera: 2 meses. Recuperaciones temporales: 7 días.
-- El ciclo del educador sigue el patrón de turnos acordado; turno actual se detecta por calendario/horario con corrección manual trazable.
-- Los informes se generan solo con información necesaria, autorizada y revisada antes de entregar.
-- No se automatizan diagnósticos, prescripciones ni valoraciones educativas.
+- Las operaciones relevantes conservan autoría, fecha/hora, historial y trazabilidad.
+
+### Edición compartida por educadores
+- Todos los educadores activos pueden consultar, crear y modificar cualquier información de los cuatro módulos, independientemente de quién creó el registro.
+- No existen restricciones de edición por autor, turno, antigüedad del registro o cierre del parte diario.
+- El cierre del parte impide añadir nuevas anotaciones ordinarias a esa fecha, pero no impide modificar anotaciones existentes.
+- La edición crea una nueva versión vinculada al original. Nunca se sobrescribe silenciosamente la información anterior.
+- Cada versión identifica al educador que realizó el cambio, fecha/hora, registro afectado y motivo de modificación cuando corresponda.
+- Los informes ya emitidos no se alteran retroactivamente: se crea una versión rectificada y se conserva la versión emitida.
+- El administrador no será intermediario obligatorio para las modificaciones ordinarias. Sus permisos adicionales se limitan a administración técnica, cuentas, configuración, copias y restauración.
+- La identidad del autor original se conserva como dato histórico aunque otro educador realice una modificación.
 
 ## 10. Ayuda y formación
 
@@ -216,7 +199,7 @@ Criterios funcionales acordados, sujetos a validación normativa:
 7. Informes, estadísticas y memorias.
 8. Móvil local, ayuda, demostración y validación integral.
 
-**No iniciar programación ni modificar código hasta recibir aprobación expresa del usuario después de revisar esta documentación y el plan técnico.**
+**La implementación está autorizada.** Los cambios se realizarán de forma incremental en `desarrollo/nucleo-aplicacion`, preservando los datos y verificando las pruebas antes de preparar cada versión compilada.
 
 
 ## 14. Decisiones técnicas aprobadas en la revisión
