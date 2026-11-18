@@ -2,183 +2,151 @@
 
 ## 1. Finalidad
 
-Este documento describe las principales entidades de información y sus relaciones. Es un modelo conceptual inicial, previo al diseño físico de tablas y a la implementación. Debe validarse con los profesionales del centro y ajustarse a las obligaciones de protección de datos y conservación documental.
+Este documento describe las entidades persistentes que sostienen los cuatro módulos funcionales. El modelo mantiene una identidad única del menor, separa las estancias de la trayectoria permanente y evita duplicar acontecimientos o documentos.
 
-El modelo evita duplicidades, conserva el histórico y permite que un mismo acontecimiento o documento esté relacionado con varios registros sin almacenar copias innecesarias.
+El esquema físico vigente se implementa mediante SQLAlchemy y migraciones Alembic. Para los requisitos funcionales prevalece [Decisiones consolidadas](DECISIONES_CONSOLIDADAS.md).
 
-## 2. Entidades principales
+## 2. Identidad y estancias
 
-### 2.1. Menor
+### Menor
 
-Representa la identidad única de cada menor atendido por el centro.
+Representa la identidad única de cada menor. Incluye datos personales y de identificación. No se crea una ficha nueva por cada ingreso o reingreso.
 
-- Tiene una ficha única.
-- No se crea una ficha nueva por cada ingreso o reingreso.
-- Se relaciona con sus estancias, anotaciones, incidencias, actividades, seguimientos, documentos y demás registros autorizados.
-- Los datos identificativos se limitarán a los necesarios y su acceso dependerá de permisos.
+### Estancia
 
-### 2.2. Estancia
+Representa un periodo concreto de ingreso. Pertenece a un menor y tiene número de secuencia, fechas y estado. Un menor puede tener varias estancias. Cerrar una estancia no elimina la ficha ni sus registros históricos.
 
-Representa un periodo concreto de ingreso o atención residencial.
+Las anotaciones, documentos y movimientos pueden relacionarse con una estancia cuando sea necesario conservar el contexto temporal. La información sanitaria permanente se relaciona directamente con el menor.
 
-- Pertenece a un único menor.
-- Un menor puede tener varias estancias a lo largo del tiempo.
-- Cada reingreso genera una nueva estancia.
-- Los registros vinculados a una estancia conservan esa relación aunque la estancia finalice.
-- La estancia no sustituye ni duplica la ficha personal.
+## 3. Módulo 1: expediente principal
 
-### 2.3. Profesional y cuenta de usuario
+### Datos personales e historial
 
-Conviene distinguir la identidad profesional de las credenciales de acceso.
+Los datos identificativos se guardan una sola vez en la entidad Menor. Las modificaciones personales relevantes pueden conservar versiones con autor, fecha/hora y valores anteriores/nuevos.
 
-- El profesional representa a la persona que trabaja en el centro.
-- La cuenta permite iniciar sesión y se asocia a un profesional.
-- Una cuenta puede estar activa, bloqueada o deshabilitada sin borrar la autoría histórica de sus registros.
-- Los permisos se asignan a través de roles y, cuando sea necesario, permisos específicos.
+### Educación y escolaridad
 
-### 2.4. Anotación del diario profesional
+- Los objetivos educativos pertenecen al expediente/estancia correspondiente.
+- Las actualizaciones de seguimiento se conservan como registros históricos versionables.
+- Las escolarizaciones tienen periodos, centro, curso y registros asociados.
+- Una rectificación no elimina la actualización original.
 
-Representa una entrada única de la cronología general del centro.
+### Documentación
 
-- Tiene fecha y hora de creación, autor y contenido.
-- Puede tener fecha y hora del acontecimiento, que no tienen por qué coincidir con las de creación.
-- Puede ser general del centro, sin menores relacionados.
-- Puede relacionarse con uno o varios menores.
-- Puede relacionarse con la estancia correspondiente de cada menor cuando proceda.
-- Tiene una categoría configurable.
-- Se muestra una sola vez en la cronología general, aunque esté relacionada con varios menores.
-- Sus rectificaciones deben mantener trazabilidad; no se debe sobrescribir silenciosamente el contenido histórico.
+Los archivos se almacenan una sola vez en el repositorio local. Sus metadatos conservan categoría, título, nombre físico seguro, hash, versión, fechas y autoría. Se relacionan con el menor y/o la estancia según corresponda.
 
-La relación entre anotaciones y menores es de muchos a muchos: una anotación puede relacionarse con varios menores y cada menor puede tener muchas anotaciones.
+### Autorizaciones, visitas y salidas
 
-### 2.5. Incidencia
+Las autorizaciones conservan vigencia, estado, alcance y trazabilidad. Las salidas y retornos distinguen horas previstas y reales, destino, responsable, estado y vínculos con menores/estancias.
 
-Representa un acontecimiento que requiere registro y seguimiento específico.
+## 4. Módulo 2: expediente sanitario
 
-- Puede implicar a uno o varios menores.
-- Puede relacionarse con uno o varios profesionales.
-- Puede tener actuaciones, documentos y tareas de seguimiento.
-- Conserva fecha, hora, lugar, clasificación, descripción, estado y autoría.
-- Puede estar relacionada con una anotación del diario que haya originado su apertura, sin duplicar innecesariamente el relato.
+### Perfil sanitario
 
-### 2.6. Actividad y participación
+La ficha sanitaria pertenece al menor, no a una estancia. Incluye CIP, centro de salud, facultativo, enfermería, vigencia de tarjeta, antecedentes, alergias, condiciones relevantes e instrucciones de emergencia. Los cambios se conservan en un historial versionado.
 
-La actividad representa una acción planificada o realizada por el centro.
+### Medicación
 
-- Una actividad puede tener varios participantes.
-- Cada participación se registra de forma individual para distinguir asistencia, ausencia y observaciones propias.
-- La participación enlaza una actividad con un menor y, cuando proceda, con su estancia.
+- La pauta prescrita se relaciona con el menor y puede conservar el vínculo a la estancia en la que se registró.
+- Los horarios diarios son entidades relacionadas con la pauta.
+- Las administraciones registran hora prevista, resultado, nota, autor y fecha de registro.
+- Las rectificaciones de administraciones crean versiones que conservan los valores anteriores.
 
-### 2.7. Seguimiento educativo y PEI
+### Vacunación
 
-Se separan los documentos o planes vigentes de los registros de seguimiento.
+- Los registros de administración se relacionan directamente con el menor.
+- Cada registro puede vincularse a un elemento del catálogo documental y a un justificante.
+- Se conservan vacuna, dosis, fecha, fabricante, producto, lote, centro/profesional y autoría cuando consten.
+- Las revisiones individuales de dosis son registros separados y repetibles, con estado, fecha, profesional y fundamento.
+- Los catálogos y ediciones son referencias documentales versionadas; no crean automáticamente administraciones ni dosis pendientes.
 
-- El PEI dispone de versiones con fechas de vigencia y estado.
-- Los objetivos pertenecen a una versión concreta del plan.
-- Las actuaciones y evaluaciones se registran como elementos históricos.
-- Una nueva versión no elimina las anteriores.
+## 5. Módulo 3: parte diario
 
-### 2.8. Salida, visita y retorno
+### Día y anotación
 
-Representa un movimiento o ausencia temporal.
+DiaryDay representa la fecha del parte. DiaryEntry representa una anotación cronológica con turno, categoría, contenido, fecha/hora del hecho, fecha/hora de registro y autor original.
 
-- Se relaciona con uno o varios menores según el caso.
-- Distingue datos previstos de datos reales.
-- Conserva responsable, tipo, estado y horas de salida y retorno.
-- No se cierra automáticamente por el mero transcurso de la hora prevista.
+Una anotación puede ser general o estar relacionada con uno o varios menores. DiaryEntryStayLink relaciona una anotación con la estancia correspondiente y conserva snapshots identificativos para consulta histórica.
 
-### 2.9. Documento
+### Rectificaciones
 
-Representa un archivo almacenado una sola vez y sus metadatos.
+Una rectificación crea otra DiaryEntry vinculada a la versión anterior mediante la relación de corrección. La cadena conserva texto original, autoría, marcas temporales y motivo. La vista cotidiana muestra la última versión vigente, y el historial permite consultar las anteriores.
 
-- El archivo físico se conserva en el repositorio documental interno.
-- Los metadatos describen categoría, título, fechas, autoría y clasificación.
-- Un documento puede relacionarse con varios menores y con otros registros.
-- Las relaciones no generan copias del archivo.
-- Los permisos deben proteger tanto los metadatos como el contenido del archivo.
+El cierre de un día limita la incorporación de nuevas anotaciones ordinarias, pero no impide rectificar anotaciones existentes por cualquier educador activo.
 
-### 2.10. Tarea y traspaso
+### Planificación
 
-La tarea representa una acción pendiente o asignada.
+Agenda y calendario son vistas de los registros de planificación compartidos. No deben convertirse en fuentes paralelas que dupliquen las mismas tareas o actividades.
 
-- Puede tener responsable individual o colectivo, según se defina.
-- Puede estar relacionada con una incidencia, anotación, actividad u otro registro.
-- Conserva prioridad, estado, fechas y resultado.
+## 6. Módulo 4: informes de incidencias
 
-El traspaso representa información operativa comunicada entre turnos.
+### Informe
 
-- Tiene autor, fecha y hora.
-- Puede referenciar tareas, incidencias y otros registros existentes.
-- La confirmación de lectura no equivale a completar ni resolver los asuntos referenciados.
+IncidentReport representa el documento lógico, con título, destinatario, estado, creador, fechas y datos de emisión.
 
-### 2.11. Información sanitaria
+### Versión
 
-La información sanitaria se modelará separada de los datos generales.
+IncidentReportVersion conserva cada versión del contenido, número secuencial, título, destinatario, estado, autor y fecha/hora. Las versiones emitidas no se sobrescriben; una rectificación genera una nueva versión.
 
-- Se relaciona con el menor correspondiente.
-- Puede incluir referencias a centros y profesionales sanitarios, datos de cobertura y documentos, únicamente en el alcance que autorice el centro.
-- Tendrá permisos reforzados.
-- No se replicará en anotaciones generales, paneles o notificaciones sin necesidad y autorización.
+### Hechos vinculados
 
-### 2.12. Auditoría
+IncidentReportEntry enlaza una versión de informe con una o varias anotaciones DiaryEntry. Un mismo hecho puede utilizarse en más de un informe. El vínculo conserva la referencia exacta a la versión de anotación que se seleccionó al emitir ese informe.
 
-Registra las operaciones relevantes realizadas en la aplicación.
+El informe es una composición documental de hechos del parte diario, no una segunda fuente de acontecimientos. Las modificaciones posteriores del diario no alteran los informes ya emitidos.
 
-- Usuario o profesional que realiza la operación.
-- Fecha y hora.
-- Tipo de operación.
-- Registro afectado.
-- Resultado y motivo cuando proceda.
+## 7. Usuarios, auditoría y permisos
 
-La auditoría debe permitir reconstruir cambios relevantes sin convertirse en una vía para conceder acceso indiscriminado al contenido sensible.
+### Profesional y cuenta
 
-## 3. Relaciones principales
+Professional representa la identidad de la persona. UserAccount contiene credenciales, rol y estado de acceso. Desactivar una cuenta no elimina la autoría histórica de sus registros.
 
-| Relación | Cardinalidad conceptual | Regla |
+### Auditoría
+
+AccessAudit registra operaciones relevantes, con cuenta, nombre de usuario, evento, fecha/hora y detalle acotado. No debe duplicar innecesariamente contenido personal o sanitario dentro de la auditoría.
+
+### Permisos
+
+- Todos los educadores activos pueden consultar, crear y modificar información ordinaria de los cuatro módulos.
+- La edición no depende de quién creó el registro, del turno o del cierre del día.
+- Las herramientas técnicas de cuentas, configuración, copias, restauración y mantenimiento se reservan al administrador.
+- Las consultas sanitarias y operaciones relevantes quedan auditadas conforme a la política vigente.
+
+## 8. Relaciones principales
+
+| Relación | Cardinalidad | Regla |
 |---|---|---|
-| Menor – Estancia | 1 a muchos | Un menor puede tener varias estancias históricas |
+| Menor – Estancia | 1 a muchos | Cada ingreso/reingreso crea una estancia nueva |
+| Menor – Perfil sanitario | 1 a 1 | Perfil sanitario permanente del menor |
+| Menor – Pauta de medicación | 1 a muchos | Historial de pautas |
+| Pauta – Horario | 1 a muchos | Horarios estructurados de la pauta |
+| Pauta – Administración | 1 a muchos | Resultados de administraciones |
+| Menor – Vacuna administrada | 1 a muchos | Historial vacunal permanente |
+| Menor – Revisión de dosis | 1 a muchos | Revisiones profesionales repetibles |
 | Menor – Anotación | muchos a muchos | Una anotación puede afectar a varios menores |
-| Anotación – Estancia | mediante relación | Se conserva la estancia de cada menor cuando corresponda |
-| Menor – Incidencia | muchos a muchos | Una incidencia puede implicar a varios menores |
-| Incidencia – Profesional | muchos a muchos | Se registran los profesionales intervinientes |
-| Actividad – Menor | muchos a muchos | La participación se registra individualmente |
-| Menor – Documento | muchos a muchos | El archivo se almacena una sola vez |
-| Registro – Documento | muchos a muchos | Un documento puede respaldar varios registros |
-| Incidencia – Tarea | uno a muchos | Una incidencia puede generar tareas de seguimiento |
-| Profesional – Anotación | uno a muchos | Cada anotación tiene un autor |
-| Profesional – Cuenta | uno a uno o uno a ninguno | La identidad profesional no depende de que la cuenta siga activa |
+| Anotación – Estancia | mediante relación | Conserva el contexto de la estancia |
+| Menor – Documento | 1 a muchos o relación compartida | El archivo se almacena una sola vez |
+| Informe – Versión | 1 a muchos | Historial completo de borradores y emisiones |
+| Versión de informe – Anotación | muchos a muchos | Un informe selecciona hechos; un hecho puede reutilizarse |
+| Profesional – Cuenta | 1 a 1 | Identidad profesional separada de credenciales |
+| Cuenta – Auditoría | 1 a muchos | Trazabilidad de operaciones |
 
-Las cardinalidades definitivas y las excepciones deberán concretarse durante el diseño técnico.
+## 9. Reglas de integridad
 
-## 4. Reglas de integridad
-
-1. No duplicar la ficha de un menor.
-2. No reutilizar una estancia finalizada para representar un reingreso.
+1. No duplicar la identidad del menor.
+2. No reutilizar una estancia cerrada para representar un reingreso.
 3. No duplicar una anotación porque afecte a varios menores.
-4. No duplicar archivos por relacionarlos con varios expedientes o registros.
-5. Mantener las relaciones históricas aunque un registro cambie de estado.
+4. No duplicar archivos por relacionarlos con varios registros.
+5. Mantener relaciones históricas aunque una estancia finalice o una cuenta se desactive.
 6. No eliminar físicamente registros históricos mediante operaciones ordinarias.
-7. Aplicar permisos en las consultas, pantallas, búsquedas, documentos y exportaciones.
-8. Conservar autoría y marcas temporales de las operaciones relevantes.
-9. Utilizar identificadores internos estables; no utilizar nombres como claves de relación.
-10. Definir qué datos admiten corrección, versionado o cierre, y quién puede realizar esas operaciones.
+7. Conservar versiones anteriores al rectificar.
+8. No modificar retroactivamente una versión de informe emitida.
+9. Mantener vínculos entre cada informe y las anotaciones que lo sustentan.
+10. Aplicar permisos también a búsquedas, documentos, consultas y exportaciones.
+11. Utilizar identificadores internos estables, no nombres como claves de relación.
+12. No generar automáticamente decisiones clínicas ni dosis pendientes a partir de la ausencia de datos.
 
-## 5. Decisiones pendientes antes del modelo físico
+## 10. Tablas heredadas
 
-- Determinar los campos mínimos de la ficha del menor.
-- Definir los datos propios de cada estancia.
-- Confirmar si una anotación puede vincularse a menores sin estancia activa y cómo se representa esa situación.
-- Definir las categorías del diario y los criterios para abrir una incidencia.
-- Concretar los datos de profesionales, cuentas, roles y permisos.
-- Determinar qué módulos necesitan versionado completo.
-- Definir metadatos, formatos y límites de los documentos.
-- Establecer la política de conservación, rectificación, bloqueo y eliminación.
-- Validar el tratamiento separado de información sanitaria.
-- Confirmar los requisitos de informes y exportaciones.
+El esquema puede conservar tablas y columnas de versiones anteriores por compatibilidad, trazabilidad o migración histórica. Su existencia física no implica que sigan siendo módulos funcionales visibles. Las migraciones deben preservar los registros y evitar que los datos históricos se pierdan o se dupliquen en las nuevas vistas.
 
-## 6. Protección de datos durante el diseño
-
-Este modelo no autoriza por sí mismo la recogida de todos los campos mencionados. El centro deberá justificar la finalidad y necesidad de cada dato, limitar el acceso y establecer plazos de conservación. Se utilizarán exclusivamente datos ficticios en el desarrollo y las pruebas. La revisión jurídica y de protección de datos deberá realizarse antes de utilizar información real.
-
-
-> **Especificación vigente:** consultar [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md). Este documento reúne las decisiones aprobadas más recientes y prevalece sobre cualquier apartado anterior que las contradiga.
+La evolución del esquema se realizará mediante migraciones Alembic versionadas y probadas con bases de datos representativas de versiones anteriores.
