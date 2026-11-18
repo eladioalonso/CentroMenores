@@ -50,10 +50,12 @@ def test_educator_sees_all_ordinary_modules():
     try:
         labels = _button_labels(window)
         expected = {
-            "Inicio", "Parte diario", "Menores", "Documentación", "Calendario",
-            "Expedientes", "Seguimiento educativo", "Ficha sanitaria y medicación",
-            "Salidas", "Autorizaciones", "Documentos de menores", "Informes externos",
-            "Calendario y agenda común", "Organizar tareas",
+            "Inicio", "Parte diario", "Expediente principal", "Expediente sanitario",
+            "Informes de incidencias", "Expedientes de menores",
+            "Seguimiento educativo y escolar", "Documentación del menor",
+            "Salidas y retornos", "Autorizaciones y visitas", "Informes externos",
+            "Abrir expediente sanitario", "Crear informe desde el parte diario",
+            "Agenda y tareas del equipo", "Calendario de actividades y citas",
         }
         assert expected <= labels
         assert "Administración" not in labels
@@ -67,11 +69,13 @@ def test_administrator_sees_ordinary_and_administration_modules():
     try:
         labels = _button_labels(window)
         expected = {
-            "Inicio", "Parte diario", "Menores", "Documentación", "Calendario",
-            "Administración", "Expedientes", "Seguimiento educativo",
-            "Ficha sanitaria y medicación", "Salidas", "Autorizaciones",
-            "Documentos de menores", "Informes externos", "Calendario y agenda común",
-            "Organizar tareas", "Administrar cuentas", "Copias de seguridad",
+            "Inicio", "Parte diario", "Expediente principal", "Expediente sanitario",
+            "Informes de incidencias", "Administración", "Expedientes de menores",
+            "Seguimiento educativo y escolar", "Documentación del menor",
+            "Salidas y retornos", "Autorizaciones y visitas", "Informes externos",
+            "Abrir expediente sanitario", "Crear informe desde el parte diario",
+            "Agenda y tareas del equipo", "Calendario de actividades y citas",
+            "Administrar cuentas", "Copias de seguridad",
             "Mantenimiento y diagnóstico", "Estadísticas y memoria",
         }
         assert expected <= labels
@@ -84,10 +88,14 @@ def test_navigation_is_grouped_by_daily_work_and_secondary_functions():
         tabs = window.findChild(QTabWidget)
         assert tabs is not None
         assert [tabs.tabText(i) for i in range(tabs.count())] == [
-            "Inicio", "Parte diario", "Menores", "Documentación", "Calendario"
+            "Inicio", "Parte diario", "Expediente principal",
+            "Expediente sanitario", "Informes de incidencias"
         ]
         nav = [button.text() for button in window.findChildren(QPushButton, "navigationButton")]
-        assert nav == ["Inicio", "Parte diario", "Menores", "Documentación", "Calendario"]
+        assert nav == [
+            "Inicio", "Parte diario", "Expediente principal",
+            "Expediente sanitario", "Informes de incidencias"
+        ]
         assert not tabs.tabBar().isVisible()
     finally:
         window.close()
