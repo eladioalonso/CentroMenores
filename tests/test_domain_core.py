@@ -193,9 +193,9 @@ def test_individual_agenda_assignment_requires_active_assignee_and_valid_interva
                 ends_at=datetime(2026, 5, 4, 11, tzinfo=timezone.utc))
 
 
-def test_diary_author_can_create_a_traceable_revision_but_not_edit_another_authors_entry():
+def test_any_educator_can_create_traceable_revision_of_another_authors_closed_entry():
     from gestion_centro.domain.models import DiaryEntry
-    from gestion_centro.domain.service import record_diary_entry, revise_diary_entry
+    from gestion_centro.domain.service import close_diary_day, record_diary_entry, revise_diary_entry
     with make_session() as session:
         author = create_professional_account(session, display_name="Autora",
             username="diary-author", password="contraseña de prueba segura", role=Role.EDUCATOR)
@@ -207,20 +207,16 @@ def test_diary_author_can_create_a_traceable_revision_but_not_edit_another_autho
             diary_date=day, shift="morning", category="general",
             content="Texto original", happened_at=datetime(2026, 6, 1, 10, tzinfo=timezone.utc),
             now=datetime(2026, 6, 1, 12, tzinfo=timezone.utc))
-        with pytest.raises(PermissionError, match="propias"):
-            revise_diary_entry(session, actor_account_id=other.id,
-                original_entry_id=original.id, content="Cambio ajeno",
-                now=datetime(2026, 6, 1, 13, tzinfo=timezone.utc))
-        revised = revise_diary_entry(session, actor_account_id=author.id,
-            original_entry_id=original.id, content="Texto corregido",
+        close_diary_day(session, actor_account_id=author.id, diary_date=day,
             now=datetime(2026, 6, 1, 14, tzinfo=timezone.utc))
+        revised = revise_diary_entry(session, actor_account_id=other.id,
+            original_entry_id=original.id, content="Texto corregido por otro educador",
+            reason="Corrección de un dato", now=datetime(2026, 6, 4, 12, tzinfo=timezone.utc))
         assert revised.correction_of_id == original.id
-        assert revised.content == "Texto corregido"
+        assert revised.content == "Texto corregido por otro educador"
+        assert revised.author_account_id == other.id
+        assert revised.author_name_snapshot == "Otro profesional"
         assert session.get(DiaryEntry, original.id).content == "Texto original"
-        with pytest.raises(ValueError, match="cerrado"):
-            revise_diary_entry(session, actor_account_id=author.id,
-                original_entry_id=original.id, content="Cambio tardío",
-                now=datetime(2026, 6, 4, 12, tzinfo=timezone.utc))
 
 
 def test_create_minor_persists_optional_personal_and_health_details():
