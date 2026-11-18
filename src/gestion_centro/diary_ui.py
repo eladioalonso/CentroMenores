@@ -21,7 +21,7 @@ from gestion_centro.domain.health_service import read_health_profile, list_medic
 
 
 class DiaryDialog(QDialog):
-    SHIFTS = {"Mañana": "morning", "Tarde": "afternoon", "Noche": "night"}
+    SHIFTS = {"Mañana": "morning", "Tarde": "afternoon", "Noche": "night", "Sin especificar": "unspecified"}
     CATEGORIES = {
         "Actividades realizadas": "activity",
         "Comportamientos positivos": "positive",
@@ -304,9 +304,6 @@ class DiaryDialog(QDialog):
             rows = [(x.happened_at, category_labels.get(x.category, x.category),
                 x.content, x.author_name_snapshot,
                 {"kind": "entry", "id": x.id}) for x in entries]
-            rows += [(x.happened_at, f"Incidencia · {x.severity}",
-                f"{x.title} · {x.description} [{x.status}]", x.author_name_snapshot,
-                {"kind": "incident", "id": x.id}) for x in incidents]
             rows.sort(key=lambda x: x[0])
             is_closed = bool(day and day.closed_at)
             health_rows = []
