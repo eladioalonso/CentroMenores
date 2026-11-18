@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt, QDate, QDateTime
 from PySide6.QtWidgets import (
     QDialog, QDialogButtonBox, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QInputDialog,
-    QLabel, QDateEdit, QTabWidget, QWidget, QTextEdit, QScrollArea, QComboBox, QDateTimeEdit, QDialogButtonBox,
+    QLabel, QDateEdit, QTabWidget, QWidget, QTextEdit, QScrollArea, QComboBox, QDateTimeEdit, QDialogButtonBox, QCheckBox,
 )
 from sqlalchemy import select
 
