@@ -64,7 +64,7 @@ def test_event_requires_active_author_and_valid_stays():
                 happened_at=datetime.now(timezone.utc), stay_ids=[])
 
 
-def test_diary_closure_blocks_edits_but_allows_append_only_correction():
+def test_diary_closure_blocks_new_entries_but_allows_traceable_revision():
     from gestion_centro.domain.models import DiaryEntry
     from gestion_centro.domain.service import close_diary_day, correct_diary_entry, record_diary_entry
     with make_session() as session:
@@ -85,6 +85,8 @@ def test_diary_closure_blocks_edits_but_allows_append_only_correction():
             original_entry_id=entry.id, content="Texto corregido", reason="Aclaración",
             happened_at=datetime(2026, 4, 2, 11, tzinfo=timezone.utc))
         assert correction.correction_of_id == entry.id
+        assert correction.content == "Texto corregido"
+        assert correction.happened_at == datetime(2026, 4, 2, 11, tzinfo=timezone.utc)
         assert session.get(DiaryEntry, entry.id).content == "Nota ficticia"
 
 
@@ -211,9 +213,14 @@ def test_any_educator_can_create_traceable_revision_of_another_authors_closed_en
             now=datetime(2026, 6, 1, 14, tzinfo=timezone.utc))
         revised = revise_diary_entry(session, actor_account_id=other.id,
             original_entry_id=original.id, content="Texto corregido por otro educador",
-            reason="Corrección de un dato", now=datetime(2026, 6, 4, 12, tzinfo=timezone.utc))
+            reason="Corrección de un dato", shift="night", category="negative",
+            happened_at=datetime(2026, 6, 1, 11, tzinfo=timezone.utc),
+            now=datetime(2026, 6, 4, 12, tzinfo=timezone.utc))
         assert revised.correction_of_id == original.id
         assert revised.content == "Texto corregido por otro educador"
+        assert revised.shift == "night"
+        assert revised.category == "negative"
+        assert revised.happened_at == datetime(2026, 6, 1, 11, tzinfo=timezone.utc)
         assert revised.author_account_id == other.id
         assert revised.author_name_snapshot == "Otro profesional"
         assert session.get(DiaryEntry, original.id).content == "Texto original"
