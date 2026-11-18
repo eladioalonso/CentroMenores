@@ -275,11 +275,17 @@ def test_incident_report_builder_uses_selected_diary_entries():
             session, actor_account_id=actor.id, minor_id=minor.id,
             started_on=date.today(),
         )
-        record_diary_entry(
+        entry = record_diary_entry(
             session, actor_account_id=actor.id, diary_date=date.today(),
             shift="morning", category="negative",
             content="Hecho ficticio registrado en el parte diario",
             happened_at=datetime.now(timezone.utc), stay_ids=[stay.id],
+        )
+        from gestion_centro.domain.incident_reports_service import save_incident_report
+        save_incident_report(
+            session, actor_account_id=actor.id, title="Borrador de prueba",
+            recipient=None, content="Contenido ficticio guardado",
+            entry_ids=[entry.id],
         )
         actor_id = actor.id
         session.commit()
@@ -287,8 +293,16 @@ def test_incident_report_builder_uses_selected_diary_entries():
     dialog = IncidentReportsDialog(factory, actor_id)
     try:
         assert dialog.table.rowCount() == 1
+        assert dialog.saved_reports.count() == 2
         checkbox = dialog.table.item(0, 0)
         assert checkbox.checkState() == Qt.CheckState.Unchecked
+        dialog.saved_reports.setCurrentIndex(1)
+        assert dialog.current_report_id is not None
+        assert dialog.preview.toPlainText() == "Contenido ficticio guardado"
+        dialog.saved_reports.setCurrentIndex(0)
+        assert dialog.current_report_id is None
+        assert dialog.table.item(0, 0).checkState() == Qt.CheckState.Unchecked
+        checkbox = dialog.table.item(0, 0)
         checkbox.setCheckState(Qt.CheckState.Checked)
         dialog.prepare_draft()
         draft = dialog.preview.toPlainText()
