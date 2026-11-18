@@ -224,6 +224,10 @@ def test_any_educator_can_create_traceable_revision_of_another_authors_closed_en
         assert revised.author_account_id == other.id
         assert revised.author_name_snapshot == "Otro profesional"
         assert session.get(DiaryEntry, original.id).content == "Texto original"
+        with pytest.raises(ValueError, match="versión posterior"):
+            revise_diary_entry(session, actor_account_id=author.id,
+                original_entry_id=original.id, content="Segunda corrección",
+                now=datetime(2026, 6, 4, 13, tzinfo=timezone.utc))
 
 
 def test_create_minor_persists_optional_personal_and_health_details():
