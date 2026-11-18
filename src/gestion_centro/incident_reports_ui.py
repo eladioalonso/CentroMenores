@@ -127,12 +127,14 @@ class IncidentReportsDialog(QDialog):
         self.issue_button.clicked.connect(self.issue_report)
         self.rectify_button = QPushButton("Preparar rectificación")
         self.rectify_button.clicked.connect(self.prepare_rectification)
+        self.history_button = QPushButton("Historial de versiones")
+        self.history_button.clicked.connect(self.view_report_history)
         export = QPushButton("Exportar Word…")
         export.clicked.connect(self.export_docx)
         new = QPushButton("Nuevo informe")
         new.clicked.connect(self.new_report)
         for button in (new, prepare, self.save_button, self.issue_button,
-                       self.rectify_button, export):
+                       self.rectify_button, self.history_button, export):
             actions.addWidget(button)
         layout.addLayout(actions)
         self.load_entries()
@@ -306,6 +308,7 @@ class IncidentReportsDialog(QDialog):
                            max(linked_dates) if linked_dates else None)
             self.current_report_id = report_id
             self.current_report_status = details[2]
+            self.minor.setCurrentIndex(0)
             if details[5] and details[6]:
                 self.start.setDate(QDate(details[5].year, details[5].month, details[5].day))
                 self.end.setDate(QDate(details[6].year, details[6].month, details[6].day))
@@ -325,6 +328,40 @@ class IncidentReportsDialog(QDialog):
             self.rectifying = False
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo abrir el informe", str(exc))
+
+    def view_report_history(self):
+        if not self.current_report_id:
+            QMessageBox.information(self, "Selecciona un informe", "Guarda o abre un informe para consultar su historial.")
+            return
+        try:
+            with session_scope(self.factory) as session:
+                report = get_incident_report(
+                    session, actor_account_id=self.actor_id, report_id=self.current_report_id
+                )
+                versions = list(report.versions)
+                history = []
+                for version in versions:
+                    history.extend([
+                        f"VERSIÓN {version.version_number} · {STATUS_LABELS.get(version.status, version.status)}",
+                        f"Fecha: {version.created_at.astimezone().strftime('%d/%m/%Y %H:%M')}",
+                        f"Realizada por: {version.created_by_name_snapshot}",
+                        f"Hechos vinculados: {len(version.entries)}",
+                        "", version.content, "", "—" * 50, "",
+                    ])
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Historial de versiones del informe")
+            dialog.resize(900, 650)
+            layout = QVBoxLayout(dialog)
+            viewer = QTextEdit()
+            viewer.setReadOnly(True)
+            viewer.setPlainText("\\n".join(history) if history else "El informe todavía no tiene versiones.")
+            layout.addWidget(viewer)
+            close = QPushButton("Cerrar")
+            close.clicked.connect(dialog.accept)
+            layout.addWidget(close)
+            dialog.exec()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo consultar el historial", str(exc))
 
     def prepare_rectification(self):
         if not self.current_report_id:
