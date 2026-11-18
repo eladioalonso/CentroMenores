@@ -31,6 +31,15 @@ def test_upgrade_creates_versioned_auth_schema(tmp_path):
             "SELECT dflt_value FROM pragma_table_info('user_accounts') WHERE name='health_access'"
         ).scalar_one()
     assert health_default in ("0", "false", "FALSE")
+    health_profile_columns = {column["name"] for column in inspector.get_columns("health_profiles")}
+    assert {
+        "cip", "health_center", "physician", "nurse",
+        "health_card_expires_on", "clinical_history",
+    } <= health_profile_columns
+    health_version_columns = {
+        column["name"]: column for column in inspector.get_columns("health_profile_versions")
+    }
+    assert health_version_columns["changed_by_account_id"]["nullable"] is True
     vaccine_record_columns = {column["name"] for column in inspector.get_columns("vaccine_records")}
     assert {
         "calendar_item_id", "manufacturer", "product_name", "batch_number",
