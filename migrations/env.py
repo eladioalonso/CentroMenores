@@ -11,6 +11,7 @@ from gestion_centro.domain import education as education_models  # noqa: F401
 from gestion_centro.domain import health as health_models  # noqa: F401
 from gestion_centro.domain import documents as document_models  # noqa: F401
 from gestion_centro.domain import external_reports as external_report_models  # noqa: F401
+from gestion_centro.domain import incident_reports as incident_report_models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
