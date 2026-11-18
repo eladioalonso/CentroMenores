@@ -383,23 +383,17 @@ def correct_diary_entry(
     session: Session, *, actor_account_id: str, original_entry_id: str, content: str,
     happened_at: datetime, reason: str,
 ):
+    """Compatibilidad: aplica la revisión compartida y conserva categoría y participantes."""
     from gestion_centro.domain.models import DiaryEntry
-    actor = _active_author(session, actor_account_id)
     original = session.get(DiaryEntry, original_entry_id)
     if original is None:
         raise ValueError("La anotación original no existe")
-    if not content.strip() or not reason.strip():
-        raise ValueError("La rectificación y su motivo son obligatorios")
-    correction = DiaryEntry(
-        diary_day_id=original.diary_day_id, shift=original.shift, category="other",
-        content=f"RECTIFICACIÓN ({reason.strip()}): {content.strip()}",
-        happened_at=happened_at, author_account_id=actor.id,
-        author_name_snapshot=actor.professional.display_name, correction_of_id=original.id,
+    if happened_at != original.happened_at:
+        raise ValueError("La fecha del hecho no se modifica al rectificar su contenido")
+    return revise_diary_entry(
+        session, actor_account_id=actor_account_id,
+        original_entry_id=original_entry_id, content=content, reason=reason,
     )
-    session.add(correction)
-    session.flush()
-    _audit(session, actor, "diary_entry_corrected", f"Original: {original.id}; rectificación: {correction.id}")
-    return correction
 
 
 def record_incident(
