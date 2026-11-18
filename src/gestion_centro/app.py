@@ -47,7 +47,6 @@ from gestion_centro.care_ui import EducationDialog, HealthDialog
 from gestion_centro.expedientes_ui import ExpedientesDialog
 from gestion_centro.maintenance_ui import MaintenanceDialog
 from gestion_centro.reports_ui import ReportsDialog
-from gestion_centro.external_reports_ui import ExternalReportsDialog
 from gestion_centro.diary_ui import DiaryDialog
 from gestion_centro.incident_reports_ui import IncidentReportsDialog
 from gestion_centro.calendar_ui import CalendarDialog
@@ -1112,7 +1111,6 @@ class MainWindow(QMainWindow):
                 ("Documentación del menor", "Añade y consulta documentos personales y administrativos vinculados al expediente.", lambda: DocumentsDialog(factory, account_id, paths).exec()),
                 ("Salidas y retornos", "Registra salidas y controla los retornos de los menores.", lambda: OutingsDialog(factory, account_id).exec()),
                 ("Autorizaciones y visitas", "Consulta y gestiona autorizaciones, consentimientos y restricciones.", lambda: AuthorizationsDialog(factory, account_id).exec()),
-                ("Informes externos", "Prepara documentación autorizada para organismos externos.", lambda: ExternalReportsDialog(factory, account_id).exec()),
             ])
 
             health_page = QWidget()
