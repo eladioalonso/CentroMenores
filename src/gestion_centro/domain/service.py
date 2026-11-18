@@ -311,7 +311,8 @@ def record_diary_entry(
 
 def revise_diary_entry(
     session: Session, *, actor_account_id: str, original_entry_id: str, content: str,
-    reason: str | None = None, now: datetime | None = None,
+    reason: str | None = None, happened_at: datetime | None = None,
+    now: datetime | None = None,
 ):
     """Crea una nueva versión de cualquier anotación, incluso de otro educador o de un día cerrado.
 
@@ -331,7 +332,7 @@ def revise_diary_entry(
     revised = DiaryEntry(
         diary_day_id=original.diary_day_id, shift=original.shift,
         category=original.category, content=content.strip(),
-        happened_at=original.happened_at, author_account_id=actor.id,
+        happened_at=happened_at or original.happened_at, author_account_id=actor.id,
         author_name_snapshot=actor.professional.display_name,
         correction_of_id=original.id,
     )
@@ -388,11 +389,10 @@ def correct_diary_entry(
     original = session.get(DiaryEntry, original_entry_id)
     if original is None:
         raise ValueError("La anotación original no existe")
-    if happened_at != original.happened_at:
-        raise ValueError("La fecha del hecho no se modifica al rectificar su contenido")
     return revise_diary_entry(
         session, actor_account_id=actor_account_id,
-        original_entry_id=original_entry_id, content=content, reason=reason,
+        original_entry_id=original_entry_id, content=content,
+        reason=reason, happened_at=happened_at,
     )
 
 
