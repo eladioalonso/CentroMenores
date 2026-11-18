@@ -251,3 +251,46 @@ def test_dashboard_counts_residents_outside_and_overdue_returns():
     finally:
         window.close()
         engine.dispose()
+
+
+
+def test_incident_report_builder_uses_selected_diary_entries():
+    _application()
+    from gestion_centro.incident_reports_ui import IncidentReportsDialog
+    from gestion_centro.domain.service import record_diary_entry
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory() as session:
+        actor = create_professional_account(
+            session, display_name="Educadora de prueba", username="report-builder",
+            password="contraseña de prueba segura", role=Role.EDUCATOR,
+        )
+        minor = create_minor(
+            session, actor_account_id=actor.id,
+            given_names="Caso", family_names="Informe ficticio",
+        )
+        stay = open_stay(
+            session, actor_account_id=actor.id, minor_id=minor.id,
+            started_on=date.today(),
+        )
+        record_diary_entry(
+            session, actor_account_id=actor.id, diary_date=date.today(),
+            shift="morning", category="negative",
+            content="Hecho ficticio registrado en el parte diario",
+            happened_at=datetime.now(timezone.utc), stay_ids=[stay.id],
+        )
+        actor_id = actor.id
+        session.commit()
+
+    dialog = IncidentReportsDialog(factory, actor_id)
+    try:
+        assert dialog.table.rowCount() == 1
+        dialog.prepare_draft()
+        draft = dialog.preview.toPlainText()
+        assert "Hecho ficticio registrado en el parte diario" in draft
+        assert "Caso Informe ficticio" in draft
+        assert "Educadora de prueba" in draft
+    finally:
+        dialog.close()
+        engine.dispose()
