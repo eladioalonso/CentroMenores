@@ -311,26 +311,23 @@ def record_diary_entry(
 
 def revise_diary_entry(
     session: Session, *, actor_account_id: str, original_entry_id: str, content: str,
-    now: datetime | None = None,
+    reason: str | None = None, now: datetime | None = None,
 ):
-    """Crea una nueva versión de una anotación propia mientras el diario siga abierto.
+    """Crea una nueva versión de cualquier anotación, incluso de otro educador o de un día cerrado.
 
-    La versión anterior nunca se sobrescribe; la nueva queda enlazada mediante
-    correction_of_id y conserva turno, categoría, hora y participantes.
+    El original nunca se sobrescribe. La nueva versión conserva el autor original
+    como dato histórico de la versión anterior y registra al educador que realiza
+    la modificación mediante su propia autoría y el registro de auditoría.
     """
-    from gestion_centro.domain.models import DiaryDay, DiaryEntry, DiaryEntryStayLink
+    from gestion_centro.domain.models import DiaryEntry, DiaryEntryStayLink
     actor = _active_author(session, actor_account_id)
     original = session.get(DiaryEntry, original_entry_id)
     if original is None:
         raise ValueError("La anotación original no existe")
-    if original.author_account_id != actor.id:
-        raise PermissionError("Solo puedes corregir tus propias anotaciones")
-    day = session.get(DiaryDay, original.diary_day_id)
-    if day is None:
-        raise ValueError("No se encuentra el día del diario")
-    _ensure_diary_open(session, day, actor, now=now)
     if not content.strip():
         raise ValueError("El contenido de la anotación es obligatorio")
+    if reason is not None and not reason.strip():
+        raise ValueError("El motivo de la modificación no puede estar vacío")
     revised = DiaryEntry(
         diary_day_id=original.diary_day_id, shift=original.shift,
         category=original.category, content=content.strip(),
@@ -349,8 +346,14 @@ def revise_diary_entry(
             minor_code_snapshot=link.minor_code_snapshot,
             minor_name_snapshot=link.minor_name_snapshot,
         ))
-    _audit(session, actor, "diary_entry_revised",
-        f"Versión anterior: {original.id}; nueva versión: {revised.id}")
+    detail = (
+        f"Versión anterior: {original.id}; nueva versión: {revised.id}; "
+        f"autor original: {original.author_name_snapshot}; "
+        f"modificado por: {actor.professional.display_name}"
+    )
+    if reason:
+        detail += f"; motivo: {reason.strip()}"
+    _audit(session, actor, "diary_entry_revised", detail)
     return revised
 
 
