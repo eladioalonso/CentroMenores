@@ -20,6 +20,17 @@ No se requiere servidor central, servicio web ni acceso simultáneo desde varios
 
 Las versiones concretas se fijarán en los archivos de dependencias y se validarán en el entorno de construcción. El usuario final no instalará Python, bibliotecas ni motores de base de datos.
 
+## 2 bis. Módulos funcionales visibles
+
+La aplicación presenta cuatro módulos de trabajo, sin crear áreas funcionales paralelas:
+
+1. Expediente principal del menor: identidad, estancias, educación y escolaridad, documentos personales, autorizaciones, visitas, salidas y retornos.
+2. Expediente sanitario del menor: datos de tarjeta sanitaria, centro y profesionales sanitarios, antecedentes, alergias, medicación, administraciones, vacunas y revisiones.
+3. Parte diario: cronología común de turnos, actividades, observaciones, comportamientos e incidencias.
+4. Informes de incidencias: borradores, selección de anotaciones del parte, emisión, rectificación e historial de versiones.
+
+El inicio/panel general es una pantalla de entrada, no un quinto módulo. Las herramientas de administración técnica no forman parte del trabajo ordinario de los educadores. El parte diario es la fuente de los hechos y los informes mantienen vínculos con las anotaciones originales, evitando duplicar acontecimientos.
+
 ## 3. Despliegue portable
 
 La distribución tendrá una carpeta raíz, por ejemplo:
@@ -88,7 +99,7 @@ Cada archivo tendrá un identificador interno único y un nombre físico que no 
 - Generar identificadores internos únicos para los archivos.
 - Validar tamaño, extensión y tipo de contenido según las políticas que se definan.
 - Aplicar controles de acceso antes de abrir, exportar o eliminar un documento.
-- No exponer documentos sanitarios a perfiles generales.
+- Los documentos sanitarios se consultan desde el expediente sanitario; todos los educadores activos tienen acceso autorizado a ese módulo y sus documentos.
 - Evitar duplicar el archivo al asociarlo a varios registros.
 - Definir qué ocurre al eliminar o archivar un registro relacionado.
 
@@ -100,8 +111,10 @@ Aunque el ordenador sea compartido, cada profesional utilizará una cuenta indiv
 - No almacenar contraseñas en texto claro.
 - Bloqueo automático por inactividad.
 - Cierre de sesión y cambio de usuario.
-- Permisos comprobados en la capa de aplicación y en los servicios de acceso a datos.
-- Registro de operaciones relevantes.
+- Todos los educadores activos pueden consultar, crear y modificar la información de los cuatro módulos, sin restricciones por autor o turno.
+- Los permisos se comprueban en la capa de aplicación y en los servicios de acceso a datos.
+- Las herramientas técnicas de cuentas, copias, restauración y mantenimiento quedan reservadas al administrador.
+- Registro de operaciones relevantes y de versiones anteriores cuando se rectifica información.
 - No confiar únicamente en ocultar controles de la interfaz para proteger información.
 
 La aplicación local no puede ofrecer la misma separación de seguridad que un servidor con controles independientes frente a una persona con privilegios de administrador sobre el propio Windows. Este riesgo deberá contemplarse en el análisis de seguridad del equipo y de la carpeta de datos.
@@ -154,7 +167,7 @@ La estructura es una propuesta de separación de responsabilidades; se concretar
 
 - Inicio, cierre de sesión y bloqueo por inactividad.
 - Acceso autorizado y denegado por perfil.
-- Aislamiento de información sanitaria.
+- Acceso de todos los educadores activos a la información sanitaria y auditoría de su consulta/modificación.
 - Integridad de relaciones y transacciones.
 - Gestión de errores y bloqueo de base de datos.
 - Prevención de dos instancias simultáneas.
