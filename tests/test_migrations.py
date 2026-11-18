@@ -173,6 +173,10 @@ def test_legacy_incidents_are_migrated_into_diary_with_minor_links(tmp_path):
             "SELECT cip, health_center, physician, nurse, health_card_expires_on, clinical_history "
             "FROM health_profiles WHERE minor_id='minor-1'"
         )).mappings().one()
+        health_version = connection.execute(text(
+            "SELECT changed_by_account_id, changed_by_name_snapshot, new_values "
+            "FROM health_profile_versions WHERE minor_id='minor-1'"
+        )).mappings().one()
     assert entry["shift"] == "unspecified"
     assert entry["category"] == "negative"
     assert "Descripción conservada" in entry["content"]
@@ -188,4 +192,7 @@ def test_legacy_incidents_are_migrated_into_diary_with_minor_links(tmp_path):
     assert health["nurse"] == "Enfermería antigua"
     assert health["health_card_expires_on"] == "2027-01-01"
     assert health["clinical_history"] == "Antecedente histórico"
+    assert health_version["changed_by_account_id"] is None
+    assert health_version["changed_by_name_snapshot"] == "Migración histórica"
+    assert "CIP-LEGACY" in health_version["new_values"]
     engine.dispose()
