@@ -36,7 +36,7 @@ class HealthProfileVersion(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     minor_id: Mapped[str] = mapped_column(ForeignKey("minors.id"), nullable=False)
     profile_id: Mapped[str] = mapped_column(String(36), nullable=False)
-    changed_by_account_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), nullable=False)
+    changed_by_account_id: Mapped[str | None] = mapped_column(ForeignKey("user_accounts.id"), nullable=True)
     changed_by_name_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
     old_values: Mapped[dict] = mapped_column(JSON, nullable=False)
