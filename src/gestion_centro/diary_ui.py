@@ -16,7 +16,7 @@ from gestion_centro.domain.service import (
     record_diary_entry, close_diary_day, revise_diary_entry,
     has_health_access, list_diary_records,
 )
-from gestion_centro.domain.documents_service import list_active_stays
+from gestion_centro.domain.documents_service import list_active_stays, list_document_stays
 from gestion_centro.domain.health_service import read_health_profile, list_medication_plans
 
 
@@ -99,7 +99,7 @@ class DiaryDialog(QDialog):
         self.day.dateChanged.connect(self.refresh)
         self.refresh()
 
-    def choose_stays(self):
+    def choose_stays(self, include_closed=False):
         dialog = QDialog(self)
         dialog.setWindowTitle("Vincular menores y estancias activas")
         dialog.resize(520, 420)
@@ -107,8 +107,13 @@ class DiaryDialog(QDialog):
         layout.addWidget(QLabel("Marca únicamente a los menores implicados. Para un hecho general, deja la selección vacía."))
         choices = QListWidget()
         with session_scope(self.factory) as session:
-            stays = list_active_stays(session, actor_account_id=self.actor_id)
-            rows = [(s.id, f"{(s.minor.nif_nie or s.minor.passport_number or 'Sin NIF/NIE')} · {s.minor.given_names} {s.minor.family_names}") for s in stays]
+            stays = (
+                list_document_stays(session, actor_account_id=self.actor_id)
+                if include_closed else list_active_stays(session, actor_account_id=self.actor_id)
+            )
+            rows = [(s.id, f"{(s.minor.nif_nie or s.minor.passport_number or 'Sin NIF/NIE')} · "
+                     f"{s.minor.given_names} {s.minor.family_names} · "
+                     f"{'Activa' if s.status == 'active' else 'Cerrada'}") for s in stays]
         for stay_id, label in rows:
             item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, stay_id)
@@ -156,7 +161,15 @@ class DiaryDialog(QDialog):
                 original = {
                     "content": entry.content, "shift": entry.shift,
                     "category": entry.category, "happened_at": entry.happened_at,
+                    "stay_ids": [link.stay_id for link in session.scalars(
+                        select(DiaryEntryStayLink).where(DiaryEntryStayLink.entry_id == entry.id)
+                    ).all()],
                 }
+            self.selected_stay_ids = list(original["stay_ids"])
+            self.participant_hint.setText(
+                f"{len(self.selected_stay_ids)} estancia(s) vinculada(s)"
+                if self.selected_stay_ids else "Sin menores vinculados"
+            )
 
             dialog = QDialog(self)
             dialog.setWindowTitle("Revisar anotación del parte diario")
@@ -188,6 +201,10 @@ class DiaryDialog(QDialog):
             form.addRow("Fecha y hora del hecho", happened)
             form.addRow("Contenido", content)
             form.addRow("Motivo de modificación", reason)
+            participants = QPushButton("Modificar menores / estancias vinculadas…")
+            participants.clicked.connect(lambda: self.choose_stays(include_closed=True))
+            form.addRow("Personas vinculadas", self.participant_hint)
+            form.addRow("", participants)
             buttons = QDialogButtonBox(
                 QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
             )
@@ -208,7 +225,10 @@ class DiaryDialog(QDialog):
                     content=content.toPlainText(), reason=reason.text(),
                     happened_at=moment, shift=shift.currentData(),
                     category=category.currentData(),
+                    stay_ids=self.selected_stay_ids,
                 )
+            self.selected_stay_ids = []
+            self.participant_hint.setText("Sin menores vinculados")
             self.refresh()
             QMessageBox.information(
                 self, "Modificación guardada",
