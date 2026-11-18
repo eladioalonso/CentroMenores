@@ -133,10 +133,6 @@ class MinorWorkspaceDialog(QDialog):
         self.personal = QWidget()
         self.personal_form = QFormLayout(self.personal)
         self.tabs.addTab(self.personal, 'Datos personales')
-        self.health_data = QWidget()
-        self.health_form = QFormLayout(self.health_data)
-        if self.health_access:
-            self.tabs.addTab(self.health_data, 'Datos sanitarios')
         self.stays = QTableWidget(0, 4)
         self.stays.setHorizontalHeaderLabels(['Ingreso', 'Salida', 'Estado', 'Motivo'])
         self.stays.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -198,20 +194,6 @@ class MinorWorkspaceDialog(QDialog):
             fields = [('Nombre', minor.given_names), ('Apellidos', minor.family_names), ('País de nacimiento', minor.birth_country), ('Localidad', minor.locality), ('Nacionalidad', minor.nationality), ('Fecha nacimiento', str(minor.birth_date or '—')), ('Edad', str(minor.age) if minor.age is not None else '—'), ('NIF/NIE', minor.nif_nie), ('Pasaporte', minor.passport_number), ('Dirección', minor.address), ('Email', minor.email)]
             for label, value in fields:
                 self.personal_form.addRow(label, QLabel(value or '—'))
-            while self.health_form.rowCount():
-                self.health_form.removeRow(0)
-            if self.health_access:
-                audit_minor_health_access(session, actor_account_id=self.actor_id, minor_id=minor.id)
-                health_fields = [('CIP', minor.cip), ('Centro de salud', minor.health_center),
-                    ('Facultativo', minor.physician), ('Enfermera', minor.nurse),
-                    ('Caducidad tarjeta sanitaria', str(minor.health_card_expires_on or '—')),
-                    ('Historial clínico', minor.clinical_history)]
-                for label, value in health_fields:
-                    display = QTextEdit()
-                    display.setReadOnly(True)
-                    display.setMinimumHeight(120 if label == 'Historial clínico' else 75)
-                    display.setPlainText(value or '—')
-                    self.health_form.addRow(label, display)
             stays = sorted(minor.stays, key=lambda item: item.sequence_number, reverse=True)
             documents = []
             for stay in stays:
@@ -373,8 +355,6 @@ class MinorWorkspaceDialog(QDialog):
             tabs = QTabWidget()
             personal_tab = QWidget()
             personal_form = QFormLayout(personal_tab)
-            health_tab = QWidget()
-            health_form = QFormLayout(health_tab)
             controls = {}
             for key, label, value in [
                 ('given_names', 'Nombre(s) *', minor.given_names),
@@ -410,29 +390,7 @@ class MinorWorkspaceDialog(QDialog):
                 age_label.setText(str(years))
             birth.dateChanged.connect(refresh_age)
             refresh_age(birth.date())
-            expiry = QDateEdit()
-            expiry.setCalendarPopup(True)
-            expiry.setDisplayFormat('dd/MM/yyyy')
-            expiry.setMinimumDate(QDate(1900, 1, 1))
-            expiry.setSpecialValueText('No indicada')
-            expiry.setDate(QDate(minor.health_card_expires_on.year, minor.health_card_expires_on.month, minor.health_card_expires_on.day) if minor.health_card_expires_on else expiry.minimumDate())
-            clinical = None
-            if self.health_access:
-                audit_minor_health_access(session, actor_account_id=self.actor_id, minor_id=minor.id)
-                for key, label, value in [
-                    ('cip', 'CIP', minor.cip), ('health_center', 'Centro de salud', minor.health_center),
-                    ('physician', 'Facultativo', minor.physician), ('nurse', 'Enfermera', minor.nurse),
-                ]:
-                    field = QLineEdit(value or '')
-                    controls[key] = field
-                    health_form.addRow(label, field)
-                health_form.addRow('Caducidad tarjeta sanitaria', expiry)
-                clinical = QTextEdit()
-                clinical.setPlainText(minor.clinical_history or '')
-                health_form.addRow('Historial clínico', clinical)
             tabs.addTab(personal_tab, 'Datos personales')
-            if self.health_access:
-                tabs.addTab(health_tab, 'Datos sanitarios')
             layout.addWidget(tabs)
             buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
             buttons.accepted.connect(dialog.accept)
@@ -442,9 +400,6 @@ class MinorWorkspaceDialog(QDialog):
                 return
             values = {key: field.text() for key, field in controls.items()}
             values['birth_date'] = birth.date().toPython() if birth.date() > birth.minimumDate() else None
-            if self.health_access:
-                values['health_card_expires_on'] = expiry.date().toPython() if expiry.date() > expiry.minimumDate() else None
-                values['clinical_history'] = clinical.toPlainText()
         try:
             from gestion_centro.domain.service import update_minor_personal_data
             with session_scope(self.factory) as session:
