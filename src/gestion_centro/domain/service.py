@@ -182,6 +182,55 @@ def close_stay(session: Session, *, actor_account_id: str, stay_id: str, ended_o
     _audit(session, actor, "stay_closed", f"Estancia: {stay.id}")
 
 
+def update_stay(session: Session, *, actor_account_id: str, stay_id: str,
+                started_on: date, status: str, ended_on: date | None = None,
+                closure_reason: str | None = None) -> Stay:
+    """Corrige fechas y estado de una estancia con comprobación de solapamientos."""
+    actor = _active_author(session, actor_account_id)
+    stay = session.get(Stay, stay_id)
+    if stay is None:
+        raise ValueError("La estancia no existe")
+    if status not in {"active", "closed"}:
+        raise ValueError("Estado de estancia no válido")
+    if status == "active":
+        ended_on, closure_reason = None, None
+        other_active = session.scalar(select(Stay.id).where(
+            Stay.minor_id == stay.minor_id, Stay.status == "active", Stay.id != stay.id
+        ))
+        if other_active:
+            raise ValueError("El menor ya tiene otra estancia activa")
+    else:
+        if ended_on is None or ended_on < started_on or not (closure_reason or "").strip():
+            raise ValueError("Una estancia cerrada requiere fecha final válida y motivo")
+    others = session.scalars(select(Stay).where(
+        Stay.minor_id == stay.minor_id, Stay.id != stay.id
+    )).all()
+    for other in others:
+        other_end = other.ended_on if other.status == "closed" else None
+        if other_end is None:
+            if started_on <= other.started_on or (
+                status == "closed" and ended_on and ended_on >= other.started_on
+            ):
+                raise ValueError("Las fechas se solapan con otra estancia del mismo menor")
+        elif started_on <= other_end and (status == "active" or ended_on is None or ended_on >= other.started_on):
+            raise ValueError("Las fechas se solapan con otra estancia del mismo menor")
+    old_values = {
+        "started_on": stay.started_on.isoformat(),
+        "ended_on": stay.ended_on.isoformat() if stay.ended_on else None,
+        "status": stay.status, "closure_reason": stay.closure_reason,
+    }
+    new_values = {
+        "started_on": started_on.isoformat(),
+        "ended_on": ended_on.isoformat() if ended_on else None,
+        "status": status, "closure_reason": closure_reason.strip() if closure_reason else None,
+    }
+    stay.started_on, stay.ended_on = started_on, ended_on
+    stay.status, stay.closure_reason = status, new_values["closure_reason"]
+    _audit(session, actor, "stay_updated",
+           f"Estancia:{stay.id}; anterior:{old_values}; nuevo:{new_values}")
+    return stay
+
+
 def record_event(
     session: Session, *, author_account_id: str, title: str, description: str,
     happened_at: datetime, stay_ids: list[str],
@@ -210,6 +259,41 @@ def record_event(
     session.flush()
     _audit(session, author, "event_recorded", f"Acontecimiento: {event.id}; vínculos: {len(stay_ids)}")
     return event
+
+
+def revise_event(session: Session, *, actor_account_id: str, event_id: str,
+                 title: str, description: str, happened_at: datetime,
+                 reason: str) -> Event:
+    """Rectifica un acontecimiento de cualquier autor mediante una versión vinculada."""
+    from gestion_centro.domain.models import EventStayLink
+    actor = _active_author(session, actor_account_id)
+    original = session.get(Event, event_id)
+    if original is None:
+        raise ValueError("El acontecimiento original no existe")
+    if session.scalar(select(Event.id).where(Event.correction_of_id == original.id)):
+        raise ValueError("El acontecimiento ya tiene una versión posterior; selecciona la última")
+    if not title.strip() or not description.strip() or not reason.strip():
+        raise ValueError("Título, descripción y motivo son obligatorios")
+    revised = Event(
+        title=title.strip(), description=description.strip(), happened_at=happened_at,
+        author_account_id=actor.id, author_name_snapshot=actor.professional.display_name,
+        status="recorded", correction_of_id=original.id,
+    )
+    session.add(revised)
+    session.flush()
+    links = session.scalars(select(EventStayLink).where(
+        EventStayLink.event_id == original.id
+    )).all()
+    for link in links:
+        session.add(EventStayLink(
+            event_id=revised.id, stay_id=link.stay_id,
+            participation_role=link.participation_role,
+            minor_code_snapshot=link.minor_code_snapshot,
+            minor_name_snapshot=link.minor_name_snapshot,
+        ))
+    _audit(session, actor, "event_revised",
+           f"Original:{original.id}; versión:{revised.id}; motivo:{reason.strip()}")
+    return revised
 
 
 def _active_author(session: Session, account_id: str) -> UserAccount:
