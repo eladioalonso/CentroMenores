@@ -5,7 +5,7 @@ from PySide6.QtCore import QDate, QDateTime, Qt
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, QDateEdit, QDateTimeEdit,
     QComboBox, QLineEdit, QTextEdit, QPushButton, QTableWidget, QTableWidgetItem,
-    QHeaderView, QMessageBox, QInputDialog, QListWidget, QListWidgetItem,
+    QHeaderView, QMessageBox, QListWidget, QListWidgetItem,
     QDialogButtonBox, QLabel,
 )
 from sqlalchemy import select, or_
@@ -13,8 +13,8 @@ from sqlalchemy import select, or_
 from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import DiaryDay, DiaryEntry, Incident, Stay
 from gestion_centro.domain.service import (
-    record_diary_entry, record_incident, close_diary_day, revise_diary_entry,
-    correct_diary_entry, has_health_access, list_diary_records,
+    record_diary_entry, close_diary_day, revise_diary_entry,
+    has_health_access, list_diary_records,
 )
 from gestion_centro.domain.documents_service import list_active_stays
 from gestion_centro.domain.health_service import read_health_profile, list_medication_plans
@@ -28,12 +28,6 @@ class DiaryDialog(QDialog):
         "Comportamientos negativos": "negative",
         "Observaciones": "observation",
     }
-    INCIDENT_TYPES = {
-        "Conducta": "behavior", "Salud": "health", "Seguridad": "safety",
-        "Conflicto": "conflict", "Fuga": "escape", "Daños": "damage", "Otros": "other",
-    }
-    SEVERITIES = {"Baja": "low", "Media": "medium", "Alta": "high", "Crítica": "critical"}
-
     def __init__(self, factory, actor_id):
         super().__init__()
         self.factory, self.actor_id = factory, actor_id
@@ -59,11 +53,7 @@ class DiaryDialog(QDialog):
         for label, key in self.CATEGORIES.items():
             if key != "health" or self.health_access:
                 self.category.addItem(label, key)
-        self.happened = QDateTimeEdit()
-        self.happened.setCalendarPopup(True)
-        self.happened.setDateTime(QDateTime.currentDateTime())
         self.shift.hide()
-        self.happened.hide()
         self.content = QTextEdit()
         self.content.setMinimumHeight(130)
         self.content.setPlaceholderText("Describe los hechos con claridad. El texto se ajustará automáticamente al ancho del cuadro.")
@@ -87,9 +77,6 @@ class DiaryDialog(QDialog):
         actions = QHBoxLayout()
         self.add_button = QPushButton("Guardar apartado")
         self.add_button.clicked.connect(self.add_entry)
-        self.incident_button = QPushButton("Registrar incidencia")
-        self.incident_button.clicked.connect(self.add_incident)
-        self.incident_button.hide()
         self.close_button = QPushButton("Cerrar parte del día")
         self.close_button.clicked.connect(self.close_day)
         self.revise_button = QPushButton("Editar anotación seleccionada")
@@ -231,29 +218,57 @@ class DiaryDialog(QDialog):
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo modificar", str(exc))
 
-    def add_incident(self):
-        title, ok = QInputDialog.getText(self, "Incidencia", "Título:")
-        if not ok or not title.strip(): return
-        description, ok = QInputDialog.getMultiLineText(self, "Incidencia", "Descripción objetiva:")
-        if not ok or not description.strip(): return
-        incident_types = [label for label, key in self.INCIDENT_TYPES.items()
-            if key != "health" or self.health_access]
-        type_label, ok = QInputDialog.getItem(self, "Incidencia", "Tipo:", incident_types, 0, False)
-        if not ok: return
-        severity_label, ok = QInputDialog.getItem(self, "Incidencia", "Gravedad:", list(self.SEVERITIES), 0, False)
-        if not ok: return
+    def _update_selection_actions(self):
+        row = self.table.currentRow()
+        cell = self.table.item(row, 0) if row >= 0 else None
+        metadata = cell.data(Qt.ItemDataRole.UserRole) if cell else None
+        selected_entry = bool(metadata and metadata.get("kind") == "entry")
+        self.revise_button.setEnabled(selected_entry)
+        self.history_button.setEnabled(selected_entry)
+
+    def view_entry_history(self):
+        row = self.table.currentRow()
+        cell = self.table.item(row, 0) if row >= 0 else None
+        metadata = cell.data(Qt.ItemDataRole.UserRole) if cell else None
+        if not metadata or metadata.get("kind") != "entry":
+            QMessageBox.information(self, "Selecciona una anotación", "Selecciona primero una anotación del parte.")
+            return
         try:
-            local = self.happened.dateTime().toPython()
-            moment = local.astimezone(timezone.utc) if local.tzinfo else local.astimezone().astimezone(timezone.utc)
             with session_scope(self.factory) as session:
-                record_incident(session, actor_account_id=self.actor_id,
-                    diary_date=self.day.date().toPython(), title=title, description=description,
-                    incident_type=self.INCIDENT_TYPES[type_label],
-                    severity=self.SEVERITIES[severity_label], happened_at=moment,
-                    participants=[(stay_id, "involved", None) for stay_id in self.selected_stay_ids])
-            self.refresh()
+                current = session.get(DiaryEntry, metadata["id"])
+                if current is None:
+                    raise ValueError("La anotación ya no existe.")
+                versions = [current]
+                parent_id = current.correction_of_id
+                while parent_id:
+                    parent = session.get(DiaryEntry, parent_id)
+                    if parent is None:
+                        break
+                    versions.append(parent)
+                    parent_id = parent.correction_of_id
+                versions.reverse()
+                history = []
+                for number, version in enumerate(versions, start=1):
+                    history.extend([
+                        f"VERSIÓN {number} · {version.recorded_at.astimezone().strftime('%d/%m/%Y %H:%M')}",
+                        f"Registrada por: {version.author_name_snapshot}",
+                        f"Fecha del hecho: {version.happened_at.astimezone().strftime('%d/%m/%Y %H:%M')}",
+                        version.content, "",
+                    ])
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Historial de la anotación")
+            dialog.resize(760, 560)
+            layout = QVBoxLayout(dialog)
+            viewer = QTextEdit()
+            viewer.setReadOnly(True)
+            viewer.setPlainText("\\n".join(history))
+            layout.addWidget(viewer)
+            close = QPushButton("Cerrar")
+            close.clicked.connect(dialog.accept)
+            layout.addWidget(close)
+            dialog.exec()
         except (ValueError, PermissionError) as exc:
-            QMessageBox.warning(self, "No se pudo registrar", str(exc))
+            QMessageBox.warning(self, "No se pudo consultar el historial", str(exc))
 
     def close_day(self):
         if QMessageBox.question(self, "Cerrar diario",
