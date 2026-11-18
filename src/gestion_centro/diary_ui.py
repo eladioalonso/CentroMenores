@@ -108,6 +108,7 @@ class DiaryDialog(QDialog):
         self.table.setTextElideMode(Qt.TextElideMode.ElideNone)
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self.table)
+        self.table.itemSelectionChanged.connect(self._update_selection_actions)
         self.day.dateChanged.connect(self.refresh)
         self.refresh()
 
@@ -184,6 +185,14 @@ class DiaryDialog(QDialog):
                 "Se ha guardado una nueva versión. La anterior permanece en el historial y queda registrado quién realizó el cambio.")
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo modificar", str(exc))
+
+    def _update_selection_actions(self):
+        row = self.table.currentRow()
+        cell = self.table.item(row, 0) if row >= 0 else None
+        metadata = cell.data(Qt.ItemDataRole.UserRole) if cell else None
+        selected_entry = bool(metadata and metadata.get("kind") == "entry")
+        self.revise_button.setEnabled(selected_entry)
+        self.history_button.setEnabled(selected_entry)
 
     def view_entry_history(self):
         row = self.table.currentRow()
@@ -322,13 +331,7 @@ class DiaryDialog(QDialog):
         self.content.setReadOnly(is_closed)
         self.add_button.setEnabled(not is_closed)
         self.close_button.setEnabled(not is_closed)
-        has_selected_entry = bool(
-            self.table.currentRow() >= 0
-            and self.table.item(self.table.currentRow(), 0)
-            and (self.table.item(self.table.currentRow(), 0).data(Qt.ItemDataRole.UserRole) or {}).get("kind") == "entry"
-        )
-        self.revise_button.setEnabled(any(row[4].get("kind") == "entry" for row in rows))
-        self.history_button.setEnabled(any(row[4].get("kind") == "entry" for row in rows))
+        self._update_selection_actions()
         self.day_state.setText("PARTE CERRADO · No admite nuevas anotaciones; puedes revisar las existentes" if is_closed else "PARTE ABIERTO · Puedes completar y revisar anotaciones")
         self.day_state.setProperty("closed", is_closed)
         self.day_state.style().unpolish(self.day_state)
