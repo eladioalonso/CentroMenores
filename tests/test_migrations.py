@@ -245,3 +245,78 @@ def test_legacy_incidents_are_migrated_into_diary_with_minor_links(tmp_path):
     assert "CIP-LEGACY" in health_version["new_values"]
     assert diary_count == 2
     engine.dispose()
+
+
+def test_health_profiles_from_multiple_stays_are_archived_without_data_loss(tmp_path):
+    engine = create_engine(f"sqlite:///{(tmp_path / 'multiple-health-profiles.db').as_posix()}")
+    root = Path(__file__).resolve().parents[1]
+    config = Config(str(root / "alembic.ini"))
+    config.set_main_option("script_location", str(root / "migrations"))
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.upgrade(config, "0013_minor_personal_data_versions")
+
+    older = datetime(2024, 1, 10, 9, tzinfo=timezone.utc)
+    newer = datetime(2025, 3, 20, 11, tzinfo=timezone.utc)
+    with engine.begin() as connection:
+        connection.execute(text(
+            "INSERT INTO professionals (id, display_name, active, created_at) "
+            "VALUES ('professional-history', 'Educador histórico', 1, :now)"
+        ), {"now": older})
+        connection.execute(text(
+            "INSERT INTO user_accounts (id, professional_id, username, password_hash, role, "
+            "active, failed_attempts, created_at, updated_at) VALUES "
+            "('account-history', 'professional-history', 'health-history', 'hash', "
+            "'educator', 1, 0, :now, :now)"
+        ), {"now": older})
+        connection.execute(text(
+            "INSERT INTO minors (id, internal_code, given_names, family_names, active, "
+            "created_at, updated_at) VALUES "
+            "('minor-history', 'legacy-history', 'Caso', 'Perfiles múltiples', 1, :now, :now)"
+        ), {"now": older})
+        connection.execute(text(
+            "INSERT INTO stays (id, minor_id, sequence_number, started_on, ended_on, status, created_at) "
+            "VALUES ('stay-old', 'minor-history', 1, '2024-01-01', '2024-12-31', 'closed', :now), "
+            "('stay-new', 'minor-history', 2, '2025-01-01', NULL, 'active', :later)"
+        ), {"now": older, "later": newer})
+        connection.execute(text(
+            "INSERT INTO health_profiles (id, stay_id, allergies, relevant_conditions, "
+            "emergency_instructions, updated_by_account_id, updated_by_name_snapshot, updated_at) "
+            "VALUES ('profile-old', 'stay-old', 'Alergia antigua', 'Antecedente antiguo', "
+            "'Instrucción antigua', 'account-history', 'Educador histórico', :older), "
+            "('profile-new', 'stay-new', 'Alergia vigente', 'Antecedente vigente', "
+            "'Instrucción vigente', 'account-history', 'Educador histórico', :newer)"
+        ), {"older": older, "newer": newer})
+
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.upgrade(config, "head")
+
+    with engine.connect() as connection:
+        active_profiles = connection.execute(text(
+            "SELECT id, allergies, relevant_conditions, emergency_instructions "
+            "FROM health_profiles WHERE minor_id='minor-history'"
+        )).mappings().all()
+        archived_profiles = connection.execute(text(
+            "SELECT original_profile_id, stay_id, allergies, relevant_conditions, "
+            "emergency_instructions, updated_by_name_snapshot "
+            "FROM health_profile_history WHERE minor_id='minor-history'"
+        )).mappings().all()
+
+    assert len(active_profiles) == 1
+    assert dict(active_profiles[0]) == {
+        "id": "profile-new",
+        "allergies": "Alergia vigente",
+        "relevant_conditions": "Antecedente vigente",
+        "emergency_instructions": "Instrucción vigente",
+    }
+    assert len(archived_profiles) == 1
+    assert dict(archived_profiles[0]) == {
+        "original_profile_id": "profile-old",
+        "stay_id": "stay-old",
+        "allergies": "Alergia antigua",
+        "relevant_conditions": "Antecedente antiguo",
+        "emergency_instructions": "Instrucción antigua",
+        "updated_by_name_snapshot": "Educador histórico",
+    }
+    engine.dispose()
