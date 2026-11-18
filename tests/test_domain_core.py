@@ -504,7 +504,7 @@ def test_diary_revision_can_correct_linked_minor_and_stay():
         moment=datetime(2026,2,3,10,tzinfo=timezone.utc)
         original=record_diary_entry(session,actor_account_id=actor.id,
             diary_date=date(2026,2,3),shift="morning",category="observation",
-            content="Hecho ficticio",happened_at=moment,stay_ids=[first.id])
+            content="Hecho ficticio",happened_at=moment,stay_ids=[first.id],now=moment)
         revised=revise_diary_entry(session,actor_account_id=actor.id,
             original_entry_id=original.id,content="Hecho vinculado correctamente",
             reason="Corrección de participantes",stay_ids=[second.id])
