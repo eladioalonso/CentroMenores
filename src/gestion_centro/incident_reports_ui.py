@@ -14,7 +14,6 @@ from sqlalchemy import select
 from gestion_centro.domain.models import (
     DiaryDay, DiaryEntry, DiaryEntryStayLink, Minor, Stay,
 )
-from gestion_centro.domain.incident_reports import IncidentReport
 from gestion_centro.domain.incident_reports_service import (
     get_incident_report, list_incident_reports, save_incident_report,
 )
@@ -169,6 +168,10 @@ class IncidentReportsDialog(QDialog):
             entries = session.scalars(
                 query.order_by(DiaryEntry.happened_at, DiaryEntry.recorded_at)
             ).all()
+            # Si una anotación tiene rectificaciones, el informe usa solo la última
+            # versión; la cadena de versiones permanece accesible en el historial.
+            superseded_ids = {entry.correction_of_id for entry in entries if entry.correction_of_id}
+            entries = [entry for entry in entries if entry.id not in superseded_ids]
             rows = []
             for entry in entries:
                 links = session.scalars(select(DiaryEntryStayLink).where(
