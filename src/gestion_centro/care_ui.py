@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QComboBox, QLineEdit, QTextEdit,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
-    QDateEdit, QHBoxLayout, QInputDialog, QTabWidget, QWidget, QLabel, QDialogButtonBox,
+    QDateEdit, QHBoxLayout, QInputDialog, QTabWidget, QWidget, QLabel, QDialogButtonBox, QCheckBox,
 )
 from sqlalchemy import select
 
@@ -23,7 +23,7 @@ from gestion_centro.domain.health import HealthProfile, MedicationPlan, Medicati
 from gestion_centro.domain.health_service import (
     read_health_profile, save_health_profile, list_health_profile_versions, add_medication_plan,
     record_medication_administration, add_vaccine_record, list_medication_plans, list_medication_plan_versions,
-    set_medication_schedules, list_daily_medication_schedule, record_vaccine_dose_review, list_vaccine_dose_reviews, list_vaccine_calendar_items,
+    set_medication_schedules, update_medication_plan, list_daily_medication_schedule, record_vaccine_dose_review, list_vaccine_dose_reviews, list_vaccine_calendar_items,
 )
 
 
@@ -444,6 +444,7 @@ class HealthDialog(StaySelectorDialog):
         medication_layout.addWidget(self.plans)
         plan_actions = QHBoxLayout()
         for label, callback in [("Registrar pauta prescrita", self.add_plan),
+                                ("Editar pauta seleccionada", self.edit_plan),
                                 ("Configurar horarios", self.configure_schedule),
                                 ("Historial de cambios", self.show_plan_history)]:
             button = QPushButton(label); button.clicked.connect(callback); plan_actions.addWidget(button)
@@ -736,10 +737,39 @@ class HealthDialog(StaySelectorDialog):
             raise ValueError("Indica al menos un horario prescrito.")
         return schedules
 
-    def add_plan(self):
+    def edit_plan(self):
+        row = self.plans.currentRow()
+        cell = self.plans.item(row, 0) if row >= 0 else None
+        if not cell:
+            QMessageBox.information(self, "Selecciona pauta", "Selecciona primero una pauta.")
+            return
+        self.add_plan(cell.data(Qt.ItemDataRole.UserRole))
+
+    def add_plan(self, plan_id=None):
+        existing = None
+        schedule_rows = []
+        if plan_id:
+            try:
+                with session_scope(self.factory) as session:
+                    existing = session.get(MedicationPlan, plan_id)
+                    if existing is None or existing.minor_id != self.stay.currentData():
+                        raise ValueError("La pauta ya no existe o no corresponde al residente seleccionado.")
+                    schedule_rows = [(item.time_of_day, item.shift) for item in existing.schedules]
+                    values = {
+                        "medication_name": existing.medication_name,
+                        "prescribed_dose": existing.prescribed_dose,
+                        "schedule_text": existing.schedule_text,
+                        "prescriber_reference": existing.prescriber_reference,
+                        "starts_on": existing.starts_on,
+                        "ends_on": existing.ends_on,
+                        "active": existing.active,
+                    }
+            except (ValueError, PermissionError) as exc:
+                QMessageBox.warning(self, "No se puede editar la pauta", str(exc))
+                return
         dialog = QDialog(self)
-        dialog.setWindowTitle("Registrar pauta prescrita")
-        dialog.resize(520, 420)
+        dialog.setWindowTitle("Editar pauta prescrita" if plan_id else "Registrar pauta prescrita")
+        dialog.resize(560, 540)
         layout = QVBoxLayout(dialog)
         form = QFormLayout()
         medication = QLineEdit()
@@ -748,23 +778,46 @@ class HealthDialog(StaySelectorDialog):
         reference = QLineEdit()
         schedules = QTextEdit()
         schedules.setPlaceholderText("Una por línea: 08:00|morning")
-        schedules.setMaximumHeight(90)
+        starts = QDateEdit(QDate.currentDate())
+        starts.setCalendarPopup(True)
+        ends = QDateEdit(QDate.currentDate())
+        ends.setCalendarPopup(True)
+        no_end = QCheckBox("Sin fecha final")
+        active = QCheckBox("Pauta activa")
+        active.setChecked(True)
+        if existing:
+            medication.setText(values["medication_name"])
+            dose.setText(values["prescribed_dose"])
+            instructions.setPlainText(values["schedule_text"])
+            reference.setText(values["prescriber_reference"])
+            starts.setDate(QDate(values["starts_on"].year, values["starts_on"].month, values["starts_on"].day))
+            if values["ends_on"]:
+                ends.setDate(QDate(values["ends_on"].year, values["ends_on"].month, values["ends_on"].day))
+            else:
+                no_end.setChecked(True)
+            active.setChecked(values["active"])
+            schedules.setPlainText("\\n".join(f"{time_text}|{shift}" for time_text, shift in schedule_rows))
+        no_end.toggled.connect(lambda checked: ends.setEnabled(not checked))
+        ends.setEnabled(not no_end.isChecked())
         form.addRow("Medicamento", medication)
         form.addRow("Dosis prescrita", dose)
         form.addRow("Pauta / instrucciones", instructions)
         form.addRow("Referencia de prescripción", reference)
+        form.addRow("Inicio de vigencia", starts)
+        form.addRow("Fin de vigencia", ends)
+        form.addRow("", no_end)
+        form.addRow("", active)
         form.addRow("Horarios prescritos", schedules)
         layout.addLayout(form)
-        hint = QLabel("Los horarios deben corresponder a la prescripción vigente. No se modifica aquí la pauta clínica.")
+        hint = QLabel("Transcribe los datos de la prescripción vigente. La aplicación no prescribe ni modifica indicaciones clínicas.")
         hint.setWordWrap(True)
         layout.addWidget(hint)
-        buttons = QHBoxLayout()
-        save = QPushButton("Guardar pauta")
-        cancel = QPushButton("Cancelar")
-        save.clicked.connect(dialog.accept)
-        cancel.clicked.connect(dialog.reject)
-        buttons.addWidget(save); buttons.addWidget(cancel)
-        layout.addLayout(buttons)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         if not self.stay.currentData():
@@ -775,17 +828,36 @@ class HealthDialog(StaySelectorDialog):
             if not medication.text().strip() or not dose.text().strip() or not reference.text().strip():
                 raise ValueError("Medicamento, dosis y referencia de prescripción son obligatorios.")
             with session_scope(self.factory) as session:
-                plan = add_medication_plan(
-                    session, actor_account_id=self.actor_id, minor_id=self.stay.currentData(),
-                    medication_name=medication.text().strip(), prescribed_dose=dose.text().strip(),
-                    schedule_text=instructions.toPlainText().strip(),
-                    prescriber_reference=reference.text().strip(), starts_on=date.today(),
-                    schedules=parsed_schedules,
-                )
+                if plan_id:
+                    update_medication_plan(
+                        session, actor_account_id=self.actor_id, plan_id=plan_id,
+                        medication_name=medication.text().strip(),
+                        prescribed_dose=dose.text().strip(),
+                        schedule_text=instructions.toPlainText().strip(),
+                        prescriber_reference=reference.text().strip(),
+                        starts_on=starts.date().toPython(),
+                        ends_on=None if no_end.isChecked() else ends.date().toPython(),
+                        instructions=None, schedules=parsed_schedules,
+                        active=active.isChecked(),
+                    )
+                else:
+                    add_medication_plan(
+                        session, actor_account_id=self.actor_id, minor_id=self.stay.currentData(),
+                        medication_name=medication.text().strip(), prescribed_dose=dose.text().strip(),
+                        schedule_text=instructions.toPlainText().strip(),
+                        prescriber_reference=reference.text().strip(),
+                        starts_on=starts.date().toPython(),
+                        ends_on=None if no_end.isChecked() else ends.date().toPython(),
+                        schedules=parsed_schedules,
+                    )
             self.refresh()
-            QMessageBox.information(self, "Pauta registrada", "La pauta y sus horarios han quedado registrados.")
+            QMessageBox.information(
+                self, "Pauta actualizada" if plan_id else "Pauta registrada",
+                "Se ha guardado una nueva versión de la pauta. El historial anterior se conserva."
+                if plan_id else "La pauta y sus horarios han quedado registrados."
+            )
         except (ValueError, PermissionError) as exc:
-            QMessageBox.warning(self, "No se pudo registrar", str(exc))
+            QMessageBox.warning(self, "No se pudo guardar la pauta", str(exc))
 
     def show_plan_history(self):
         row = self.plans.currentRow()
