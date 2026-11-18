@@ -52,11 +52,12 @@ def upgrade():
             f"Estado histórico: {incident['status']}. Cierre: {incident['closure_note']}"
             if incident["closure_note"] else f"Estado histórico: {incident['status']}"
         )
+        participant_suffix = f"\n{participant_text}" if participant_text else ""
         content = (
             f"Incidencia histórica: {incident['title']}\n"
             f"Tipo: {incident['incident_type']} · Gravedad: {incident['severity']}\n"
             f"{incident['description']}\n{closure_text}"
-            f"{'\n' + participant_text if participant_text else ''}"
+            f"{participant_suffix}"
         )
         connection.execute(sa.text("""
             INSERT INTO diary_entries (
