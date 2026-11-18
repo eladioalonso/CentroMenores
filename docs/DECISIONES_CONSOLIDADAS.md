@@ -190,17 +190,17 @@ Criterios funcionales acordados, sujetos a validación normativa:
 
 ## 13. Fases de implementación
 
-La implementación está en curso en `desarrollo/nucleo-aplicacion`. El orden de trabajo vigente es:
+La implementación continúa en `desarrollo/nucleo-aplicacion`. Estado de las fases:
 
-1. Consolidar navegación y permisos compartidos en los cuatro módulos.
-2. Terminar la trazabilidad y edición de expedientes principales y sanitarios.
-3. Consolidar el parte diario como fuente cronológica de hechos y conservar el historial de rectificaciones.
-4. Completar borradores, emisión, rectificación e historial de informes basados en anotaciones del parte.
-5. Revisar las funciones secundarias para que queden integradas dentro de los cuatro módulos.
-6. Validar migraciones, integridad de datos, copias, restauración y funcionamiento en Windows.
-7. Ejecutar pruebas funcionales con datos ficticios y preparar una compilación candidata para pruebas del usuario.
+1. **Completada:** navegación de cuatro módulos y permisos ordinarios compartidos.
+2. **Completada en el núcleo funcional:** edición y trazabilidad de expedientes principales y sanitarios; continúa la revisión integral de casos límite.
+3. **Completada en el núcleo funcional:** parte diario como fuente cronológica, rectificaciones vinculadas e integración de incidencias históricas sin duplicación deliberada.
+4. **Completada en el núcleo funcional:** borradores persistentes, emisión, rectificación, historial de versiones y exportación de informes desde el parte diario.
+5. **Completada en la navegación:** agenda, documentación, seguimiento educativo, escolaridad, salidas, visitas y autorizaciones quedan integrados en los módulos principales.
+6. **En validación:** migraciones, integridad de datos, copias, restauración y comprobaciones de la compilación Windows. Las pruebas automatizadas de migración y copia/restauración deben complementarse con validación operativa en Windows.
+7. **En validación:** la batería automatizada alcanza 133 pruebas superadas y existe una compilación portable generada; queda la prueba funcional del usuario con datos ficticios y la revisión final antes de declarar una versión candidata.
 
-Los cambios se realizan de forma incremental, sin borrar información histórica ni modificar datos de usuario de forma destructiva. Una compilación de desarrollo no se considerará definitiva hasta superar las pruebas y la revisión funcional.
+Los cambios se realizan de forma incremental, sin borrar información histórica ni modificar datos de usuario de forma destructiva. Una compilación de desarrollo no se considerará definitiva hasta superar las pruebas, la validación funcional y la revisión de seguridad.
 
 
 ## 14. Decisiones técnicas aprobadas en la revisión
