@@ -50,18 +50,34 @@ def read_health_profile(session: Session, *, actor_account_id: str, minor_id: st
 
 def save_health_profile(session: Session, *, actor_account_id: str, allergies: str | None,
                          relevant_conditions: str | None, emergency_instructions: str | None,
-                         minor_id: str | None = None, stay_id: str | None = None):
+                         minor_id: str | None = None, stay_id: str | None = None,
+                         cip: str | None = None, health_center: str | None = None,
+                         physician: str | None = None, nurse: str | None = None,
+                         health_card_expires_on: date | None = None,
+                         clinical_history: str | None = None):
     actor=_actor(session,actor_account_id); minor, stay = _resolve_minor(session,minor_id=minor_id,stay_id=stay_id)
     profile=session.scalar(select(HealthProfile).where(HealthProfile.minor_id==minor.id))
     old_values = {
         "allergies": profile.allergies if profile else None,
         "relevant_conditions": profile.relevant_conditions if profile else None,
         "emergency_instructions": profile.emergency_instructions if profile else None,
+        "cip": profile.cip if profile else None,
+        "health_center": profile.health_center if profile else None,
+        "physician": profile.physician if profile else None,
+        "nurse": profile.nurse if profile else None,
+        "health_card_expires_on": profile.health_card_expires_on.isoformat() if profile and profile.health_card_expires_on else None,
+        "clinical_history": profile.clinical_history if profile else None,
     }
     new_values = {
         "allergies": allergies.strip() if allergies else None,
         "relevant_conditions": relevant_conditions.strip() if relevant_conditions else None,
         "emergency_instructions": emergency_instructions.strip() if emergency_instructions else None,
+        "cip": (cip or "").strip().upper() or None,
+        "health_center": (health_center or "").strip() or None,
+        "physician": (physician or "").strip() or None,
+        "nurse": (nurse or "").strip() or None,
+        "health_card_expires_on": health_card_expires_on.isoformat() if health_card_expires_on else None,
+        "clinical_history": (clinical_history or "").strip() or None,
     }
     if old_values != new_values:
         changed_at = datetime.now(timezone.utc)
@@ -72,6 +88,10 @@ def save_health_profile(session: Session, *, actor_account_id: str, allergies: s
                 allergies=new_values["allergies"],
                 relevant_conditions=new_values["relevant_conditions"],
                 emergency_instructions=new_values["emergency_instructions"],
+                cip=new_values["cip"], health_center=new_values["health_center"],
+                physician=new_values["physician"], nurse=new_values["nurse"],
+                health_card_expires_on=health_card_expires_on,
+                clinical_history=new_values["clinical_history"],
                 updated_by_account_id=actor.id,
                 updated_by_name_snapshot=actor.professional.display_name,
                 updated_at=changed_at,
@@ -82,6 +102,12 @@ def save_health_profile(session: Session, *, actor_account_id: str, allergies: s
             profile.allergies = new_values["allergies"]
             profile.relevant_conditions = new_values["relevant_conditions"]
             profile.emergency_instructions = new_values["emergency_instructions"]
+            profile.cip = new_values["cip"]
+            profile.health_center = new_values["health_center"]
+            profile.physician = new_values["physician"]
+            profile.nurse = new_values["nurse"]
+            profile.health_card_expires_on = health_card_expires_on
+            profile.clinical_history = new_values["clinical_history"]
             profile.updated_by_account_id = actor.id
             profile.updated_by_name_snapshot = actor.professional.display_name
             profile.updated_at = changed_at
