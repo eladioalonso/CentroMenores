@@ -18,6 +18,23 @@ def _actor(session: Session, account_id: str) -> UserAccount:
 def _audit(session: Session, actor: UserAccount, event: str, details: str):
     session.add(AccessAudit(account_id=actor.id,username_snapshot=actor.username,event=event,details=details))
 
+def _next_health_profile_timestamp(session: Session, minor_id: str) -> datetime:
+    """Garantiza orden temporal estricto entre versiones del mismo perfil."""
+    previous = session.scalar(
+        select(HealthProfileVersion.changed_at)
+        .where(HealthProfileVersion.minor_id == minor_id)
+        .order_by(HealthProfileVersion.changed_at.desc())
+        .limit(1)
+    )
+    now = datetime.now(timezone.utc)
+    if previous is not None:
+        if previous.tzinfo is None:
+            previous = previous.replace(tzinfo=timezone.utc)
+        if now <= previous:
+            now = previous + timedelta(microseconds=1)
+    return now
+
+
 def _resolve_minor(session: Session, *, minor_id: str | None = None, stay_id: str | None = None):
     if minor_id:
         minor=session.get(Minor,minor_id)
@@ -80,7 +97,7 @@ def save_health_profile(session: Session, *, actor_account_id: str, allergies: s
         "clinical_history": (clinical_history or "").strip() or None,
     }
     if old_values != new_values:
-        changed_at = datetime.now(timezone.utc)
+        changed_at = _next_health_profile_timestamp(session, minor.id)
         if profile is None:
             profile = HealthProfile(
                 minor_id=minor.id,
