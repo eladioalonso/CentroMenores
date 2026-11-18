@@ -198,7 +198,7 @@ La implementación continúa en `desarrollo/nucleo-aplicacion`. Estado de las fa
 4. **Completada en el núcleo funcional:** borradores persistentes, emisión, rectificación, historial de versiones y exportación de informes desde el parte diario.
 5. **Completada en la navegación:** agenda, documentación, seguimiento educativo, escolaridad, salidas, visitas y autorizaciones quedan integrados en los módulos principales.
 6. **En validación:** migraciones, integridad de datos, copias, restauración y comprobaciones de la compilación Windows. Las pruebas automatizadas de migración y copia/restauración deben complementarse con validación operativa en Windows.
-7. **En validación:** la batería automatizada alcanza 134 pruebas superadas y existe una compilación portable generada; queda la prueba funcional del usuario con datos ficticios y la revisión final antes de declarar una versión candidata.
+7. **En validación:** la batería automatizada alcanza 135 pruebas superadas y existe una compilación portable generada; queda la prueba funcional del usuario con datos ficticios y la revisión final antes de declarar una versión candidata.
 
 Los cambios se realizan de forma incremental, sin borrar información histórica ni modificar datos de usuario de forma destructiva. Una compilación de desarrollo no se considerará definitiva hasta superar las pruebas, la validación funcional y la revisión de seguridad.
 
