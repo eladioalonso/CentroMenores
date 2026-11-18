@@ -13,7 +13,8 @@ def upgrade():
     connection = op.get_bind()
     incidents = connection.execute(sa.text("""
         SELECT id, diary_day_id, title, description, incident_type, severity,
-               happened_at, recorded_at, author_account_id, author_name_snapshot
+               happened_at, recorded_at, author_account_id, author_name_snapshot,
+               status, closure_note, closed_at
         FROM incidents
         ORDER BY happened_at, recorded_at, id
     """)).mappings().all()
@@ -38,10 +39,24 @@ def upgrade():
             else "negative" if incident["incident_type"] in {"behavior", "conflict"}
             else "observation"
         )
+        participants = connection.execute(sa.text("""
+            SELECT stay_id, role, factual_note, minor_code_snapshot, minor_name_snapshot
+            FROM incident_participants WHERE incident_id = :incident_id
+        """), {"incident_id": incident["id"]}).mappings().all()
+        participant_text = "\\n".join(
+            f"Participante ({item['role']}): {item['minor_name_snapshot']} "
+            f"{'· ' + item['factual_note'] if item['factual_note'] else ''}"
+            for item in participants
+        )
+        closure_text = (
+            f"Estado histórico: {incident['status']}. Cierre: {incident['closure_note']}"
+            if incident["closure_note"] else f"Estado histórico: {incident['status']}"
+        )
         content = (
-            f"Incidencia histórica: {incident['title']}\n"
-            f"Tipo: {incident['incident_type']} · Gravedad: {incident['severity']}\n"
-            f"{incident['description']}"
+            f"Incidencia histórica: {incident['title']}\\n"
+            f"Tipo: {incident['incident_type']} · Gravedad: {incident['severity']}\\n"
+            f"{incident['description']}\\n{closure_text}"
+            f"{'\\n' + participant_text if participant_text else ''}"
         )
         connection.execute(sa.text("""
             INSERT INTO diary_entries (
@@ -58,10 +73,6 @@ def upgrade():
             "author_account_id": incident["author_account_id"],
             "author_name_snapshot": incident["author_name_snapshot"],
         })
-        participants = connection.execute(sa.text("""
-            SELECT stay_id, minor_code_snapshot, minor_name_snapshot
-            FROM incident_participants WHERE incident_id = :incident_id
-        """), {"incident_id": incident["id"]}).mappings().all()
         for participant in participants:
             connection.execute(sa.text("""
                 INSERT INTO diary_entry_stay_links (
