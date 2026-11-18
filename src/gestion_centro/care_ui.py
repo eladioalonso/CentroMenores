@@ -24,6 +24,7 @@ from gestion_centro.domain.health_service import (
     read_health_profile, save_health_profile, list_health_profile_versions, add_medication_plan,
     record_medication_administration, add_vaccine_record, list_medication_plans, list_medication_plan_versions,
     set_medication_schedules, update_medication_plan, list_daily_medication_schedule, record_vaccine_dose_review, list_vaccine_dose_reviews, list_vaccine_calendar_items,
+    update_vaccine_record, list_vaccine_record_versions,
 )
 
 
@@ -510,10 +511,16 @@ class HealthDialog(StaySelectorDialog):
         catalog_button.clicked.connect(self.show_vaccine_catalog)
         vaccine_button = QPushButton("Registrar vacuna administrada")
         vaccine_button.clicked.connect(self.add_vaccine)
+        edit_vaccine_button = QPushButton("Editar vacuna seleccionada")
+        edit_vaccine_button.clicked.connect(self.edit_vaccine)
+        vaccine_history_button = QPushButton("Historial de vacuna")
+        vaccine_history_button.clicked.connect(self.show_vaccine_history)
         review_button = QPushButton("Añadir revisión profesional")
         review_button.clicked.connect(self.add_vaccine_review)
         vaccine_actions.addWidget(catalog_button)
         vaccine_actions.addWidget(vaccine_button)
+        vaccine_actions.addWidget(edit_vaccine_button)
+        vaccine_actions.addWidget(vaccine_history_button)
         vaccine_actions.addWidget(review_button)
         vaccine_layout.addLayout(vaccine_actions)
         self.tabs.addTab(vaccine_tab, "Vacunas")
@@ -641,7 +648,10 @@ class HealthDialog(StaySelectorDialog):
                 source_doc.title if source_doc else "Sin justificante",
             ]
             for col, value in enumerate(values):
-                self.vaccines.setItem(i, col, QTableWidgetItem(value))
+                cell = QTableWidgetItem(value)
+                if col == 0:
+                    cell.setData(Qt.ItemDataRole.UserRole, record.id)
+                self.vaccines.setItem(i, col, cell)
         self.vaccine_reviews.setRowCount(len(vaccine_reviews))
         for i, review in enumerate(vaccine_reviews):
             item = calendar_items.get(review.calendar_item_id) if review.calendar_item_id else None
@@ -1093,12 +1103,75 @@ class HealthDialog(StaySelectorDialog):
         layout.addWidget(close)
         dialog.exec()
 
-    def add_vaccine(self):
-        if not self.stay.currentData():
+    def edit_vaccine(self):
+        row = self.vaccines.currentRow()
+        cell = self.vaccines.item(row, 0) if row >= 0 else None
+        if not cell:
+            QMessageBox.information(self, "Selecciona vacuna", "Selecciona primero un registro vacunal.")
+            return
+        self.add_vaccine(cell.data(Qt.ItemDataRole.UserRole))
+
+    def show_vaccine_history(self):
+        row = self.vaccines.currentRow()
+        cell = self.vaccines.item(row, 0) if row >= 0 else None
+        if not cell:
+            QMessageBox.information(self, "Selecciona vacuna", "Selecciona primero un registro vacunal.")
+            return
+        with session_scope(self.factory) as session:
+            versions = list_vaccine_record_versions(
+                session, actor_account_id=self.actor_id,
+                record_id=cell.data(Qt.ItemDataRole.UserRole)
+            )
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Historial del registro vacunal")
+        dialog.resize(950, 520)
+        layout = QVBoxLayout(dialog)
+        table = QTableWidget(len(versions), 4)
+        table.setHorizontalHeaderLabels(["Fecha y hora", "Profesional", "Datos anteriores", "Datos guardados"])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.setWordWrap(True)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        for row_index, version in enumerate(versions):
+            values = [
+                version.changed_at.astimezone().strftime("%d/%m/%Y %H:%M"),
+                version.changed_by_name_snapshot,
+                json.dumps(version.old_values, ensure_ascii=False, indent=2),
+                json.dumps(version.new_values, ensure_ascii=False, indent=2),
+            ]
+            for col, value in enumerate(values):
+                table.setItem(row_index, col, QTableWidgetItem(value))
+        layout.addWidget(table)
+        close = QPushButton("Cerrar")
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close)
+        dialog.exec()
+
+    def add_vaccine(self, record_id=None):
+        minor_id = self.stay.currentData()
+        if not minor_id:
             QMessageBox.information(self, "Selecciona residente", "Selecciona un residente antes de registrar una vacuna.")
             return
+        existing = None
+        if record_id:
+            with session_scope(self.factory) as session:
+                existing = session.get(VaccineRecord, record_id)
+                if existing is None or existing.minor_id != minor_id:
+                    QMessageBox.warning(self, "No se puede editar", "El registro vacunal ya no existe o no corresponde al residente.")
+                    return
+                existing_values = {
+                    "vaccine_name": existing.vaccine_name,
+                    "dose_reference": existing.dose_reference,
+                    "calendar_item_id": existing.calendar_item_id,
+                    "manufacturer": existing.manufacturer,
+                    "product_name": existing.product_name,
+                    "batch_number": existing.batch_number,
+                    "administration_center": existing.administration_center,
+                    "administering_professional": existing.administering_professional,
+                    "source_document_id": existing.source_document_id,
+                    "administered_on": existing.administered_on,
+                }
         dialog = QDialog(self)
-        dialog.setWindowTitle("Registrar administración de vacuna")
+        dialog.setWindowTitle("Editar registro vacunal" if record_id else "Registrar administración de vacuna")
         form = QFormLayout(dialog)
         name = QLineEdit()
         dose = QLineEdit()
@@ -1121,12 +1194,28 @@ class HealthDialog(StaySelectorDialog):
                         catalog_item.addItem(f"{edition.title} · {item.display_name} · {item.dose_label} · {item.target_age_text}", item.id)
             documents = session.scalars(
                 select(PersonalDocument).join(Stay, PersonalDocument.stay_id == Stay.id)
-                .where(Stay.minor_id == self.stay.currentData(), PersonalDocument.category == "health")
+                .where(Stay.minor_id == minor_id, PersonalDocument.category == "health")
                 .order_by(PersonalDocument.created_at.desc())
             ).all()
             for document in documents:
                 source_document.addItem(f"{document.title} · {document.original_filename}", document.id)
-        administered.setDate(QDate.currentDate())
+        if existing:
+            name.setText(existing_values["vaccine_name"])
+            dose.setText(existing_values["dose_reference"] or "")
+            manufacturer.setText(existing_values["manufacturer"] or "")
+            product.setText(existing_values["product_name"] or "")
+            batch.setText(existing_values["batch_number"] or "")
+            center.setText(existing_values["administration_center"] or "")
+            professional.setText(existing_values["administering_professional"] or "")
+            administered.setDate(QDate(
+                existing_values["administered_on"].year,
+                existing_values["administered_on"].month,
+                existing_values["administered_on"].day,
+            ))
+            catalog_item.setCurrentIndex(max(0, catalog_item.findData(existing_values["calendar_item_id"])))
+            source_document.setCurrentIndex(max(0, source_document.findData(existing_values["source_document_id"])))
+        else:
+            administered.setDate(QDate.currentDate())
         form.addRow("Vacuna", name)
         form.addRow("Dosis / referencia", dose)
         form.addRow("Dosis del calendario (opcional)", catalog_item)
@@ -1147,21 +1236,36 @@ class HealthDialog(StaySelectorDialog):
             return
         try:
             with session_scope(self.factory) as session:
-                add_vaccine_record(
-                    session, actor_account_id=self.actor_id, minor_id=self.stay.currentData(),
-                    vaccine_name=name.text().strip(), administered_on=administered.date().toPython(),
-                    dose_reference=dose.text().strip() or None,
-                    calendar_item_id=catalog_item.currentData(),
-                    manufacturer=manufacturer.text(), product_name=product.text(),
-                    batch_number=batch.text(), administration_center=center.text(),
-                    administering_professional=professional.text(),
-                    source_document_id=source_document.currentData(),
-                )
+                if record_id:
+                    update_vaccine_record(
+                        session, actor_account_id=self.actor_id, record_id=record_id,
+                        vaccine_name=name.text().strip(), administered_on=administered.date().toPython(),
+                        dose_reference=dose.text().strip() or None,
+                        calendar_item_id=catalog_item.currentData(),
+                        manufacturer=manufacturer.text(), product_name=product.text(),
+                        batch_number=batch.text(), administration_center=center.text(),
+                        administering_professional=professional.text(),
+                        source_document_id=source_document.currentData(),
+                    )
+                else:
+                    add_vaccine_record(
+                        session, actor_account_id=self.actor_id, minor_id=minor_id,
+                        vaccine_name=name.text().strip(), administered_on=administered.date().toPython(),
+                        dose_reference=dose.text().strip() or None,
+                        calendar_item_id=catalog_item.currentData(),
+                        manufacturer=manufacturer.text(), product_name=product.text(),
+                        batch_number=batch.text(), administration_center=center.text(),
+                        administering_professional=professional.text(),
+                        source_document_id=source_document.currentData(),
+                    )
             self.refresh()
-            QMessageBox.information(self, "Vacunación", "Registro añadido.")
+            QMessageBox.information(
+                self, "Registro actualizado" if record_id else "Vacunación",
+                "Se ha guardado una nueva versión del registro. El historial anterior se conserva."
+                if record_id else "Registro añadido."
+            )
         except (ValueError, PermissionError) as exc:
-            QMessageBox.warning(self, "No se pudo registrar", str(exc))
-
+            QMessageBox.warning(self, "No se pudo guardar", str(exc))
 
     def add_vaccine_review(self):
         minor_id = self.stay.currentData()
