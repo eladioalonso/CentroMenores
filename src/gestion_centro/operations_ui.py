@@ -14,7 +14,7 @@ from gestion_centro.domain.models import Stay
 from gestion_centro.domain.documents import Authorization, Outing, OutingStay
 from gestion_centro.domain.documents_service import (
     record_authorization, set_authorization_status, create_outing, set_outing_status,
-    list_active_stays, list_authorizations, list_valid_authorizations, list_outings,
+    list_document_stays, list_authorizations, list_valid_authorizations, list_outings, update_authorization,
 )
 
 
@@ -38,6 +38,10 @@ class AuthorizationsDialog(QDialog):
             self.kind.addItem(label, value)
         self.scope = QLineEdit()
         self.issuer = QLineEdit()
+        self.conditions = QTextEdit()
+        self.conditions.setMaximumHeight(70)
+        self.editing_authorization_id = None
+        self.editing_document_id = None
         self.start = QDateEdit(QDate.currentDate())
         self.start.setCalendarPopup(True)
         self.end = QDateEdit(QDate.currentDate().addYears(5))
@@ -47,13 +51,14 @@ class AuthorizationsDialog(QDialog):
         form.addRow("Tipo", self.kind)
         form.addRow("Alcance", self.scope)
         form.addRow("Emisor", self.issuer)
+        form.addRow("Condiciones", self.conditions)
         form.addRow("Válida desde", self.start)
         form.addRow("Válida hasta", self.end)
         form.addRow("", self.no_end)
         layout.addLayout(form)
-        save = QPushButton("Registrar autorización")
-        save.clicked.connect(self.save)
-        layout.addWidget(save)
+        self.save_button = QPushButton("Registrar autorización")
+        self.save_button.clicked.connect(self.save)
+        layout.addWidget(self.save_button)
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(["Tipo", "Alcance", "Emisor", "Vigencia", "Estado"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -61,15 +66,18 @@ class AuthorizationsDialog(QDialog):
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.table)
         actions = QHBoxLayout()
+        edit = QPushButton("Editar autorización seleccionada")
+        edit.clicked.connect(self.edit_selected)
         revoke = QPushButton("Revocar con motivo")
         revoke.clicked.connect(self.revoke)
         refresh = QPushButton("Actualizar")
         refresh.clicked.connect(self.refresh)
+        actions.addWidget(edit)
         actions.addWidget(revoke)
         actions.addWidget(refresh)
         layout.addLayout(actions)
         with session_scope(factory) as session:
-            stays = list_active_stays(session, actor_account_id=self.actor_id)
+            stays = list_document_stays(session, actor_account_id=self.actor_id)
             for stay in stays:
                 self.stay.addItem(f"{(stay.minor.nif_nie or stay.minor.passport_number or 'Sin NIF/NIE')} · {stay.minor.given_names} {stay.minor.family_names}", stay.id)
         self.stay.currentIndexChanged.connect(self.refresh)
@@ -94,6 +102,34 @@ class AuthorizationsDialog(QDialog):
                     cell.setData(Qt.ItemDataRole.UserRole, auth_id)
                 self.table.setItem(row, col, cell)
 
+    def edit_selected(self):
+        row = self.table.currentRow()
+        cell = self.table.item(row, 0) if row >= 0 else None
+        if cell is None:
+            QMessageBox.information(self, "Selecciona", "Selecciona una autorización.")
+            return
+        try:
+            with session_scope(self.factory) as session:
+                authorization = session.get(Authorization, cell.data(Qt.ItemDataRole.UserRole))
+                if authorization is None:
+                    raise ValueError("La autorización ya no existe.")
+                self.editing_authorization_id = authorization.id
+                self.editing_document_id = authorization.document_id
+                self.stay.setCurrentIndex(max(0, self.stay.findData(authorization.stay_id)))
+                self.kind.setCurrentIndex(max(0, self.kind.findData(authorization.authorization_type)))
+                self.scope.setText(authorization.scope)
+                self.issuer.setText(authorization.issuer)
+                self.conditions.setPlainText(authorization.conditions or "")
+                self.start.setDate(QDate(authorization.valid_from.year, authorization.valid_from.month, authorization.valid_from.day))
+                if authorization.valid_until:
+                    self.end.setDate(QDate(authorization.valid_until.year, authorization.valid_until.month, authorization.valid_until.day))
+                    self.no_end.setChecked(False)
+                else:
+                    self.no_end.setChecked(True)
+                self.save_button.setText("Guardar cambios de autorización")
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se puede editar", str(exc))
+
     def save(self):
         if not self.stay.currentData() or not self.scope.text().strip() or not self.issuer.text().strip():
             QMessageBox.warning(self, "Datos incompletos", "Completa estancia, alcance y emisor.")
@@ -101,14 +137,28 @@ class AuthorizationsDialog(QDialog):
         end = None if self.no_end.isChecked() else self.end.date().toPython()
         try:
             with session_scope(self.factory) as session:
-                record_authorization(
-                    session, actor_account_id=self.actor_id, stay_id=self.stay.currentData(),
-                    authorization_type=self.kind.currentData(), scope=self.scope.text(),
-                    issuer=self.issuer.text(), valid_from=self.start.date().toPython(),
-                    valid_until=end,
-                )
+                if self.editing_authorization_id:
+                    update_authorization(
+                        session, actor_account_id=self.actor_id,
+                        authorization_id=self.editing_authorization_id,
+                        authorization_type=self.kind.currentData(), scope=self.scope.text(),
+                        issuer=self.issuer.text(), valid_from=self.start.date().toPython(),
+                        valid_until=end, conditions=self.conditions.toPlainText(),
+                        document_id=self.editing_document_id,
+                    )
+                else:
+                    record_authorization(
+                        session, actor_account_id=self.actor_id, stay_id=self.stay.currentData(),
+                        authorization_type=self.kind.currentData(), scope=self.scope.text(),
+                        issuer=self.issuer.text(), valid_from=self.start.date().toPython(),
+                        valid_until=end, conditions=self.conditions.toPlainText(),
+                    )
+            self.editing_authorization_id = None
+            self.editing_document_id = None
             self.scope.clear()
             self.issuer.clear()
+            self.conditions.clear()
+            self.save_button.setText("Registrar autorización")
             self.refresh()
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo guardar", str(exc))
