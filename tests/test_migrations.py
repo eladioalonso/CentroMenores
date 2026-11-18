@@ -58,7 +58,7 @@ def test_upgrade_creates_versioned_auth_schema(tmp_path):
         "vaccine_records", "personal_documents", "authorizations", "outings",
         "outing_stays", "outing_authorizations", "vaccine_calendar_editions",
         "vaccine_calendar_items", "vaccine_dose_reviews", "incident_reports",
-        "incident_report_versions", "incident_report_entries",
+        "incident_report_versions", "incident_report_entries", "vaccine_record_versions",
     } <= set(inspector.get_table_names())
     with engine.connect() as connection:
         editions = connection.exec_driver_sql(
