@@ -130,8 +130,10 @@ def test_legacy_incidents_are_migrated_into_diary_with_minor_links(tmp_path):
         ), {"now": now})
         connection.execute(text(
             "INSERT INTO minors (id, internal_code, given_names, family_names, active, "
+            "cip, health_center, physician, nurse, health_card_expires_on, clinical_history, "
             "created_at, updated_at) VALUES ('minor-1', 'legacy-code', 'Caso', 'Histórico', "
-            "1, :now, :now)"
+            "1, 'CIP-LEGACY', 'Centro antiguo', 'Facultativo antiguo', 'Enfermería antigua', "
+            "'2027-01-01', 'Antecedente histórico', :now, :now)"
         ), {"now": now})
         connection.execute(text(
             "INSERT INTO stays (id, minor_id, sequence_number, started_on, status, created_at) "
@@ -167,6 +169,10 @@ def test_legacy_incidents_are_migrated_into_diary_with_minor_links(tmp_path):
             "FROM diary_entry_stay_links WHERE entry_id = ("
             "SELECT id FROM diary_entries WHERE content LIKE '%Hecho histórico%')"
         )).mappings().one()
+        health = connection.execute(text(
+            "SELECT cip, health_center, physician, nurse, health_card_expires_on, clinical_history "
+            "FROM health_profiles WHERE minor_id='minor-1'"
+        )).mappings().one()
     assert entry["shift"] == "unspecified"
     assert entry["category"] == "negative"
     assert "Descripción conservada" in entry["content"]
@@ -176,4 +182,10 @@ def test_legacy_incidents_are_migrated_into_diary_with_minor_links(tmp_path):
         "minor_code_snapshot": "X1234567A",
         "minor_name_snapshot": "Caso Histórico",
     }
+    assert health["cip"] == "CIP-LEGACY"
+    assert health["health_center"] == "Centro antiguo"
+    assert health["physician"] == "Facultativo antiguo"
+    assert health["nurse"] == "Enfermería antigua"
+    assert health["health_card_expires_on"] == "2027-01-01"
+    assert health["clinical_history"] == "Antecedente histórico"
     engine.dispose()
