@@ -1,67 +1,102 @@
 # Revisión de navegación y carga de trabajo cotidiana
 
-**Estado:** propuesta de organización de interfaz aplicada al menú principal; los flujos internos siguen en revisión.
+**Estado:** la navegación principal está organizada en los cuatro módulos aprobados. Esta revisión sirve para comprobar que los flujos internos siguen siendo sencillos y que no reaparecen módulos funcionales paralelos.
 
-## Criterio
+## Criterio de organización
 
-La aplicación debe separar las tareas frecuentes del turno de las funciones de consulta, gestión especializada y administración. Reducir opciones visibles no significa eliminar datos ni controles necesarios.
+La aplicación se utiliza en un único ordenador compartido por educadores de distintos turnos. Debe ser fácil localizar la información, evitar duplicidades y permitir que cualquier educador continúe el trabajo de otro sin depender de la persona que creó el registro.
 
-## Navegación principal
+La navegación funcional tiene exactamente cuatro módulos:
 
-### Día a día
-Accesos prioritarios:
-1. Expedientes y estancias.
-2. Diario e incidencias.
-3. Agenda común y tareas.
-4. Comunicaciones internas.
+1. Expediente principal del menor.
+2. Expediente sanitario del menor.
+3. Parte diario.
+4. Informes de incidencias.
 
-Son los puntos de entrada previsibles para registrar hechos, consultar la situación de los menores y realizar el traspaso entre turnos.
+Inicio es un panel de entrada, no un módulo funcional adicional. Administración es un área técnica reservada al administrador, no un módulo de trabajo para educadores.
 
-### Gestión y consultas
-Funciones disponibles sin ocupar el primer nivel del trabajo diario:
-- Calendario.
-- Documentación personal.
-- Autorizaciones.
-- Salidas.
-- Seguimiento educativo y escolaridad.
-- Ficha sanitaria y medicación.
-- Informes externos.
+## 1. Expediente principal del menor
 
-### Administración
-Pestaña exclusiva del perfil administrador:
-- Administración de cuentas.
-- Copias de seguridad.
-- Mantenimiento y diagnóstico.
-- Estadísticas y memoria.
+Debe ser el punto de referencia para consultar la trayectoria personal y educativa.
 
-## Solapamientos que deben resolverse en siguientes iteraciones
+Contiene o integra:
+- Datos identificativos y personales.
+- Estancias, ingresos, reingresos y bajas.
+- Acontecimientos e historial del menor.
+- Seguimiento educativo, objetivos y escolaridad.
+- Documentación personal y administrativa.
+- Salidas, retornos, autorizaciones, visitas y restricciones.
 
-- **Agenda y calendario:** la agenda debe ser el lugar para crear y actualizar tareas, citas y eventos. El calendario debe ser una vista temporal de esa misma información, no una segunda fuente de datos. Antes de unificar pantallas hay que comprobar que ambas consultan los mismos registros y no mantienen calendarios paralelos.
-- **Expediente y documentación:** la ficha del menor debe ser el punto de acceso contextual a documentos, autorizaciones, salidas, escolaridad, salud e historial. Los módulos especializados pueden seguir existiendo, pero deben abrirse con el menor/estancia ya seleccionados cuando se llegue desde un expediente.
-- **Diario e incidencias:** mantenerlos como acceso cotidiano conjunto, pero distinguir claramente una anotación ordinaria de una incidencia formal. No duplicar un mismo hecho en ambos registros por defecto.
-- **Informes externos y estadísticas:** separar los informes individualizados destinados a organismos externos de las estadísticas internas. Evitar que un mismo dato tenga que registrarse otra vez para generar un informe.
-- **Salidas y autorizaciones:** la autorización debe consultarse desde el flujo de salida. No exigir navegar a otro módulo para comprobar una autorización, sin dejar de registrar la comprobación.
-- **Escolaridad y seguimiento educativo:** mantener un único contexto educativo por estancia y evitar repetir datos escolares básicos en varias pantallas.
+La ficha principal debe facilitar el acceso a los apartados especializados con el menor ya seleccionado. La información sanitaria detallada se mantiene en el expediente sanitario y no se duplica en el principal.
+
+## 2. Expediente sanitario del menor
+
+Debe estar vinculado a la ficha única del menor y permitir consultar la historia sanitaria aunque no exista una estancia activa.
+
+Contiene:
+- Ficha sanitaria y datos de contacto sanitario.
+- Antecedentes, alergias e instrucciones de emergencia.
+- Consultas, urgencias y actuaciones registradas.
+- Medicación, pautas, horarios y administraciones.
+- Vacunas, dosis, justificantes y revisiones profesionales.
+- Historial de cambios.
+
+Todos los educadores activos tienen las mismas capacidades ordinarias de consulta y edición. Las operaciones sanitarias relevantes quedan trazadas. La interfaz debe dejar claro cuándo se está consultando información histórica de un menor sin estancia activa.
+
+Los calendarios vacunales son referencias documentales; no prescriben ni determinan por sí solos dosis pendientes.
+
+## 3. Parte diario
+
+Es la fuente cronológica única de los hechos y de la actividad cotidiana del centro.
+
+Debe facilitar:
+- Consulta por fecha, turno, categoría y menor.
+- Identificación de educadores de mañana, tarde y noche.
+- Registro de altas, bajas, actividades, observaciones y comportamientos.
+- Anotaciones generales o relacionadas con varios menores.
+- Rectificaciones vinculadas a la anotación original.
+- Acceso a agenda y calendario como vistas de planificación relacionadas, sin crear una segunda fuente de datos.
+
+El cierre de un día organiza el registro e impide añadir nuevas anotaciones ordinarias, pero no bloquea la corrección de hechos existentes. Cualquier educador activo puede rectificar anotaciones de otro educador; la aplicación conserva original, versión, autor y motivo.
+
+## 4. Informes de incidencias
+
+Los informes se elaboran a partir de anotaciones ya existentes en el parte diario.
+
+El flujo debe ser:
+1. Buscar por periodo y, cuando proceda, por menor.
+2. Seleccionar expresamente los hechos que se incluirán.
+3. Preparar el borrador cronológico.
+4. Guardar el borrador para continuarlo desde otra sesión de educador.
+5. Revisar y emitir la versión oficial.
+6. Exportar a Word.
+7. Si hay que corregirla, crear una nueva versión rectificada sin sobrescribir la emitida.
+
+Por seguridad, ninguna anotación debe estar seleccionada automáticamente al iniciar un informe. Así se evita incorporar accidentalmente hechos o menores ajenos al documento.
+
+## Administración técnica
+
+Solo el administrador accede a cuentas, configuración, copias de seguridad, restauración, mantenimiento y diagnóstico. Estas funciones no deben convertirse en un quinto módulo de trabajo.
 
 ## Principios para reducir carga de datos
 
 - Capturar cada dato una sola vez y reutilizarlo mediante relaciones.
-- Mostrar primero los datos y acciones relevantes para la tarea actual.
-- No exigir campos que no sean necesarios para guardar el registro; distinguir obligatorios legales/operativos de información complementaria.
-- Usar valores predeterminados seguros y editables, nunca inferir hechos sensibles.
-- Mantener formularios breves por pasos cuando haya tareas complejas.
-- Mostrar campos avanzados solo cuando la elección anterior los haga necesarios.
-- No convertir cada módulo funcional en una pantalla o botón de primer nivel.
-- No eliminar trazabilidad, autoría, fecha/hora, controles de permisos ni validaciones para acortar formularios.
-- Evitar alertas redundantes; agrupar avisos por prioridad y mostrar pendientes accionables.
+- Mostrar primero la información y las acciones relevantes para la tarea actual.
+- No exigir campos complementarios que no sean necesarios para guardar un registro.
+- Usar valores predeterminados seguros y editables; nunca inferir hechos sensibles.
+- Mantener formularios claros y breves, agrupando datos relacionados en pestañas.
+- Evitar botones grandes o repetidos; priorizar textos legibles y acciones claras.
+- Mantener trazabilidad, autoría, fecha/hora, controles de permisos y validaciones.
+- Evitar alertas redundantes y mostrar avisos accionables.
 
-## Pendiente de validar con usuarios del centro
+## Pendiente de validación funcional
 
-Antes de cerrar el diseño de los formularios y panel:
-- Qué cuatro o cinco tareas se realizan realmente en cada turno.
-- Qué datos son obligatorios en cada tipo de anotación/incidencia.
-- Qué información debe verse de inmediato al abrir un expediente.
-- Qué campos se repiten entre diario, incidencias, comunicaciones y seguimiento educativo.
-- Qué informes se utilizan de verdad y con qué periodicidad.
+La prueba en el equipo de trabajo debe confirmar:
+- Que las tareas habituales se pueden realizar en pocos pasos.
+- Que la tipografía se lee cómodamente en el monitor de oficina.
+- Que los expedientes se entienden sin formación informática avanzada.
+- Que los educadores pueden corregir registros compartidos sin sobrescribir versiones.
+- Que la búsqueda de hechos para informes no facilita incluir datos ajenos por error.
+- Que la navegación no presenta opciones duplicadas ni módulos heredados.
 
-La navegación agrupada ya está implementada en el menú principal. La consolidación de datos y pantallas descrita en los solapamientos requiere revisar los servicios y modelos antes de modificar la estructura persistente.
+La revisión funcional debe realizarse con datos ficticios. La aprobación de uso con datos reales requiere, además, las validaciones institucionales y de protección de datos descritas en la documentación de seguridad.
