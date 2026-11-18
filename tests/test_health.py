@@ -394,3 +394,33 @@ def test_health_profile_contains_sanitary_identity_fields_and_versions_them(heal
  assert versions[0].old_values["cip"]=="CIP-123"
  assert versions[0].new_values["cip"]=="CIP-456"
  assert versions[0].new_values["clinical_history"]=="Historial actualizado"
+
+
+
+def test_any_educator_can_rectify_medication_administration_with_history(health_case):
+ s,actor,stay=health_case
+ plan=add_medication_plan(s,actor_account_id=actor,stay_id=stay,
+  medication_name="Tratamiento",prescribed_dose="1 unidad",schedule_text="Diaria",
+  prescriber_reference="Prescripción",starts_on=date(2026,1,1),
+  schedules=[("08:00","morning")])
+ record=record_medication_administration(s,actor_account_id=actor,plan_id=plan.id,
+  scheduled_at=datetime(2026,1,2,8,tzinfo=timezone.utc),status="administered",shift="morning")
+ professional=Professional(display_name="Segundo educador")
+ s.add(professional); s.flush()
+ other=UserAccount(professional_id=professional.id,username="administration-editor",
+  password_hash="x",role="educator",health_access=False)
+ s.add(other); s.flush()
+ from gestion_centro.domain.health_service import (
+  update_medication_administration, list_medication_administration_versions,
+ )
+ updated=update_medication_administration(s,actor_account_id=other.id,
+  administration_id=record.id,scheduled_at=record.scheduled_at,
+  status="refused",shift="morning",note="Rectificación ficticia")
+ assert updated.status=="refused"
+ assert updated.note=="Rectificación ficticia"
+ versions=list_medication_administration_versions(
+  s,actor_account_id=actor,administration_id=record.id)
+ assert len(versions)==1
+ assert versions[0].changed_by_name_snapshot=="Segundo educador"
+ assert versions[0].old_values["status"]=="administered"
+ assert versions[0].new_values["status"]=="refused"
