@@ -18,12 +18,12 @@ def _actor(session: Session, account_id: str) -> UserAccount:
 def _audit(session: Session, actor: UserAccount, event: str, details: str):
     session.add(AccessAudit(account_id=actor.id,username_snapshot=actor.username,event=event,details=details))
 
-def _next_health_profile_timestamp(session: Session, minor_id: str) -> datetime:
-    """Garantiza orden temporal estricto entre versiones del mismo perfil."""
+def _next_version_timestamp(session: Session, version_model, owner_column, owner_id: str) -> datetime:
+    """Garantiza orden temporal estricto entre versiones del mismo registro."""
     previous = session.scalar(
-        select(HealthProfileVersion.changed_at)
-        .where(HealthProfileVersion.minor_id == minor_id)
-        .order_by(HealthProfileVersion.changed_at.desc())
+        select(version_model.changed_at)
+        .where(owner_column == owner_id)
+        .order_by(version_model.changed_at.desc())
         .limit(1)
     )
     now = datetime.now(timezone.utc)
@@ -97,7 +97,7 @@ def save_health_profile(session: Session, *, actor_account_id: str, allergies: s
         "clinical_history": (clinical_history or "").strip() or None,
     }
     if old_values != new_values:
-        changed_at = _next_health_profile_timestamp(session, minor.id)
+        changed_at = _next_version_timestamp(session, HealthProfileVersion, HealthProfileVersion.minor_id, minor.id)
         if profile is None:
             profile = HealthProfile(
                 minor_id=minor.id,
@@ -173,7 +173,7 @@ def _record_medication_plan_version(session: Session, plan: MedicationPlan, acto
         plan_id=plan.id, minor_id=plan.minor_id,
         changed_by_account_id=actor.id,
         changed_by_name_snapshot=actor.professional.display_name,
-        changed_at=datetime.now(timezone.utc),
+        changed_at=_next_version_timestamp(session, MedicationPlanVersion, MedicationPlanVersion.plan_id, plan.id),
         old_values=old_values, new_values=new_values,
     ))
 
@@ -413,7 +413,7 @@ def update_medication_administration(session: Session, *, actor_account_id: str,
     session.add(MedicationAdministrationVersion(
         administration_id=record.id, changed_by_account_id=actor.id,
         changed_by_name_snapshot=actor.professional.display_name,
-        changed_at=datetime.now(timezone.utc), old_values=old_values,
+        changed_at=_next_version_timestamp(session, MedicationAdministrationVersion, MedicationAdministrationVersion.administration_id, administration.id), old_values=old_values,
         new_values=new_values,
     ))
     _audit(session, actor, "medication_administration_updated",
@@ -545,7 +545,7 @@ def update_vaccine_record(session: Session, *, actor_account_id: str,
     session.add(VaccineRecordVersion(
         vaccine_record_id=record.id, changed_by_account_id=actor.id,
         changed_by_name_snapshot=actor.professional.display_name,
-        changed_at=datetime.now(timezone.utc), old_values=old_values,
+        changed_at=_next_version_timestamp(session, VaccineRecordVersion, VaccineRecordVersion.vaccine_record_id, record.id), old_values=old_values,
         new_values=new_values,
     ))
     _audit(session, actor, "vaccine_record_updated",
