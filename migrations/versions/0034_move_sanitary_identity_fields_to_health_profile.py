@@ -98,13 +98,13 @@ def upgrade():
             "cip": values["cip"], "health_center": values["health_center"],
             "physician": values["physician"], "nurse": values["nurse"],
             "health_card_expires_on": (
-                values["health_card_expires_on"].isoformat()
+                str(values["health_card_expires_on"])
                 if values["health_card_expires_on"] else None
             ),
             "clinical_history": values["clinical_history"],
         }
         old_values["health_card_expires_on"] = (
-            old_values["health_card_expires_on"].isoformat()
+            str(old_values["health_card_expires_on"])
             if old_values["health_card_expires_on"] else None
         )
         connection.execute(sa.text("""
