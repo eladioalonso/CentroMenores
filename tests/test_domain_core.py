@@ -333,3 +333,55 @@ def test_vaccine_agenda_items_are_visible_to_all_educators():
             title="Segunda cita ficticia", starts_at=starts)
         assert another is not None
 
+
+
+
+def test_incident_report_drafts_issue_and_rectification_are_versioned_and_shared():
+    from gestion_centro.domain.incident_reports import IncidentReportVersion
+    from gestion_centro.domain.incident_reports_service import (
+        get_incident_report, list_incident_reports, save_incident_report,
+    )
+    from gestion_centro.domain.service import record_diary_entry
+    with make_session() as session:
+        author = create_professional_account(session, display_name="Autora",
+            username="incident-report-author", password="contraseña de prueba segura",
+            role=Role.EDUCATOR)
+        editor = create_professional_account(session, display_name="Segundo educador",
+            username="incident-report-editor", password="contraseña de prueba segura",
+            role=Role.EDUCATOR)
+        moment = datetime(2026, 6, 1, 10, tzinfo=timezone.utc)
+        entry = record_diary_entry(session, actor_account_id=author.id,
+            diary_date=date(2026, 6, 1), shift="morning", category="negative",
+            content="Hecho ficticio de prueba", happened_at=moment, now=moment)
+        draft = save_incident_report(session, actor_account_id=author.id,
+            title="Informe de prueba", recipient="Organismo de prueba",
+            content="Versión inicial", entry_ids=[entry.id])
+        draft_id = draft.id
+        assert draft.status == "draft"
+        save_incident_report(session, actor_account_id=editor.id,
+            title="Informe revisado", recipient="Organismo de prueba",
+            content="Versión definitiva", entry_ids=[entry.id], report_id=draft_id,
+            issue=True)
+        report = get_incident_report(session, actor_account_id=author.id, report_id=draft_id)
+        assert report.status == "issued"
+        assert [version.version_number for version in report.versions] == [1, 2]
+        assert report.versions[0].content == "Versión inicial"
+        assert report.versions[1].content == "Versión definitiva"
+        assert report.versions[1].created_by_name_snapshot == "Segundo educador"
+        assert [link.entry_id for link in report.versions[1].entries] == [entry.id]
+        with pytest.raises(ValueError, match="no se modifica"):
+            save_incident_report(session, actor_account_id=author.id,
+                title="Cambio indebido", recipient=None, content="No debe sustituir",
+                entry_ids=[entry.id], report_id=draft_id)
+        save_incident_report(session, actor_account_id=author.id,
+            title="Informe rectificado", recipient="Organismo de prueba",
+            content="Versión rectificada", entry_ids=[entry.id], report_id=draft_id,
+            issue=True)
+        report = get_incident_report(session, actor_account_id=author.id, report_id=draft_id)
+        assert report.status == "rectified"
+        assert [version.status for version in report.versions] == [
+            "draft", "issued", "rectified"
+        ]
+        assert report.versions[1].content == "Versión definitiva"
+        assert report.versions[2].content == "Versión rectificada"
+        assert len(list_incident_reports(session, actor_account_id=editor.id)) == 1
