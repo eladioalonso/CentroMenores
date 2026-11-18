@@ -14,16 +14,15 @@ from gestion_centro.domain.models import Minor, Stay, Event, EventStayLink, Mino
 from gestion_centro.domain.documents_service import list_documents
 from gestion_centro.domain.service import (
     create_minor, open_stay, close_stay, record_event, update_stay, revise_event,
-    has_health_access, HEALTH_PERSONAL_FIELDS,
+    HEALTH_PERSONAL_FIELDS,
 )
 
 
 class NewMinorDialog(QDialog):
     """Alta completa del expediente. Los campos complementarios son opcionales."""
 
-    def __init__(self, parent=None, *, health_access=False):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.health_access = health_access
         self.setWindowTitle("Nuevo expediente")
         self.resize(620, 720)
         root = QVBoxLayout(self)
@@ -96,8 +95,6 @@ class MinorWorkspaceDialog(QDialog):
         super().__init__(parent)
         self.factory, self.actor_id, self.minor_id = factory, actor_id, minor_id
         self.documents_opener = documents_opener
-        with session_scope(factory) as session:
-            self.health_access = has_health_access(session, actor_account_id=actor_id)
         self.resize(980, 680)
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
@@ -153,9 +150,6 @@ class MinorWorkspaceDialog(QDialog):
             button = QPushButton(label)
             button.setMinimumHeight(34)
             button.clicked.connect(callback)
-            if label == 'Ficha sanitaria y medicación':
-                button.setEnabled(self.health_access)
-                button.setToolTip("" if self.health_access else "Tu cuenta no tiene autorización sanitaria.")
             actions.addWidget(button, index // 4, index % 4)
         layout.addLayout(actions)
         self.refresh()
@@ -555,8 +549,6 @@ class ExpedientesDialog(QDialog):
         super().__init__()
         self.factory, self.actor_id = factory, actor_id
         self.documents_opener = documents_opener
-        with session_scope(factory) as session:
-            self.health_access = has_health_access(session, actor_account_id=actor_id)
         self.setWindowTitle("Expedientes y estancias")
         self.resize(980, 620)
         layout = QVBoxLayout(self)
@@ -664,7 +656,7 @@ class ExpedientesDialog(QDialog):
         return item.data(Qt.ItemDataRole.UserRole) if item else (None, None)
 
     def new_minor(self):
-        dialog = NewMinorDialog(self, health_access=self.health_access)
+        dialog = NewMinorDialog(self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         values = dialog.values()
