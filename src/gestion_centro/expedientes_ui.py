@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt, QDate, QDateTime
 from PySide6.QtWidgets import (
     QDialog, QDialogButtonBox, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QInputDialog,
-    QLabel, QDateEdit, QTabWidget, QWidget, QTextEdit, QScrollArea, QComboBox, QDateTimeEdit, QDialogButtonBox, QCheckBox,
+    QLabel, QDateEdit, QTabWidget, QWidget, QTextEdit, QScrollArea, QComboBox, QDateTimeEdit, QDialogButtonBox, QCheckBox, QGridLayout,
 )
 from sqlalchemy import select
 
@@ -98,7 +98,7 @@ class MinorWorkspaceDialog(QDialog):
         self.documents_opener = documents_opener
         with session_scope(factory) as session:
             self.health_access = has_health_access(session, actor_account_id=actor_id)
-        self.resize(850, 600)
+        self.resize(980, 680)
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
@@ -133,28 +133,30 @@ class MinorWorkspaceDialog(QDialog):
         documents_layout.addWidget(documents_button)
         documents_layout.addStretch(1)
         self.tabs.addTab(documents_tab, 'Documentación')
-        actions = QHBoxLayout()
-        for label, callback in [('Nuevo ingreso / reingreso', self.new_stay), ('Cerrar estancia', self.close_stay), ('Modificar estancia', self.edit_stay), ('Registrar acontecimiento', self.add_event), ('Rectificar acontecimiento', self.edit_event), ('Historial acontecimiento', self.show_event_history), ('Historial completo', lambda: self.tabs.setCurrentWidget(self.events))]:
+        actions = QGridLayout()
+        actions.setHorizontalSpacing(8)
+        actions.setVerticalSpacing(6)
+        action_items = [
+            ('Nuevo ingreso / reingreso', self.new_stay),
+            ('Cerrar estancia', self.close_stay),
+            ('Modificar estancia', self.edit_stay),
+            ('Modificar datos', self.edit_personal),
+            ('Registrar acontecimiento', self.add_event),
+            ('Rectificar acontecimiento', self.edit_event),
+            ('Historial acontecimiento', self.show_event_history),
+            ('Historial de modificaciones', self.show_personal_history),
+            ('Ficha sanitaria y medicación', self.open_health),
+            ('Seguimiento educativo', self.open_education),
+            ('Cerrar expediente', self.accept),
+        ]
+        for index, (label, callback) in enumerate(action_items):
             button = QPushButton(label)
+            button.setMinimumHeight(34)
             button.clicked.connect(callback)
-            actions.addWidget(button)
-        edit = QPushButton('Modificar datos')
-        edit.clicked.connect(self.edit_personal)
-        actions.addWidget(edit)
-        history = QPushButton('Historial de modificaciones')
-        history.clicked.connect(self.show_personal_history)
-        actions.addWidget(history)
-        health = QPushButton('Ficha sanitaria y medicación')
-        health.clicked.connect(self.open_health)
-        health.setEnabled(self.health_access)
-        health.setToolTip("" if self.health_access else "Tu cuenta no tiene autorización sanitaria.")
-        actions.addWidget(health)
-        education = QPushButton('Seguimiento educativo')
-        education.clicked.connect(self.open_education)
-        actions.addWidget(education)
-        close = QPushButton('Cerrar')
-        close.clicked.connect(self.accept)
-        actions.addWidget(close)
+            if label == 'Ficha sanitaria y medicación':
+                button.setEnabled(self.health_access)
+                button.setToolTip("" if self.health_access else "Tu cuenta no tiene autorización sanitaria.")
+            actions.addWidget(button, index // 4, index % 4)
         layout.addLayout(actions)
         self.refresh()
 
