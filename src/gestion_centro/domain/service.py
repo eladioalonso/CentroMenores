@@ -312,6 +312,7 @@ def record_diary_entry(
 def revise_diary_entry(
     session: Session, *, actor_account_id: str, original_entry_id: str, content: str,
     reason: str | None = None, happened_at: datetime | None = None,
+    shift: str | None = None, category: str | None = None,
     now: datetime | None = None,
 ):
     """Crea una nueva versión de cualquier anotación, incluso de otro educador o de un día cerrado.
@@ -329,9 +330,13 @@ def revise_diary_entry(
         raise ValueError("El contenido de la anotación es obligatorio")
     if reason is not None and not reason.strip():
         raise ValueError("El motivo de la modificación no puede estar vacío")
+    new_shift = shift or original.shift
+    new_category = category or original.category
+    if new_shift not in VALID_SHIFTS or new_category not in VALID_CATEGORIES:
+        raise ValueError("Turno o categoría no válidos")
     revised = DiaryEntry(
-        diary_day_id=original.diary_day_id, shift=original.shift,
-        category=original.category, content=content.strip(),
+        diary_day_id=original.diary_day_id, shift=new_shift,
+        category=new_category, content=content.strip(),
         happened_at=happened_at or original.happened_at, author_account_id=actor.id,
         author_name_snapshot=actor.professional.display_name,
         correction_of_id=original.id,
@@ -350,7 +355,8 @@ def revise_diary_entry(
     detail = (
         f"Versión anterior: {original.id}; nueva versión: {revised.id}; "
         f"autor original: {original.author_name_snapshot}; "
-        f"modificado por: {actor.professional.display_name}"
+        f"modificado por: {actor.professional.display_name}; "
+        f"categoría: {original.category}->{new_category}; turno: {original.shift}->{new_shift}"
     )
     if reason:
         detail += f"; motivo: {reason.strip()}"
