@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from gestion_centro.auth.models import AccessAudit, UserAccount
 from gestion_centro.domain.models import Minor, Stay
-from gestion_centro.domain.health import HealthProfile, HealthProfileVersion, MedicationPlan, MedicationPlanVersion, MedicationSchedule, MedicationAdministration, VaccineRecord
+from gestion_centro.domain.health import HealthProfile, HealthProfileVersion, MedicationPlan, MedicationPlanVersion, MedicationSchedule, MedicationAdministration, VaccineRecord, VaccineRecordVersion
 
 MEDICATION_RESULTS={"administered","refused","not_available"}
 
@@ -364,6 +364,92 @@ def add_vaccine_record(session: Session, *, actor_account_id: str, vaccine_name:
     session.add(record); session.flush()
     _audit(session,actor,"vaccine_recorded",f"{minor.id}:{record.id}")
     return record
+
+def update_vaccine_record(session: Session, *, actor_account_id: str,
+                        record_id: str, vaccine_name: str, administered_on: date,
+                        dose_reference: str | None = None, calendar_item_id: str | None = None,
+                        manufacturer: str | None = None, product_name: str | None = None,
+                        batch_number: str | None = None, administration_center: str | None = None,
+                        administering_professional: str | None = None,
+                        source_document_id: str | None = None):
+    """Rectifica un registro vacunal conservando instantánea anterior y nueva."""
+    from gestion_centro.domain.health import VaccineCalendarItem
+    from gestion_centro.domain.documents import PersonalDocument
+    actor = _actor(session, actor_account_id)
+    record = session.get(VaccineRecord, record_id)
+    if record is None:
+        raise ValueError("El registro vacunal no existe")
+    if not vaccine_name.strip():
+        raise ValueError("La vacuna es obligatoria")
+    if administered_on > date.today():
+        raise ValueError("La fecha de administración no puede ser futura")
+    if dose_reference and len(dose_reference) > 80:
+        raise ValueError("La referencia de dosis supera la longitud permitida")
+    if calendar_item_id:
+        item = session.get(VaccineCalendarItem, calendar_item_id)
+        if item is None or item.entry_kind != "dose":
+            raise ValueError("La referencia del calendario no es una dosis individual válida")
+    metadata = {
+        "manufacturer": (manufacturer or "").strip() or None,
+        "product_name": (product_name or "").strip() or None,
+        "batch_number": (batch_number or "").strip() or None,
+        "administration_center": (administration_center or "").strip() or None,
+        "administering_professional": (administering_professional or "").strip() or None,
+    }
+    limits = {"manufacturer": 160, "product_name": 180, "batch_number": 100,
+              "administration_center": 180, "administering_professional": 160}
+    if any(metadata[key] is not None and len(metadata[key]) > limit for key, limit in limits.items()):
+        raise ValueError("Uno de los datos de trazabilidad supera la longitud permitida")
+    if source_document_id:
+        document = session.get(PersonalDocument, source_document_id)
+        document_stay = session.get(Stay, document.stay_id) if document else None
+        if (document is None or document.category != "health" or document_stay is None
+                or document_stay.minor_id != record.minor_id):
+            raise ValueError("El justificante debe ser un documento sanitario del expediente")
+    fields = {
+        "vaccine_name": vaccine_name.strip(),
+        "administered_on": administered_on,
+        "dose_reference": dose_reference.strip() if dose_reference else None,
+        "calendar_item_id": calendar_item_id,
+        "source_document_id": source_document_id,
+        **metadata,
+    }
+    old_values = {
+        key: (getattr(record, key).isoformat() if isinstance(getattr(record, key), date)
+              else getattr(record, key))
+        for key in fields
+    }
+    new_values = {
+        key: (value.isoformat() if isinstance(value, date) else value)
+        for key, value in fields.items()
+    }
+    changed = {key: value for key, value in fields.items() if getattr(record, key) != value}
+    if not changed:
+        return record
+    for key, value in changed.items():
+        setattr(record, key, value)
+    session.flush()
+    session.add(VaccineRecordVersion(
+        vaccine_record_id=record.id, changed_by_account_id=actor.id,
+        changed_by_name_snapshot=actor.professional.display_name,
+        changed_at=datetime.now(timezone.utc), old_values=old_values,
+        new_values=new_values,
+    ))
+    _audit(session, actor, "vaccine_record_updated",
+           f"{record.minor_id}:{record.id}; modificado por:{actor.professional.display_name}")
+    return record
+
+
+def list_vaccine_record_versions(session: Session, *, actor_account_id: str, record_id: str):
+    actor = _actor(session, actor_account_id)
+    record = session.get(VaccineRecord, record_id)
+    if record is None:
+        raise ValueError("El registro vacunal no existe")
+    _audit(session, actor, "vaccine_record_history_accessed", record.id)
+    return session.scalars(select(VaccineRecordVersion).where(
+        VaccineRecordVersion.vaccine_record_id == record.id
+    ).order_by(VaccineRecordVersion.changed_at.desc(), VaccineRecordVersion.id.desc())).all()
+
 
 def list_medication_plans(session: Session, *, actor_account_id: str,
                           minor_id: str | None = None, stay_id: str | None = None):
