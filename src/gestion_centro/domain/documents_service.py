@@ -77,6 +77,44 @@ def register_document(session: Session, *, actor_account_id: str, stay_id: str, 
     return doc
 
 
+def update_document_metadata(session: Session, *, actor_account_id: str,
+                            document_id: str, category: str, title: str,
+                            document_date: date | None, expires_on: date | None,
+                            notes: str | None):
+    """Permite a cualquier educador corregir metadatos sin alterar el archivo original."""
+    actor = _actor(session, actor_account_id)
+    document = session.get(PersonalDocument, document_id)
+    if document is None:
+        raise ValueError("El documento no existe")
+    if category not in DOCUMENT_CATEGORIES or not title.strip():
+        raise ValueError("Categoría y título son obligatorios")
+    if expires_on and document_date and expires_on < document_date:
+        raise ValueError("La caducidad no puede preceder a la fecha del documento")
+    old_values = {
+        "category": document.category, "title": document.title,
+        "document_date": document.document_date.isoformat() if document.document_date else None,
+        "expires_on": document.expires_on.isoformat() if document.expires_on else None,
+        "notes": document.notes,
+    }
+    new_values = {
+        "category": category, "title": title.strip(),
+        "document_date": document_date.isoformat() if document_date else None,
+        "expires_on": expires_on.isoformat() if expires_on else None,
+        "notes": notes.strip() if notes else None,
+    }
+    if old_values == new_values:
+        return document
+    document.category = category
+    document.title = title.strip()
+    document.document_date = document_date
+    document.expires_on = expires_on
+    document.notes = notes.strip() if notes else None
+    _audit(session, actor, "personal_document_metadata_updated",
+           f"{document.id}; anterior:{old_values}; nuevo:{new_values}; "
+           f"modificado por:{actor.professional.display_name}")
+    return document
+
+
 def list_documents(session: Session, *, actor_account_id: str, stay_id: str):
     actor = _actor(session, actor_account_id)
     if session.get(Stay, stay_id) is None:
