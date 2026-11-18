@@ -326,6 +326,10 @@ def revise_diary_entry(
     original = session.get(DiaryEntry, original_entry_id)
     if original is None:
         raise ValueError("La anotación original no existe")
+    if session.scalar(select(DiaryEntry.id).where(
+        DiaryEntry.correction_of_id == original.id
+    )) is not None:
+        raise ValueError("La anotación ya tiene una versión posterior; selecciona la última versión")
     if not content.strip():
         raise ValueError("El contenido de la anotación es obligatorio")
     if reason is not None and not reason.strip():
