@@ -1,0 +1,375 @@
+"""Pruebas de humo de la navegación principal de escritorio."""
+
+from PySide6.QtWidgets import QApplication, QPushButton, QTabWidget
+from PySide6.QtCore import Qt
+
+from gestion_centro.app import MainWindow, CredentialsDialog
+from gestion_centro.expedientes_ui import MinorWorkspaceDialog
+from datetime import date, datetime, timedelta, timezone
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from PySide6.QtWidgets import QFrame, QLabel
+from gestion_centro.persistence.base import Base
+from gestion_centro.auth.models import Professional, UserAccount
+from gestion_centro.domain.models import Minor, Stay
+from gestion_centro.domain.documents import Outing, OutingStay
+from gestion_centro.auth.service import Role, create_professional_account
+from gestion_centro.domain.service import create_minor, open_stay
+
+
+# Mantener viva la envoltura Python de QApplication durante toda la suite.
+# Si solo se conserva la instancia C++ de Qt, su destrucción al finalizar
+# puede provocar una salida anómala del intérprete en Windows.
+_APP: QApplication | None = None
+
+
+def _application() -> QApplication:
+    global _APP
+    if _APP is None:
+        _APP = QApplication.instance() or QApplication([])
+    return _APP
+
+
+def _window(role: Role) -> MainWindow:
+    _application()
+    # Los objetos de infraestructura no se usan hasta que se abre cada diálogo.
+    return MainWindow(
+        "Profesional de prueba",
+        role,
+        factory=object(),
+        account_id="account-test",
+        paths=object(),
+    )
+
+
+def _button_labels(window: MainWindow) -> set[str]:
+    return {button.text() for button in window.findChildren(QPushButton)}
+
+
+def test_educator_sees_all_ordinary_modules():
+    window = _window(Role.EDUCATOR)
+    try:
+        labels = _button_labels(window)
+        expected = {
+            "Inicio", "Parte diario", "Expediente principal", "Expediente sanitario",
+            "Informes de incidencias", "Expedientes de menores",
+            "Seguimiento educativo y escolar", "Documentación del menor",
+            "Salidas y retornos", "Autorizaciones y visitas",
+            "Abrir expediente sanitario", "Crear informe desde el parte diario",
+            "Agenda y tareas del equipo", "Calendario de actividades y citas",
+        }
+        assert expected <= labels
+        assert "Administración" not in labels
+        assert "Administrar cuentas" not in labels
+        assert "Copias de seguridad" not in labels
+    finally:
+        window.close()
+
+def test_administrator_sees_ordinary_and_administration_modules():
+    window = _window(Role.ADMIN)
+    try:
+        labels = _button_labels(window)
+        expected = {
+            "Inicio", "Parte diario", "Expediente principal", "Expediente sanitario",
+            "Informes de incidencias", "Administración", "Expedientes de menores",
+            "Seguimiento educativo y escolar", "Documentación del menor",
+            "Salidas y retornos", "Autorizaciones y visitas",
+            "Abrir expediente sanitario", "Crear informe desde el parte diario",
+            "Agenda y tareas del equipo", "Calendario de actividades y citas",
+            "Administrar cuentas", "Copias de seguridad",
+            "Mantenimiento y diagnóstico", "Estadísticas y memoria",
+        }
+        assert expected <= labels
+    finally:
+        window.close()
+
+def test_navigation_is_grouped_by_daily_work_and_secondary_functions():
+    window = _window(Role.EDUCATOR)
+    try:
+        tabs = window.findChild(QTabWidget)
+        assert tabs is not None
+        assert [tabs.tabText(i) for i in range(tabs.count())] == [
+            "Inicio", "Parte diario", "Expediente principal",
+            "Expediente sanitario", "Informes de incidencias"
+        ]
+        nav = [button.text() for button in window.findChildren(QPushButton, "navigationButton")]
+        assert nav == [
+            "Inicio", "Parte diario", "Expediente principal",
+            "Expediente sanitario", "Informes de incidencias"
+        ]
+        assert not tabs.tabBar().isVisible()
+    finally:
+        window.close()
+
+def test_administration_is_separate_tab_only_for_admin():
+    educator = _window(Role.EDUCATOR)
+    admin = _window(Role.ADMIN)
+    try:
+        assert educator.findChild(QTabWidget).count() == 5
+        assert admin.findChild(QTabWidget).count() == 6
+        assert admin.findChild(QTabWidget).tabText(5) == "Administración"
+        assert len(admin.findChild(QTabWidget).widget(5).findChildren(QPushButton)) == 4
+    finally:
+        educator.close()
+        admin.close()
+
+def test_first_admin_setup_ignores_preseeded_demo_accounts():
+    _application()
+    dialog = CredentialsDialog(
+        first_admin=True,
+        available_accounts=[("educador", "educador")],
+    )
+    try:
+        dialog.show()
+        assert dialog.account_selector.count() == 0
+        assert not dialog.username.isReadOnly()
+        assert dialog.name.isVisible()
+    finally:
+        dialog.close()
+
+
+def test_login_account_selector_fills_username_and_requires_password():
+    app = _application()
+    dialog = CredentialsDialog(
+        available_accounts=[("Ana Educadora", "ana"), ("Luis Educador", "luis")]
+    )
+    try:
+        assert dialog.account_selector.count() == 2
+        assert dialog.username.text() == "ana"
+        assert dialog.username.isReadOnly()
+        dialog.account_selector.setCurrentIndex(1)
+        assert dialog.username.text() == "luis"
+        assert dialog.password.text() == ""
+    finally:
+        dialog.close()
+
+
+def test_main_window_exposes_logout_action():
+    window = _window(Role.EDUCATOR)
+    try:
+        logout = next(button for button in window.findChildren(QPushButton)
+                      if button.text() == "Cerrar sesión")
+        logout.click()
+        assert window.logout_requested is True
+    finally:
+        window.close()
+
+
+def test_resident_workspace_includes_documents_tab_and_opener():
+    _application()
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory() as session:
+        actor = create_professional_account(
+            session, display_name="Educador ficticio", username="workspace-test",
+            password="contraseña de prueba segura", role=Role.EDUCATOR,
+        )
+        minor = create_minor(
+            session, actor_account_id=actor.id, given_names="Caso", family_names="Ficticio",
+        )
+        open_stay(session, actor_account_id=actor.id, minor_id=minor.id, started_on=date.today())
+        actor_id, minor_id = actor.id, minor.id
+        session.commit()
+
+    opened = []
+    dialog = MinorWorkspaceDialog(
+        factory, actor_id, minor_id, documents_opener=lambda selected: opened.append(selected),
+    )
+    try:
+        labels = [dialog.tabs.tabText(i) for i in range(dialog.tabs.count())]
+        assert "Documentación" in labels
+        assert dialog.documents_table.columnCount() == 5
+        health_button = next(
+            button for button in dialog.findChildren(QPushButton)
+            if button.text() == "Ficha sanitaria y medicación"
+        )
+        assert health_button.isEnabled()
+        dialog.open_documents()
+        assert opened == [minor_id]
+    finally:
+        dialog.close()
+        engine.dispose()
+
+
+def test_dashboard_counts_residents_outside_and_overdue_returns():
+    _application()
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    now = datetime.now(timezone.utc)
+    with factory() as session:
+        professional = Professional(display_name="Educador ficticio")
+        session.add(professional)
+        session.flush()
+        account = UserAccount(
+            professional_id=professional.id, username="dashboard-test",
+            password_hash="hash-ficticio", role="educator",
+        )
+        session.add(account)
+        session.flush()
+        stays = []
+        for index in range(2):
+            minor = Minor(
+                given_names=f"Caso {index}", family_names="Ficticio",
+            )
+            session.add(minor)
+            session.flush()
+            stay = Stay(
+                minor_id=minor.id, sequence_number=1,
+                started_on=date.today(), status="active",
+            )
+            session.add(stay)
+            session.flush()
+            stays.append(stay)
+        outing = Outing(
+            kind="family", destination="Destino ficticio", purpose="Prueba",
+            planned_departure=now - timedelta(hours=2),
+            planned_return=now - timedelta(hours=1),
+            actual_departure=now - timedelta(hours=2),
+            responsible_account_id=account.id, status="in_progress",
+            restrictions_checked=True, created_by_account_id=account.id,
+            created_by_name_snapshot="Educador ficticio",
+        )
+        session.add(outing)
+        session.flush()
+        session.add(OutingStay(outing_id=outing.id, stay_id=stays[0].id))
+        session.flush()
+        account_id = account.id
+        session.commit()
+
+    window = MainWindow(
+        "Educador ficticio", Role.EDUCATOR,
+        factory=factory, account_id=account_id, paths=object(),
+    )
+    try:
+        cards = {}
+        for frame in window.findChildren(QFrame):
+            if frame.objectName() != "dashboardCard":
+                continue
+            title = frame.findChild(QLabel, "dashboardCardTitle")
+            value = frame.findChild(QLabel, "dashboardCardValue")
+            if title is not None and value is not None:
+                cards[title.text()] = value.text()
+        assert cards["Menores presentes"] == "1"
+        assert cards["Menores fuera del centro"] == "1"
+        assert cards["Retornos atrasados"] == "1"
+    finally:
+        window.close()
+        engine.dispose()
+
+
+
+def test_incident_report_builder_uses_selected_diary_entries(monkeypatch):
+    _application()
+    from gestion_centro.incident_reports_ui import IncidentReportsDialog
+    from gestion_centro.domain.service import record_diary_entry
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory() as session:
+        actor = create_professional_account(
+            session, display_name="Educadora de prueba", username="report-builder",
+            password="contraseña de prueba segura", role=Role.EDUCATOR,
+        )
+        minor = create_minor(
+            session, actor_account_id=actor.id,
+            given_names="Caso", family_names="Informe ficticio",
+        )
+        stay = open_stay(
+            session, actor_account_id=actor.id, minor_id=minor.id,
+            started_on=date.today(),
+        )
+        entry = record_diary_entry(
+            session, actor_account_id=actor.id, diary_date=date.today(),
+            shift="morning", category="negative",
+            content="Hecho ficticio registrado en el parte diario",
+            happened_at=datetime.now(timezone.utc), stay_ids=[stay.id],
+        )
+        from gestion_centro.domain.incident_reports_service import save_incident_report
+        draft_report = save_incident_report(
+            session, actor_account_id=actor.id, title="Borrador de prueba",
+            recipient=None, content="Contenido ficticio guardado",
+            entry_ids=[entry.id],
+        )
+        issued_report = save_incident_report(
+            session, actor_account_id=actor.id, title="Informe emitido de prueba",
+            recipient=None, content="Contenido oficial ficticio",
+            entry_ids=[entry.id], issue=True,
+        )
+        draft_report_id, issued_report_id = draft_report.id, issued_report.id
+        actor_id = actor.id
+        session.commit()
+
+    dialog = IncidentReportsDialog(factory, actor_id)
+    try:
+        assert dialog.table.rowCount() == 1
+        assert dialog.saved_reports.count() == 3
+        checkbox = dialog.table.item(0, 0)
+        assert checkbox.checkState() == Qt.CheckState.Unchecked
+        dialog.saved_reports.setCurrentIndex(dialog.saved_reports.findData(draft_report_id))
+        assert dialog.current_report_id == draft_report_id
+        assert dialog.preview.toPlainText() == "Contenido ficticio guardado"
+        dialog.saved_reports.setCurrentIndex(0)
+        assert dialog.current_report_id is None
+        assert dialog.table.item(0, 0).checkState() == Qt.CheckState.Unchecked
+        dialog.saved_reports.setCurrentIndex(dialog.saved_reports.findData(issued_report_id))
+        assert dialog.current_report_id == issued_report_id
+        assert not dialog.save_button.isEnabled()
+        assert not dialog.issue_button.isEnabled()
+        from PySide6.QtWidgets import QMessageBox
+        monkeypatch.setattr(
+            QMessageBox, "information",
+            staticmethod(lambda *args, **kwargs: QMessageBox.StandardButton.Ok),
+        )
+        dialog.prepare_rectification()
+        assert dialog.issue_button.isEnabled()
+        dialog.new_report()
+        assert dialog.current_report_id is None
+        assert dialog.table.item(0, 0).checkState() == Qt.CheckState.Unchecked
+        checkbox = dialog.table.item(0, 0)
+        checkbox.setCheckState(Qt.CheckState.Checked)
+        dialog.prepare_draft()
+        draft = dialog.preview.toPlainText()
+        assert "Hecho ficticio registrado en el parte diario" in draft
+        assert "Caso Informe ficticio" in draft
+        assert "Educadora de prueba" in draft
+        dialog.new_report()
+        assert dialog.current_report_id is None
+        assert dialog.table.item(0, 0).checkState() == Qt.CheckState.Unchecked
+    finally:
+        dialog.close()
+        engine.dispose()
+
+
+def test_health_module_lists_inactive_minors_without_special_health_flag():
+    _application()
+    from gestion_centro.care_ui import HealthDialog
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory() as session:
+        actor = create_professional_account(
+            session, display_name="Educadora ficticia", username="health-inactive-ui",
+            password="contraseña de prueba segura", role=Role.EDUCATOR,
+        )
+        minor = create_minor(
+            session, actor_account_id=actor.id,
+            given_names="Caso histórico", family_names="Ficticio",
+        )
+        minor.active = False
+        actor_id, minor_id = actor.id, minor.id
+        session.commit()
+
+    dialog = HealthDialog(factory, actor_id)
+    try:
+        assert dialog.stay.count() == 2
+        assert dialog.stay.itemData(1) == minor_id
+        assert dialog.stay.itemText(1).endswith("· Inactivo")
+        assert "Sin ingreso activo" in dialog.resident_context.text() or (
+            dialog.stay.currentData() is None
+        )
+    finally:
+        dialog.close()
+        engine.dispose()
