@@ -159,74 +159,77 @@ class DiaryDialog(QDialog):
         cell = self.table.item(row, 0) if row >= 0 else None
         metadata = cell.data(Qt.ItemDataRole.UserRole) if cell else None
         if not metadata or metadata.get("kind") != "entry":
-            QMessageBox.information(self, "Selecciona una anotación", "Selecciona una anotación del parte diario; las incidencias se gestionarán desde su propio apartado.")
+            QMessageBox.information(self, "Selecciona una anotación", "Selecciona una anotación del parte diario.")
             return
         try:
             with session_scope(self.factory) as session:
                 entry = session.get(DiaryEntry, metadata["id"])
                 if entry is None:
                     raise ValueError("La anotación ya no existe.")
-                new_content, ok = QInputDialog.getMultiLineText(
-                    self, "Editar anotación del parte diario",
-                    "Texto actualizado (se conservará la versión anterior):", entry.content)
-                if not ok or not new_content.strip():
-                    return
-                reason, ok = QInputDialog.getText(
-                    self, "Motivo de modificación",
-                    "Indica brevemente por qué se modifica la anotación:")
-                if not ok or not reason.strip():
-                    return
+                original = {
+                    "content": entry.content, "shift": entry.shift,
+                    "category": entry.category, "happened_at": entry.happened_at,
+                }
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Revisar anotación del parte diario")
+            dialog.resize(680, 520)
+            form = QFormLayout(dialog)
+            shift = QComboBox()
+            for label, key in self.SHIFTS.items():
+                shift.addItem(label, key)
+            shift.setCurrentIndex(max(0, shift.findData(original["shift"])))
+            category = QComboBox()
+            categories = dict(self.CATEGORIES)
+            categories.update({
+                "General (histórico)": "general", "Salud (histórico)": "health",
+                "Mantenimiento (histórico)": "maintenance", "Otros (histórico)": "other",
+            })
+            for label, key in categories.items():
+                category.addItem(label, key)
+            category.setCurrentIndex(max(0, category.findData(original["category"])))
+            happened = QDateTimeEdit()
+            happened.setCalendarPopup(True)
+            happened.setDisplayFormat("dd/MM/yyyy HH:mm")
+            happened.setDateTime(QDateTime.fromPython(original["happened_at"].astimezone()))
+            content = QTextEdit()
+            content.setPlainText(original["content"])
+            reason = QLineEdit()
+            reason.setPlaceholderText("Motivo breve de la corrección")
+            form.addRow("Turno", shift)
+            form.addRow("Apartado", category)
+            form.addRow("Fecha y hora del hecho", happened)
+            form.addRow("Contenido", content)
+            form.addRow("Motivo de modificación", reason)
+            buttons = QDialogButtonBox(
+                QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+            )
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            form.addRow(buttons)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+            if not content.toPlainText().strip() or not reason.text().strip():
+                QMessageBox.warning(self, "Datos incompletos", "El contenido y el motivo son obligatorios.")
+                return
+            local_moment = happened.dateTime().toPython()
+            moment = local_moment.astimezone(timezone.utc) if local_moment.tzinfo else local_moment.astimezone().astimezone(timezone.utc)
+            with session_scope(self.factory) as session:
                 revise_diary_entry(
                     session, actor_account_id=self.actor_id,
-                    original_entry_id=entry.id, content=new_content, reason=reason)
+                    original_entry_id=metadata["id"],
+                    content=content.toPlainText(), reason=reason.text(),
+                    happened_at=moment, shift=shift.currentData(),
+                    category=category.currentData(),
+                )
             self.refresh()
             QMessageBox.information(
                 self, "Modificación guardada",
-                "Se ha guardado una nueva versión. La anterior permanece en el historial y queda registrado quién realizó el cambio.")
+                "Se ha creado una nueva versión. El texto anterior y sus vínculos se conservan, "
+                "y queda registrada la persona que realizó la modificación."
+            )
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, "No se pudo modificar", str(exc))
-
-    def _update_selection_actions(self):
-        row = self.table.currentRow()
-        cell = self.table.item(row, 0) if row >= 0 else None
-        metadata = cell.data(Qt.ItemDataRole.UserRole) if cell else None
-        selected_entry = bool(metadata and metadata.get("kind") == "entry")
-        self.revise_button.setEnabled(selected_entry)
-        self.history_button.setEnabled(selected_entry)
-
-    def view_entry_history(self):
-        row = self.table.currentRow()
-        cell = self.table.item(row, 0) if row >= 0 else None
-        metadata = cell.data(Qt.ItemDataRole.UserRole) if cell else None
-        if not metadata or metadata.get("kind") != "entry":
-            QMessageBox.information(self, "Selecciona una anotación", "Selecciona primero una anotación del parte.")
-            return
-        try:
-            with session_scope(self.factory) as session:
-                current = session.get(DiaryEntry, metadata["id"])
-                if current is None:
-                    raise ValueError("La anotación ya no existe.")
-                versions = [current]
-                parent_id = current.correction_of_id
-                while parent_id:
-                    parent = session.get(DiaryEntry, parent_id)
-                    if parent is None:
-                        break
-                    versions.append(parent)
-                    parent_id = parent.correction_of_id
-                versions.reverse()
-                lines = []
-                for number, version in enumerate(versions, start=1):
-                    lines.append(
-                        f"Versión {number} · {version.recorded_at.astimezone().strftime('%d/%m/%Y %H:%M')} "
-                        f"· {version.author_name_snapshot}"
-                    )
-                    lines.append(version.content)
-                    lines.append("")
-                history = "\\n".join(lines)
-            QMessageBox.information(self, "Historial de la anotación", history)
-        except (ValueError, PermissionError) as exc:
-            QMessageBox.warning(self, "No se pudo consultar el historial", str(exc))
 
     def add_incident(self):
         title, ok = QInputDialog.getText(self, "Incidencia", "Título:")
