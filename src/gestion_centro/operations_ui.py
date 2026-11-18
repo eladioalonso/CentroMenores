@@ -15,6 +15,7 @@ from gestion_centro.domain.documents import Authorization, Outing, OutingStay
 from gestion_centro.domain.documents_service import (
     record_authorization, set_authorization_status, create_outing, set_outing_status,
     list_document_stays, list_authorizations, list_valid_authorizations, list_outings, update_authorization,
+    update_outing_details,
 )
 
 
@@ -188,6 +189,7 @@ class OutingsDialog(QDialog):
     def __init__(self, factory, actor_id):
         super().__init__()
         self.factory, self.actor_id = factory, actor_id
+        self.editing_outing_id = None
         self.setWindowTitle("Salidas")
         self.resize(900, 560)
         layout = QVBoxLayout(self)
@@ -216,9 +218,9 @@ class OutingsDialog(QDialog):
         form.addRow("Regreso previsto", self.back)
         form.addRow("", self.restrictions)
         layout.addLayout(form)
-        create = QPushButton("Registrar salida")
-        create.clicked.connect(self.create)
-        layout.addWidget(create)
+        self.create_button = QPushButton("Registrar salida")
+        self.create_button.clicked.connect(self.create)
+        layout.addWidget(self.create_button)
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["Destino", "Salida prevista", "Estado", "Regreso real"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -229,8 +231,11 @@ class OutingsDialog(QDialog):
         self.status = QComboBox()
         for label, value in [("En curso", "in_progress"), ("Regresó", "returned"), ("Cancelada", "cancelled")]:
             self.status.addItem(label, value)
+        edit = QPushButton("Editar salida seleccionada")
+        edit.clicked.connect(self.edit_selected)
         update = QPushButton("Actualizar estado")
         update.clicked.connect(self.update_status)
+        actions.addWidget(edit)
         actions.addWidget(self.status)
         actions.addWidget(update)
         layout.addLayout(actions)
@@ -268,8 +273,37 @@ class OutingsDialog(QDialog):
                     cell.setData(Qt.ItemDataRole.UserRole, outing_id)
                 self.table.setItem(row, col, cell)
 
+    def edit_selected(self):
+        row = self.table.currentRow()
+        cell = self.table.item(row, 0) if row >= 0 else None
+        if cell is None:
+            QMessageBox.information(self, "Selecciona salida", "Selecciona primero una salida.")
+            return
+        try:
+            with session_scope(self.factory) as session:
+                outing = session.get(Outing, cell.data(Qt.ItemDataRole.UserRole))
+                if outing is None:
+                    raise ValueError("La salida ya no existe.")
+                stay_link = session.scalar(select(OutingStay).where(
+                    OutingStay.outing_id == outing.id
+                ))
+                self.editing_outing_id = outing.id
+                if stay_link:
+                    self.stay.setCurrentIndex(max(0, self.stay.findData(stay_link.stay_id)))
+                self.kind.setCurrentIndex(max(0, self.kind.findData(outing.kind)))
+                self.destination.setText(outing.destination)
+                self.purpose.setPlainText(outing.purpose)
+                self.depart.setDateTime(QDateTime.fromPython(outing.planned_departure.astimezone()))
+                self.back.setDateTime(QDateTime.fromPython(outing.planned_return.astimezone()))
+                self.restrictions.setChecked(outing.restrictions_checked)
+                self.create_button.setText("Guardar cambios de salida")
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se puede editar", str(exc))
+
     def create(self):
-        if not self.stay.currentData() or not self.auth.currentData() or not self.restrictions.isChecked():
+        if not self.stay.currentData() or not self.restrictions.isChecked() or (
+            not self.editing_outing_id and not self.auth.currentData()
+        ):
             QMessageBox.warning(self, "Falta información", "Selecciona estancia, autorización y confirma la revisión de restricciones.")
             return
         departure = self.depart.dateTime().toPython()
@@ -278,13 +312,24 @@ class OutingsDialog(QDialog):
         returning = returning.astimezone(timezone.utc) if returning.tzinfo else returning.astimezone().astimezone(timezone.utc)
         try:
             with session_scope(self.factory) as session:
-                create_outing(
-                    session, actor_account_id=self.actor_id, kind=self.kind.currentData(),
-                    destination=self.destination.text(), purpose=self.purpose.toPlainText(),
-                    planned_departure=departure, planned_return=returning,
-                    responsible_account_id=self.actor_id, stay_ids=[self.stay.currentData()],
-                    authorization_ids=[self.auth.currentData()], restrictions_checked=True,
-                )
+                if self.editing_outing_id:
+                    update_outing_details(
+                        session, actor_account_id=self.actor_id,
+                        outing_id=self.editing_outing_id, kind=self.kind.currentData(),
+                        destination=self.destination.text(), purpose=self.purpose.toPlainText(),
+                        planned_departure=departure, planned_return=returning,
+                        restrictions_checked=True,
+                    )
+                else:
+                    create_outing(
+                        session, actor_account_id=self.actor_id, kind=self.kind.currentData(),
+                        destination=self.destination.text(), purpose=self.purpose.toPlainText(),
+                        planned_departure=departure, planned_return=returning,
+                        responsible_account_id=self.actor_id, stay_ids=[self.stay.currentData()],
+                        authorization_ids=[self.auth.currentData()], restrictions_checked=True,
+                    )
+            self.editing_outing_id = None
+            self.create_button.setText("Registrar salida")
             self.destination.clear()
             self.purpose.clear()
             self.restrictions.setChecked(False)
