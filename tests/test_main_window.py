@@ -180,6 +180,11 @@ def test_resident_workspace_includes_documents_tab_and_opener():
         labels = [dialog.tabs.tabText(i) for i in range(dialog.tabs.count())]
         assert "Documentación" in labels
         assert dialog.documents_table.columnCount() == 5
+        health_button = next(
+            button for button in dialog.findChildren(QPushButton)
+            if button.text() == "Ficha sanitaria y medicación"
+        )
+        assert health_button.isEnabled()
         dialog.open_documents()
         assert opened == [minor_id]
     finally:
