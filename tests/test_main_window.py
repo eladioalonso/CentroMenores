@@ -255,7 +255,7 @@ def test_dashboard_counts_residents_outside_and_overdue_returns():
 
 
 
-def test_incident_report_builder_uses_selected_diary_entries():
+def test_incident_report_builder_uses_selected_diary_entries(monkeypatch):
     _application()
     from gestion_centro.incident_reports_ui import IncidentReportsDialog
     from gestion_centro.domain.service import record_diary_entry
@@ -282,24 +282,44 @@ def test_incident_report_builder_uses_selected_diary_entries():
             happened_at=datetime.now(timezone.utc), stay_ids=[stay.id],
         )
         from gestion_centro.domain.incident_reports_service import save_incident_report
-        save_incident_report(
+        draft_report = save_incident_report(
             session, actor_account_id=actor.id, title="Borrador de prueba",
             recipient=None, content="Contenido ficticio guardado",
             entry_ids=[entry.id],
         )
+        issued_report = save_incident_report(
+            session, actor_account_id=actor.id, title="Informe emitido de prueba",
+            recipient=None, content="Contenido oficial ficticio",
+            entry_ids=[entry.id], issue=True,
+        )
+        draft_report_id, issued_report_id = draft_report.id, issued_report.id
         actor_id = actor.id
         session.commit()
 
     dialog = IncidentReportsDialog(factory, actor_id)
     try:
         assert dialog.table.rowCount() == 1
-        assert dialog.saved_reports.count() == 2
+        assert dialog.saved_reports.count() == 3
         checkbox = dialog.table.item(0, 0)
         assert checkbox.checkState() == Qt.CheckState.Unchecked
-        dialog.saved_reports.setCurrentIndex(1)
-        assert dialog.current_report_id is not None
+        dialog.saved_reports.setCurrentIndex(dialog.saved_reports.findData(draft_report_id))
+        assert dialog.current_report_id == draft_report_id
         assert dialog.preview.toPlainText() == "Contenido ficticio guardado"
         dialog.saved_reports.setCurrentIndex(0)
+        assert dialog.current_report_id is None
+        assert dialog.table.item(0, 0).checkState() == Qt.CheckState.Unchecked
+        dialog.saved_reports.setCurrentIndex(dialog.saved_reports.findData(issued_report_id))
+        assert dialog.current_report_id == issued_report_id
+        assert not dialog.save_button.isEnabled()
+        assert not dialog.issue_button.isEnabled()
+        from PySide6.QtWidgets import QMessageBox
+        monkeypatch.setattr(
+            QMessageBox, "information",
+            staticmethod(lambda *args, **kwargs: QMessageBox.StandardButton.Ok),
+        )
+        dialog.prepare_rectification()
+        assert dialog.issue_button.isEnabled()
+        dialog.new_report()
         assert dialog.current_report_id is None
         assert dialog.table.item(0, 0).checkState() == Qt.CheckState.Unchecked
         checkbox = dialog.table.item(0, 0)
