@@ -114,40 +114,38 @@ Disponer de un registro cronológico general y único de la actividad cotidiana 
 - Si un mismo acontecimiento afecta a varios menores, se creará una única anotación con varias relaciones; no se duplicará el texto por cada menor.
 - La fecha y hora del acontecimiento, si difieren de la fecha y hora de registro, deberán poder distinguirse.
 - Las consultas podrán filtrarse, como mínimo, por intervalo de fechas, menor relacionado, profesional autor y categoría, siempre respetando los permisos.
-- Una anotación no debe confundirse automáticamente con una incidencia.
-- Si el contenido requiere abrir una incidencia formal, la aplicación podrá ofrecer iniciar ese flujo y mantener la relación entre ambos registros, evitando duplicar innecesariamente la información.
-- Las anotaciones guardadas no se modificarán de forma silenciosa. Todos los educadores activos podrán revisar y corregir cualquier anotación, aunque la haya creado otro profesional o el parte esté cerrado. Cada modificación generará una nueva versión vinculada al original, conservando su contenido, autoría y fecha iniciales, e identificando al educador que realiza el cambio, la fecha/hora y el motivo. El cierre del parte impide añadir nuevas anotaciones ordinarias a esa fecha, pero no bloquea la corrección de las ya existentes.
-- Se definirán permisos diferenciados para consultar, crear, rectificar y exportar anotaciones.
+- Las incidencias que deban comunicarse formalmente se documentan primero como hechos en el parte diario. No se exige volver a registrar el mismo acontecimiento en una ficha independiente de incidencias.
+- Los informes de incidencias se elaboran seleccionando una o varias anotaciones del parte diario. Se conserva el vínculo con cada anotación original y se permite reutilizar un hecho en más de un informe.
+- Todos los educadores activos pueden corregir cualquier anotación, incluso de otro profesional o de un día cerrado. La corrección genera una nueva versión, conserva la anterior y registra al autor de la modificación, fecha/hora y motivo cuando proceda.
 
-## 7. Registro y seguimiento de una incidencia
+## 7. Elaboración de informes de incidencias desde el parte diario
 
 ### Objetivo
 
-Documentar un acontecimiento, las personas implicadas y las actuaciones de seguimiento.
+Preparar informes cronológicos sin duplicar los hechos ya registrados en el parte diario y conservar cada versión emitida.
 
-### Recorrido propuesto
+### Recorrido
 
-1. El profesional autorizado abre Incidencias y selecciona Nuevo registro.
-2. Introduce fecha, hora, lugar, tipo y descripción.
-3. Selecciona uno o varios menores implicados.
-4. Comprueba la estancia relacionada de cada menor cuando proceda.
-5. Identifica a los profesionales intervinientes, según los permisos y datos disponibles.
-6. Añade las actuaciones realizadas y la información complementaria que corresponda.
-7. Adjunta documentos si está autorizado.
-8. Guarda el borrador del informe, que mantiene los vínculos con las anotaciones originales.
-9. La aplicación crea las relaciones con todos los menores y profesionales seleccionados.
-10. Si procede, el usuario crea tareas de seguimiento relacionadas con la incidencia.
-11. Los profesionales autorizados consultan su evolución.
-12. La incidencia se cierra cuando se cumplen los criterios de cierre que establezca el centro.
+1. El educador abre el módulo Informes de incidencias.
+2. Selecciona un periodo y, si lo necesita, filtra por un menor.
+3. La aplicación muestra las anotaciones del parte diario, utilizando la última versión vigente de cada hecho.
+4. El educador selecciona las anotaciones que deben formar parte del informe.
+5. Prepara el borrador cronológico y revisa título, destinatario y contenido.
+6. Guarda el borrador para continuar trabajando posteriormente, incluso desde otra sesión de educador.
+7. Cuando el contenido está revisado, emite una versión oficial.
+8. La aplicación conserva el contenido íntegro de la versión, la persona que la emitió, fecha/hora y las referencias a las anotaciones seleccionadas.
+9. Si es necesario corregir un informe emitido, se crea una nueva versión rectificada. Las versiones anteriores no se sustituyen.
+10. El informe emitido o rectificado puede exportarse a Word.
 
 ### Reglas
 
-- Una incidencia puede implicar a varios menores.
-- No se creará una incidencia independiente por cada menor si se trata del mismo acontecimiento.
-- Las actuaciones posteriores se añadirán al historial de seguimiento.
-- El cierre no eliminará la incidencia ni sus relaciones.
-- Los datos sensibles se mostrarán únicamente a los perfiles autorizados.
-- La aplicación no sustituye los canales de comunicación urgente establecidos por el centro.
+- El parte diario es la fuente de los hechos; el informe es una composición documental de esos hechos, no una segunda fuente de acontecimientos.
+- Un informe puede incluir hechos de varios días y menores; un mismo hecho puede aparecer en distintos informes.
+- La aplicación no incorpora automáticamente datos sanitarios del expediente sanitario. Si un hecho sanitario debe mencionarse, se utiliza exclusivamente el contenido autorizado y registrado en el parte diario.
+- Los borradores son compartidos por los educadores y pueden ser continuados por cualquiera de ellos.
+- Cada versión emitida conserva el texto y las referencias originales. La rectificación crea otra versión y mantiene accesible la anterior.
+- La autoría del hecho y la autoría de la elaboración/emisión del informe son datos diferentes y se conservan por separado.
+- La exportación no cambia el estado ni el contenido de la versión guardada.
 
 ## 8. Salida, visita y retorno
 
