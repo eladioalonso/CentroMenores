@@ -7,7 +7,15 @@ datas = [
     (str(ROOT / "alembic.ini"), "."),
     (str(ROOT / "migrations"), "migrations"),
 ]
-hiddenimports = collect_submodules("alembic") + ["logging.config"]
+# Alembic carga migrations/env.py dinámicamente. PyInstaller no detecta los
+# imports de modelos realizados allí, por lo que se incluyen explícitamente
+# todos los submódulos del dominio para que las migraciones funcionen también
+# dentro del ejecutable congelado.
+hiddenimports = (
+    collect_submodules("alembic")
+    + collect_submodules("gestion_centro.domain")
+    + ["logging.config"]
+)
 
 a = Analysis(
     [str(ROOT / "src" / "gestion_centro" / "__main__.py")],
