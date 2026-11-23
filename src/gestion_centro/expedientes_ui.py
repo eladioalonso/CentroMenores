@@ -19,12 +19,12 @@ from gestion_centro.domain.service import (
 
 
 class NewMinorDialog(QDialog):
-    """Alta completa del expediente. Los campos complementarios son opcionales."""
+    """Alta de menor con los campos de la ficha simplificada."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Nuevo expediente")
-        self.resize(620, 720)
+        self.resize(760, 760)
         root = QVBoxLayout(self)
         tabs = QTabWidget()
         root.addWidget(tabs)
@@ -33,32 +33,63 @@ class NewMinorDialog(QDialog):
         personal_form = QFormLayout(personal)
         self.given = QLineEdit()
         self.family = QLineEdit()
-        self.birth_country = QLineEdit()
-        self.locality = QLineEdit()
-        self.nationality = QLineEdit()
-        self.birth_date = QDateEdit()
-        self.birth_date.setCalendarPopup(True)
-        self.birth_date.setDisplayFormat("dd/MM/yyyy")
-        self.birth_date.setMinimumDate(QDate(1900, 1, 1))
-        self.birth_date.setSpecialValueText("No indicada")
-        self.birth_date.setDate(self.birth_date.minimumDate())
+        self.sex = QComboBox()
+        self.sex.addItem("No indicado", "")
+        self.sex.addItem("Femenino", "female")
+        self.sex.addItem("Masculino", "male")
+        self.sex.addItem("Otro", "other")
+        self.birth_date = self._date_field()
         self.age_label = QLabel("—")
         self.birth_date.dateChanged.connect(self.update_age)
-        self.nif_nie = QLineEdit()
-        self.passport = QLineEdit()
+        self.locality = QLineEdit()
+        self.birth_country = QLineEdit()
+        self.nationality = QLineEdit()
         self.address = QTextEdit()
-        self.address.setMinimumHeight(90)
+        self.address.setMaximumHeight(70)
+        self.postal_code = QLineEdit()
+        self.nif_nie = QLineEdit()
         self.email = QLineEdit()
+        self.mobile_phone = QLineEdit()
         for label, widget in [
-            ("Nombre(s) *", self.given),
-            ("Apellidos *", self.family), ("País de nacimiento", self.birth_country),
-            ("Localidad", self.locality), ("Nacionalidad", self.nationality),
-            ("Fecha de nacimiento", self.birth_date), ("Edad (calculada)", self.age_label),
-            ("NIF o NIE", self.nif_nie),
-            ("Pasaporte", self.passport), ("Dirección", self.address), ("Email", self.email),
+            ("Nombre *", self.given), ("Apellidos *", self.family),
+            ("Sexo", self.sex), ("Fecha de nacimiento", self.birth_date),
+            ("Edad (calculada)", self.age_label), ("Lugar de nacimiento", self.locality),
+            ("País de nacimiento", self.birth_country), ("Nacionalidad", self.nationality),
+            ("Dirección actual", self.address), ("Código postal", self.postal_code),
+            ("NIF/NIE", self.nif_nie), ("Email", self.email),
+            ("Nº teléfono móvil", self.mobile_phone),
         ]:
             personal_form.addRow(label, widget)
-        tabs.addTab(personal, "Datos personales")
+        tabs.addTab(personal, "1. Datos generales")
+
+        sanitary = QWidget()
+        sanitary_form = QFormLayout(sanitary)
+        self.cip = QLineEdit()
+        self.card_issued = self._date_field()
+        self.card_expires = self._date_field()
+        self.health_center = QLineEdit()
+        self.physician = QLineEdit()
+        self.nurse = QLineEdit()
+        self.clinical_history = QTextEdit()
+        self.clinical_history.setMinimumHeight(100)
+        for label, widget in [
+            ("CIP", self.cip), ("Fecha de emisión", self.card_issued),
+            ("Fecha de caducidad", self.card_expires),
+            ("Centro de salud asignado", self.health_center),
+            ("Facultativo asignado", self.physician),
+            ("Enfermería asignada", self.nurse),
+            ("Enfermedades y tratamientos", self.clinical_history),
+        ]:
+            sanitary_form.addRow(label, widget)
+        tabs.addTab(sanitary, "2. Información sanitaria")
+
+        documents = QWidget()
+        documents_layout = QVBoxLayout(documents)
+        note = QLabel("Los documentos escaneados se añadirán y consultarán desde la pestaña Documentos de la ficha, una vez creado el expediente.")
+        note.setWordWrap(True)
+        documents_layout.addWidget(note)
+        documents_layout.addStretch(1)
+        tabs.addTab(documents, "3. Documentos")
 
         buttons = QHBoxLayout()
         save = QPushButton("Crear expediente")
@@ -69,26 +100,51 @@ class NewMinorDialog(QDialog):
         buttons.addWidget(cancel)
         root.addLayout(buttons)
 
-    def update_age(self, birth_date):
-        if birth_date <= self.birth_date.minimumDate():
+    @staticmethod
+    def _date_field():
+        field = QDateEdit()
+        field.setCalendarPopup(True)
+        field.setDisplayFormat("dd/MM/yyyy")
+        field.setMinimumDate(QDate(1900, 1, 1))
+        field.setSpecialValueText("No indicada")
+        field.setDate(field.minimumDate())
+        return field
+
+    def update_age(self, selected):
+        if selected <= self.birth_date.minimumDate():
             self.age_label.setText("—")
             return
-        born = birth_date.toPython()
+        born = selected.toPython()
         today = date.today()
         years = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
         self.age_label.setText(str(years))
 
+    def _optional_date(self, field):
+        return field.date().toPython() if field.date() > field.minimumDate() else None
+
     def values(self):
-        birth = self.birth_date.date().toPython() if self.birth_date.date() > self.birth_date.minimumDate() else None
         return {
             "given_names": self.given.text(),
-            "family_names": self.family.text(), "birth_country": self.birth_country.text(),
-            "locality": self.locality.text(), "nationality": self.nationality.text(),
-            "birth_date": birth, "nif_nie": self.nif_nie.text(),
-            "passport_number": self.passport.text(),
-            "address": self.address.toPlainText(), "email": self.email.text(),
+            "family_names": self.family.text(),
+            "sex": self.sex.currentData(),
+            "birth_date": self._optional_date(self.birth_date),
+            "locality": self.locality.text(),
+            "birth_country": self.birth_country.text(),
+            "nationality": self.nationality.text(),
+            "address": self.address.toPlainText(),
+            "postal_code": self.postal_code.text(),
+            "nif_nie": self.nif_nie.text(),
+            "email": self.email.text(),
+            "mobile_phone": self.mobile_phone.text(),
+            "cip": self.cip.text(),
+            "health_card_issued_on": self._optional_date(self.card_issued),
+            "health_card_expires_on": self._optional_date(self.card_expires),
+            "health_center": self.health_center.text(),
+            "physician": self.physician.text(),
+            "nurse": self.nurse.text(),
+            "clinical_history": self.clinical_history.toPlainText(),
         }
-
+}
 
 class MinorWorkspaceDialog(QDialog):
     def __init__(self, factory, actor_id, minor_id, parent=None, documents_opener=None):
