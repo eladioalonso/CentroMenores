@@ -47,7 +47,7 @@ En desarrollo, la carpeta de datos se puede indicar con `CENTRO_DATOS_DIR`; por 
 
 - Nueva organización simplificada en dos apartados de trabajo: Información del menor y Parte diario / Calendario.
 - Información del menor en una ficha única con datos generales, información sanitaria y documentos escaneados.
-- Parte diario organizado por fecha y turnos, con personal, altas, bajas, actividades, conductas y observaciones.
+- Parte diario organizado por fecha y cuatro categorías: actividades realizadas, comportamientos positivos, comportamientos negativos y observaciones. Las anotaciones conservan fecha/hora, autoría y vínculos con menores cuando corresponda.
 - Historial, autoría y rectificaciones versionadas conservados.
 - Edición ordinaria compartida: cualquier educador activo puede modificar registros creados por otro educador; se conserva la autoría histórica.
 - Copias ZIP verificables y restauración con copia previa, validación de integridad y reconciliación de auditoría.
