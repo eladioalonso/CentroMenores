@@ -45,3 +45,29 @@ def test_health_module_lists_inactive_minors_without_special_health_flag():
     finally:
         dialog.close()
         engine.dispose()
+
+
+
+def test_health_dialog_preselects_minor_when_opened_from_workspace_without_active_stay():
+    _application()
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory() as session:
+        actor = create_professional_account(
+            session, display_name="Educador ficticio", username="health-preselect-ui",
+            password="contraseña de prueba segura", role=Role.EDUCATOR,
+        )
+        minor = create_minor(
+            session, actor_account_id=actor.id,
+            given_names="Caso sin estancia", family_names="Ficticio",
+        )
+        actor_id, minor_id = actor.id, minor.id
+        session.commit()
+
+    dialog = HealthDialog(factory, actor_id, minor_id=minor_id)
+    try:
+        assert dialog.stay.currentData() == minor_id
+    finally:
+        dialog.close()
+        engine.dispose()
