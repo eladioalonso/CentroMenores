@@ -169,13 +169,11 @@ class MinorWorkspaceDialog(QDialog):
         self.stays.setColumnHidden(0, True)
         self.stays.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.stays.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.tabs.addTab(self.stays, 'Estancias')
         self.events = QTableWidget(0, 5)
         self.events.setHorizontalHeaderLabels(['ID', 'Fecha', 'Acontecimiento', 'Descripción', 'Autor'])
         self.events.setColumnHidden(0, True)
         self.events.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.events.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.tabs.addTab(self.events, 'Acontecimientos')
         documents_tab = QWidget()
         documents_layout = QVBoxLayout(documents_tab)
         documents_info = QLabel('Los documentos se conservan vinculados a cada ingreso o reingreso. Puedes consultar el historial documental de todas las estancias desde aquí.')
@@ -196,16 +194,9 @@ class MinorWorkspaceDialog(QDialog):
         actions.setHorizontalSpacing(8)
         actions.setVerticalSpacing(6)
         action_items = [
-            ('Nuevo ingreso / reingreso', self.new_stay),
-            ('Cerrar estancia', self.close_stay),
-            ('Modificar estancia', self.edit_stay),
-            ('Modificar datos', self.edit_personal),
-            ('Registrar acontecimiento', self.add_event),
-            ('Rectificar acontecimiento', self.edit_event),
-            ('Historial acontecimiento', self.show_event_history),
-            ('Historial de modificaciones', self.show_personal_history),
-            ('Seguimiento educativo', self.open_education),
-            ('Cerrar expediente', self.accept),
+            ("Modificar información del menor", self.edit_personal),
+            ("Historial de modificaciones", self.show_personal_history),
+            ("Cerrar ficha", self.accept),
         ]
         for index, (label, callback) in enumerate(action_items):
             button = QPushButton(label)
