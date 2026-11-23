@@ -51,12 +51,8 @@ def test_educator_sees_all_ordinary_modules():
     try:
         labels = _button_labels(window)
         expected = {
-            "Inicio", "Parte diario", "Expediente principal", "Expediente sanitario",
-            "Informes de incidencias", "Expedientes de menores",
-            "Seguimiento educativo y escolar", "Documentación del menor",
-            "Salidas y retornos", "Autorizaciones y visitas",
-            "Abrir expediente sanitario", "Crear informe desde el parte diario",
-            "Agenda y tareas del equipo", "Calendario de actividades y citas",
+            "Inicio", "Parte diario / Calendario", "Información del menor",
+            "Abrir ficha de un menor", "Calendario de actividades y citas",
         }
         assert expected <= labels
         assert "Administración" not in labels
@@ -70,13 +66,9 @@ def test_administrator_sees_ordinary_and_administration_modules():
     try:
         labels = _button_labels(window)
         expected = {
-            "Inicio", "Parte diario", "Expediente principal", "Expediente sanitario",
-            "Informes de incidencias", "Administración", "Expedientes de menores",
-            "Seguimiento educativo y escolar", "Documentación del menor",
-            "Salidas y retornos", "Autorizaciones y visitas",
-            "Abrir expediente sanitario", "Crear informe desde el parte diario",
-            "Agenda y tareas del equipo", "Calendario de actividades y citas",
-            "Administrar cuentas", "Copias de seguridad",
+            "Inicio", "Parte diario / Calendario", "Información del menor",
+            "Abrir ficha de un menor", "Calendario de actividades y citas",
+            "Administración", "Administrar cuentas", "Copias de seguridad",
             "Mantenimiento y diagnóstico", "Estadísticas y memoria",
         }
         assert expected <= labels
@@ -89,14 +81,10 @@ def test_navigation_is_grouped_by_daily_work_and_secondary_functions():
         tabs = window.findChild(QTabWidget)
         assert tabs is not None
         assert [tabs.tabText(i) for i in range(tabs.count())] == [
-            "Inicio", "Parte diario", "Expediente principal",
-            "Expediente sanitario", "Informes de incidencias"
+            "Inicio", "Parte diario / Calendario", "Información del menor"
         ]
         nav = [button.text() for button in window.findChildren(QPushButton, "navigationButton")]
-        assert nav == [
-            "Inicio", "Parte diario", "Expediente principal",
-            "Expediente sanitario", "Informes de incidencias"
-        ]
+        assert nav == ["Inicio", "Parte diario / Calendario", "Información del menor"]
         assert not tabs.tabBar().isVisible()
     finally:
         window.close()
@@ -105,9 +93,9 @@ def test_administration_is_separate_tab_only_for_admin():
     educator = _window(Role.EDUCATOR)
     admin = _window(Role.ADMIN)
     try:
-        assert educator.findChild(QTabWidget).count() == 5
-        assert admin.findChild(QTabWidget).count() == 6
-        assert admin.findChild(QTabWidget).tabText(5) == "Administración"
+        assert educator.findChild(QTabWidget).count() == 3
+        assert admin.findChild(QTabWidget).count() == 4
+        assert admin.findChild(QTabWidget).tabText(3) == "Administración"
         assert len(admin.findChild(QTabWidget).widget(5).findChildren(QPushButton)) == 4
     finally:
         educator.close()
