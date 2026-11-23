@@ -12,6 +12,7 @@ from sqlalchemy import select
 from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import Minor, Stay, Event, EventStayLink, MinorPersonalDataVersion
 from gestion_centro.domain.documents_service import list_documents
+from gestion_centro.domain.health_service import read_health_profile
 from gestion_centro.domain.service import (
     create_minor, open_stay, close_stay, record_event, update_stay, revise_event,
     HEALTH_PERSONAL_FIELDS,
@@ -212,6 +213,9 @@ class MinorWorkspaceDialog(QDialog):
                 self.reject()
                 return
             self.setWindowTitle('Expediente · ' + (minor.nif_nie or minor.passport_number or 'Sin NIF/NIE') + ' · ' + minor.given_names + ' ' + minor.family_names)
+            health_profile = read_health_profile(
+                session, actor_account_id=self.actor_id, minor_id=minor.id
+            )
             while self.personal_form.rowCount():
                 self.personal_form.removeRow(0)
             general_fields = [
@@ -225,10 +229,12 @@ class MinorWorkspaceDialog(QDialog):
                 ("Email", minor.email), ("Teléfono móvil", minor.mobile_phone),
             ]
             sanitary_fields = [
-                ("CIP", minor.cip), ("Fecha de emisión", str(minor.health_card_issued_on or "—")),
-                ("Fecha de caducidad", str(minor.health_card_expires_on or "—")),
-                ("Centro de salud asignado", minor.health_center), ("Facultativo asignado", minor.physician),
-                ("Enfermería asignada", minor.nurse), ("Enfermedades y tratamientos", minor.clinical_history),
+                ("CIP", health_profile.cip if health_profile else None), ("Fecha de emisión", str(minor.health_card_issued_on or "—")),
+                ("Fecha de caducidad", str(health_profile.health_card_expires_on or "—") if health_profile else "—"),
+                ("Centro de salud asignado", health_profile.health_center if health_profile else None),
+                ("Facultativo asignado", health_profile.physician if health_profile else None),
+                ("Enfermería asignada", health_profile.nurse if health_profile else None),
+                ("Enfermedades y tratamientos", health_profile.clinical_history if health_profile else None),
             ]
             for form_widget, fields in ((self.personal_form, general_fields), (self.sanitary_form, sanitary_fields)):
                 while form_widget.rowCount():
