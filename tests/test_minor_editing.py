@@ -21,7 +21,8 @@ def test_personal_data_update_is_saved_and_audited():
         minor = create_minor(session, actor_account_id=actor.id, given_names='Original', family_names='Name')
         update_minor_personal_data(session, actor_account_id=actor.id, minor_id=minor.id,
             given_names='Corrected', family_names='Name', locality='Lorca',
-            nif_nie='x1234567a', email='test@example.test', cip='cip-123',
+            sex='female', postal_code='52001', mobile_phone='600000000',
+            health_card_issued_on=date(2026, 1, 10), nif_nie='x1234567a', email='test@example.test', cip='cip-123',
             health_center='Centro ficticio', physician='Facultativo ficticio',
             nurse='Enfermera ficticia', health_card_expires_on=date(2027, 5, 1),
             clinical_history='Historial ficticio')
@@ -29,6 +30,10 @@ def test_personal_data_update_is_saved_and_audited():
         assert saved.given_names == 'Corrected'
         assert saved.nif_nie == 'X1234567A'
         assert saved.locality == 'Lorca'
+        assert saved.sex == 'female'
+        assert saved.postal_code == '52001'
+        assert saved.mobile_phone == '600000000'
+        assert saved.health_card_issued_on == date(2026, 1, 10)
         assert saved.cip == 'CIP-123'
         assert saved.health_center == 'Centro ficticio'
         assert saved.physician == 'Facultativo ficticio'
