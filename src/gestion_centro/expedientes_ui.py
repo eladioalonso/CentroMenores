@@ -567,7 +567,9 @@ class MinorWorkspaceDialog(QDialog):
         # su vínculo con el ingreso en el que se registran.
         stay_id = self.active_stay_id()
         from gestion_centro.care_ui import HealthDialog
-        HealthDialog(self.factory, self.actor_id, stay_id=stay_id).exec()
+        HealthDialog(
+            self.factory, self.actor_id, stay_id=stay_id, minor_id=self.minor_id
+        ).exec()
         self.refresh()
 
     def open_education(self):
