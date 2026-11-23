@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt
 
 from gestion_centro.app import MainWindow, CredentialsDialog
 from gestion_centro.expedientes_ui import MinorWorkspaceDialog
+from gestion_centro.diary_ui import DiaryDialog
 from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -183,6 +184,32 @@ def test_resident_workspace_includes_documents_tab_and_opener():
         assert health_button.isEnabled()
         dialog.open_documents()
         assert opened == [minor_id]
+    finally:
+        dialog.close()
+        engine.dispose()
+
+
+
+def test_diary_uses_only_the_four_approved_categories_without_shift_selector():
+    _application()
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory() as session:
+        actor = create_professional_account(
+            session, display_name="Educador ficticio", username="diary-ui-test",
+            password="contraseña de prueba segura", role=Role.EDUCATOR,
+        )
+        actor_id = actor.id
+        session.commit()
+    dialog = DiaryDialog(factory, actor_id)
+    try:
+        assert list(dialog.CATEGORIES.values()) == [
+            "activity", "positive", "negative", "observation"
+        ]
+        assert dialog.category.count() == 4
+        assert not hasattr(dialog, "shift")
+        assert dialog.content is not None
     finally:
         dialog.close()
         engine.dispose()
