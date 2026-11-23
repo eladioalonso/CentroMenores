@@ -554,3 +554,27 @@ def test_simple_minor_fields_and_daily_shift_details_are_persisted_and_audited()
         assert session.scalar(select(AccessAudit).where(
             AccessAudit.event == "diary_day_details_updated"
         )) is not None
+        from gestion_centro.domain.service import record_diary_entry, close_diary_day
+        moment = datetime(2026, 11, 23, 12, tzinfo=timezone.utc)
+        high = record_diary_entry(
+            session, actor_account_id=actor.id, diary_date=date(2026, 11, 23),
+            shift="morning", category="admission", content="Alta ficticia",
+            happened_at=moment,
+        )
+        low = record_diary_entry(
+            session, actor_account_id=actor.id, diary_date=date(2026, 11, 23),
+            shift="afternoon", category="discharge", content="Baja ficticia",
+            happened_at=moment,
+        )
+        assert high.category == "admission"
+        assert low.category == "discharge"
+        close_diary_day(session, actor_account_id=actor.id, diary_date=date(2026, 11, 23))
+        with pytest.raises(ValueError, match="motivo"):
+            update_diary_day_details(
+                session, actor_account_id=actor.id, diary_date=date(2026, 11, 23),
+                morning_staff="Cambio sin motivo",
+            )
+        update_diary_day_details(
+            session, actor_account_id=actor.id, diary_date=date(2026, 11, 23),
+            morning_staff="Cambio justificado", reason="Rectificación de prueba",
+        )
