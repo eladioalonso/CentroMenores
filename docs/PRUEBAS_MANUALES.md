@@ -17,10 +17,11 @@ Esta guía sirve para probar la interfaz y los flujos con información inventada
 ## Primera ejecución: modo demostración
 
 1. Ejecuta `GestionCentro.exe --demo`.
-2. La demostración utiliza una carpeta independiente `demo_data` junto al EXE portable (o `.centro_demo` en desarrollo) y solicita crear un administrador de prueba.
+2. Comprueba que aparecen 30 expedientes ficticios, con estancias activas y ficha sanitaria de prueba, y que el parte diario contiene 20 anotaciones de ejemplo vinculadas a distintos menores.
+3. La demostración utiliza una carpeta independiente `demo_data` junto al EXE portable (o `.centro_demo` en desarrollo) y solicita crear un administrador de prueba.
 3. Usa una contraseña robusta que no utilices en ningún otro servicio.
-4. Crea dos cuentas ficticias de educador para comprobar la edición compartida.
-5. Mantén separadas la carpeta de demostración y la carpeta normal. No copies datos entre ellas.
+5. Crea dos cuentas ficticias de educador para comprobar la edición compartida.
+6. Mantén separadas la carpeta de demostración y la carpeta normal. No copies datos entre ellas.
 
 ## Lista de comprobación
 
