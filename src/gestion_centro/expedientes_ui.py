@@ -161,6 +161,9 @@ class MinorWorkspaceDialog(QDialog):
         self.sanitary = QWidget()
         self.sanitary_form = QFormLayout(self.sanitary)
         self.tabs.addTab(self.sanitary, "2. Información sanitaria")
+        health_management = QPushButton("Gestionar medicación, administraciones y vacunas")
+        health_management.clicked.connect(self.open_health)
+        self.sanitary_form.addRow(health_management)
         self.stays = QTableWidget(0, 5)
         self.stays.setHorizontalHeaderLabels(['ID', 'Ingreso', 'Salida', 'Estado', 'Motivo'])
         self.stays.setColumnHidden(0, True)
@@ -188,7 +191,7 @@ class MinorWorkspaceDialog(QDialog):
         documents_button.clicked.connect(self.open_documents)
         documents_layout.addWidget(documents_button)
         documents_layout.addStretch(1)
-        self.tabs.addTab(documents_tab, 'Documentación')
+        self.tabs.addTab(documents_tab, '3. Documentos escaneados')
         actions = QGridLayout()
         actions.setHorizontalSpacing(8)
         actions.setVerticalSpacing(6)
@@ -201,7 +204,6 @@ class MinorWorkspaceDialog(QDialog):
             ('Rectificar acontecimiento', self.edit_event),
             ('Historial acontecimiento', self.show_event_history),
             ('Historial de modificaciones', self.show_personal_history),
-            ('Ficha sanitaria y medicación', self.open_health),
             ('Seguimiento educativo', self.open_education),
             ('Cerrar expediente', self.accept),
         ]
