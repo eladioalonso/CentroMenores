@@ -27,6 +27,8 @@ class DiaryDialog(QDialog):
         "Comportamientos positivos": "positive",
         "Comportamientos negativos": "negative",
         "Observaciones": "observation",
+        "Altas de usuarios": "admission",
+        "Bajas de usuarios": "discharge",
     }
     def __init__(self, factory, actor_id):
         super().__init__()
@@ -372,6 +374,8 @@ class DiaryDialog(QDialog):
                 "positive": "Comportamientos positivos",
                 "negative": "Comportamientos negativos",
                 "observation": "Observaciones",
+                "admission": "Altas de usuarios",
+                "discharge": "Bajas de usuarios",
                 "general": "General (histórico)",
                 "health": "Salud (histórico)",
                 "maintenance": "Mantenimiento (histórico)",
