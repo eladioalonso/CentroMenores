@@ -96,7 +96,7 @@ def test_administration_is_separate_tab_only_for_admin():
         assert educator.findChild(QTabWidget).count() == 3
         assert admin.findChild(QTabWidget).count() == 4
         assert admin.findChild(QTabWidget).tabText(3) == "Administración"
-        assert len(admin.findChild(QTabWidget).widget(5).findChildren(QPushButton)) == 4
+        assert len(admin.findChild(QTabWidget).widget(3).findChildren(QPushButton)) == 4
     finally:
         educator.close()
         admin.close()
