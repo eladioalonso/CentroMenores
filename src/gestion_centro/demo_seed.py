@@ -98,7 +98,10 @@ def seed_demo_data(factory) -> None:
             ("activity", "Actividad de biblioteca y lectura individual."),
         ]
         for offset, (category, content) in enumerate(examples, 1):
-            diary_date = today - timedelta(days=offset)
+            # El parte de días anteriores se cierra automáticamente; para que
+            # las anotaciones sean editables en la demo se cargan en el parte
+            # de hoy y se conserva una hora distinta para cada ejemplo.
+            diary_date = today
             day = session.scalar(select(DiaryDay).where(DiaryDay.diary_date == diary_date))
             duplicate = session.scalar(select(DiaryEntry.id).where(
                 DiaryEntry.diary_day_id == day.id, DiaryEntry.content == content,
@@ -108,6 +111,6 @@ def seed_demo_data(factory) -> None:
             record_diary_entry(
                 session, actor_account_id=actor_id, diary_date=diary_date,
                 shift="unspecified", category=category, content=content,
-                happened_at=now - timedelta(days=offset, hours=2),
+                happened_at=now - timedelta(minutes=offset * 3),
                 stay_ids=[stays[(offset - 1) % len(stays)].id], now=now,
             )
