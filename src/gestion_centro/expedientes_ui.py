@@ -219,7 +219,20 @@ class MinorWorkspaceDialog(QDialog):
             self.setWindowTitle('Expediente · ' + (minor.nif_nie or minor.passport_number or 'Sin NIF/NIE') + ' · ' + minor.given_names + ' ' + minor.family_names)
             while self.personal_form.rowCount():
                 self.personal_form.removeRow(0)
-            fields = [('Nombre', minor.given_names), ('Apellidos', minor.family_names), ('País de nacimiento', minor.birth_country), ('Localidad', minor.locality), ('Nacionalidad', minor.nationality), ('Fecha nacimiento', str(minor.birth_date or '—')), ('Edad', str(minor.age) if minor.age is not None else '—'), ('NIF/NIE', minor.nif_nie), ('Pasaporte', minor.passport_number), ('Dirección', minor.address), ('Email', minor.email)]
+            fields = [
+                ('Nombre', minor.given_names), ('Apellidos', minor.family_names),
+                ('Sexo', {'female': 'Femenino', 'male': 'Masculino', 'other': 'Otro'}.get(minor.sex, '—')),
+                ('Fecha de nacimiento', str(minor.birth_date or '—')),
+                ('Edad', str(minor.age) if minor.age is not None else '—'),
+                ('Lugar de nacimiento', minor.locality), ('País de nacimiento', minor.birth_country),
+                ('Nacionalidad', minor.nationality), ('Dirección actual', minor.address),
+                ('Código postal', minor.postal_code), ('NIF/NIE', minor.nif_nie),
+                ('Email', minor.email), ('Teléfono móvil', minor.mobile_phone),
+                ('CIP', minor.cip), ('Fecha de emisión tarjeta', str(minor.health_card_issued_on or '—')),
+                ('Fecha de caducidad tarjeta', str(minor.health_card_expires_on or '—')),
+                ('Centro de salud', minor.health_center), ('Facultativo', minor.physician),
+                ('Enfermería', minor.nurse), ('Enfermedades y tratamientos', minor.clinical_history),
+            ]
             for label, value in fields:
                 self.personal_form.addRow(label, QLabel(value or '—'))
             stays = sorted(minor.stays, key=lambda item: item.sequence_number, reverse=True)
@@ -540,48 +553,72 @@ class MinorWorkspaceDialog(QDialog):
             if minor is None:
                 return
             dialog = QDialog(self)
-            dialog.setWindowTitle('Modificar datos del expediente')
-            dialog.resize(650, 700)
+            dialog.setWindowTitle("Modificar información del menor")
+            dialog.resize(760, 760)
             layout = QVBoxLayout(dialog)
             tabs = QTabWidget()
             personal_tab = QWidget()
             personal_form = QFormLayout(personal_tab)
             controls = {}
             for key, label, value in [
-                ('given_names', 'Nombre(s) *', minor.given_names),
-                ('family_names', 'Apellidos *', minor.family_names),
-                ('birth_country', 'País de nacimiento', minor.birth_country),
-                ('locality', 'Localidad', minor.locality),
-                ('nationality', 'Nacionalidad', minor.nationality),
-                ('nif_nie', 'NIF / NIE', minor.nif_nie),
-                ('passport_number', 'Pasaporte', minor.passport_number),
-                ('address', 'Dirección', minor.address),
-                ('email', 'Email', minor.email),
+                ("given_names", "Nombre *", minor.given_names),
+                ("family_names", "Apellidos *", minor.family_names),
+                ("birth_country", "País de nacimiento", minor.birth_country),
+                ("locality", "Lugar de nacimiento", minor.locality),
+                ("nationality", "Nacionalidad", minor.nationality),
+                ("nif_nie", "NIF/NIE", minor.nif_nie),
+                ("address", "Dirección actual", minor.address),
+                ("postal_code", "Código postal", minor.postal_code),
+                ("email", "Email", minor.email),
+                ("mobile_phone", "Nº teléfono móvil", minor.mobile_phone),
             ]:
-                field = QLineEdit(value or '')
+                field = QLineEdit(value or "")
                 controls[key] = field
                 personal_form.addRow(label, field)
-            birth = QDateEdit()
-            birth.setCalendarPopup(True)
-            birth.setDisplayFormat('dd/MM/yyyy')
-            birth.setMinimumDate(QDate(1900, 1, 1))
-            birth.setSpecialValueText('No indicada')
+            sex = QComboBox()
+            sex.addItem("No indicado", "")
+            sex.addItem("Femenino", "female")
+            sex.addItem("Masculino", "male")
+            sex.addItem("Otro", "other")
+            sex.setCurrentIndex(max(0, sex.findData(minor.sex or "")))
+            birth = NewMinorDialog._date_field()
             birth.setDate(QDate(minor.birth_date.year, minor.birth_date.month, minor.birth_date.day) if minor.birth_date else birth.minimumDate())
-            personal_form.addRow('Fecha de nacimiento', birth)
-            age_label = QLabel(str(minor.age) if minor.age is not None else '—')
-            personal_form.addRow('Edad (calculada)', age_label)
+            personal_form.addRow("Sexo", sex)
+            personal_form.addRow("Fecha de nacimiento", birth)
+            age_label = QLabel(str(minor.age) if minor.age is not None else "—")
+            personal_form.addRow("Edad (calculada)", age_label)
             def refresh_age(selected):
                 if selected <= birth.minimumDate():
-                    age_label.setText('—')
+                    age_label.setText("—")
                     return
                 today = QDate.currentDate()
-                years = today.year() - selected.year() - (
-                    (today.month(), today.day()) < (selected.month(), selected.day())
-                )
+                years = today.year() - selected.year() - ((today.month(), today.day()) < (selected.month(), selected.day()))
                 age_label.setText(str(years))
             birth.dateChanged.connect(refresh_age)
-            refresh_age(birth.date())
-            tabs.addTab(personal_tab, 'Datos personales')
+            tabs.addTab(personal_tab, "1. Datos generales")
+
+            sanitary_tab = QWidget()
+            sanitary_form = QFormLayout(sanitary_tab)
+            health_controls = {}
+            for key, label, value in [
+                ("cip", "CIP", minor.cip), ("health_center", "Centro de salud asignado", minor.health_center),
+                ("physician", "Facultativo asignado", minor.physician), ("nurse", "Enfermería asignada", minor.nurse),
+            ]:
+                field = QLineEdit(value or "")
+                health_controls[key] = field
+                sanitary_form.addRow(label, field)
+            issued = NewMinorDialog._date_field()
+            expires = NewMinorDialog._date_field()
+            for widget, value in ((issued, minor.health_card_issued_on), (expires, minor.health_card_expires_on)):
+                if value:
+                    widget.setDate(QDate(value.year, value.month, value.day))
+            clinical = QTextEdit()
+            clinical.setPlainText(minor.clinical_history or "")
+            clinical.setMinimumHeight(100)
+            sanitary_form.addRow("Fecha de emisión", issued)
+            sanitary_form.addRow("Fecha de caducidad", expires)
+            sanitary_form.addRow("Enfermedades y tratamientos", clinical)
+            tabs.addTab(sanitary_tab, "2. Información sanitaria")
             layout.addWidget(tabs)
             buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
             buttons.accepted.connect(dialog.accept)
@@ -590,15 +627,20 @@ class MinorWorkspaceDialog(QDialog):
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 return
             values = {key: field.text() for key, field in controls.items()}
-            values['birth_date'] = birth.date().toPython() if birth.date() > birth.minimumDate() else None
+            values.update({key: field.text() for key, field in health_controls.items()})
+            values["sex"] = sex.currentData()
+            values["birth_date"] = birth.date().toPython() if birth.date() > birth.minimumDate() else None
+            values["health_card_issued_on"] = issued.date().toPython() if issued.date() > issued.minimumDate() else None
+            values["health_card_expires_on"] = expires.date().toPython() if expires.date() > expires.minimumDate() else None
+            values["clinical_history"] = clinical.toPlainText()
         try:
             from gestion_centro.domain.service import update_minor_personal_data
             with session_scope(self.factory) as session:
                 update_minor_personal_data(session, actor_account_id=self.actor_id, minor_id=self.minor_id, **values)
             self.refresh()
-            QMessageBox.information(self, 'Expediente', 'Datos modificados y cambio versionado y auditado.')
+            QMessageBox.information(self, "Información del menor", "Los cambios se han guardado y quedan versionados y auditados.")
         except (ValueError, PermissionError) as exc:
-            QMessageBox.warning(self, 'No se pudo modificar', str(exc))
+            QMessageBox.warning(self, "No se pudo modificar", str(exc))
 
 class ExpedientesDialog(QDialog):
     def __init__(self, factory, actor_id, documents_opener=None):
