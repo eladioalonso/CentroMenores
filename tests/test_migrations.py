@@ -22,6 +22,12 @@ def test_upgrade_creates_versioned_auth_schema(tmp_path):
     minor_columns = {column["name"] for column in inspector.get_columns("minors")}
     assert "internal_code" in minor_columns  # clave técnica heredada, no visible en la interfaz
     assert "nif_nie" in minor_columns
+    assert {"sex", "postal_code", "mobile_phone", "health_card_issued_on"} <= minor_columns
+    diary_columns = {column["name"] for column in inspector.get_columns("diary_days")}
+    assert {
+        "morning_staff", "afternoon_staff", "night_staff",
+        "morning_activities", "afternoon_activities", "night_activities",
+    } <= diary_columns
     minor_indexes = {item["name"]: item for item in inspector.get_indexes("minors")}
     assert minor_indexes["uq_minors_nif_nie"]["unique"] == 1
     user_account_columns = {column["name"] for column in inspector.get_columns("user_accounts")}
