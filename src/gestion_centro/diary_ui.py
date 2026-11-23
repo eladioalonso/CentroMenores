@@ -52,8 +52,6 @@ class DiaryDialog(QDialog):
         form = QFormLayout()
         self.day.setCalendarPopup(True)
         self.day.setDate(QDate.currentDate())
-        self.shift = QComboBox()
-        for label, key in self.SHIFTS.items(): self.shift.addItem(label, key)
         self.category = QComboBox()
         for label, key in self.CATEGORIES.items():
             self.category.addItem(label, key)
@@ -63,7 +61,6 @@ class DiaryDialog(QDialog):
         self.participant_hint = QLineEdit("Sin menores vinculados")
         self.participant_hint.setReadOnly(True)
         self.selected_stay_ids = []
-        form.addRow("Turno", self.shift)
         form.addRow("Apartado", self.category)
         form.addRow("Contenido", self.content)
         select_stays = QPushButton("Vincular menores / estancias…")
@@ -163,7 +160,7 @@ class DiaryDialog(QDialog):
             moment = local.astimezone().astimezone(timezone.utc)
             with session_scope(self.factory) as session:
                 record_diary_entry(session, actor_account_id=self.actor_id,
-                    diary_date=self.day.date().toPython(), shift=self.shift.currentData(),
+                    diary_date=self.day.date().toPython(), shift="unspecified",
                     category=self.category.currentData(), content=self.content.toPlainText(),
                     happened_at=moment, stay_ids=self.selected_stay_ids)
             self.content.clear()
@@ -202,10 +199,6 @@ class DiaryDialog(QDialog):
             dialog.setWindowTitle("Revisar anotación del parte diario")
             dialog.resize(680, 520)
             form = QFormLayout(dialog)
-            shift = QComboBox()
-            for label, key in self.SHIFTS.items():
-                shift.addItem(label, key)
-            shift.setCurrentIndex(max(0, shift.findData(original["shift"])))
             category = QComboBox()
             categories = dict(self.CATEGORIES)
             categories.update({
@@ -223,7 +216,6 @@ class DiaryDialog(QDialog):
             content.setPlainText(original["content"])
             reason = QLineEdit()
             reason.setPlaceholderText("Motivo breve de la corrección")
-            form.addRow("Turno", shift)
             form.addRow("Apartado", category)
             form.addRow("Fecha y hora del hecho", happened)
             form.addRow("Contenido", content)
@@ -250,7 +242,7 @@ class DiaryDialog(QDialog):
                     session, actor_account_id=self.actor_id,
                     original_entry_id=metadata["id"],
                     content=content.toPlainText(), reason=reason.text(),
-                    happened_at=moment, shift=shift.currentData(),
+                    happened_at=moment, shift=original["shift"],
                     category=category.currentData(),
                     stay_ids=self.selected_stay_ids,
                 )
