@@ -514,3 +514,43 @@ def test_diary_revision_can_correct_linked_minor_and_stay():
         old_links=session.scalars(select(DiaryEntryStayLink).where(
             DiaryEntryStayLink.entry_id==original.id)).all()
         assert [link.stay_id for link in old_links]==[first.id]
+
+
+def test_simple_minor_fields_and_daily_shift_details_are_persisted_and_audited():
+    from gestion_centro.auth.models import AccessAudit
+    from gestion_centro.domain.models import DiaryDay
+    from gestion_centro.domain.service import update_diary_day_details
+
+    with make_session() as session:
+        actor = create_professional_account(
+            session, display_name="Educadora de prueba",
+            username="simple-fields-test",
+            password="contraseña de prueba segura", role=Role.EDUCATOR,
+        )
+        minor = create_minor(
+            session, actor_account_id=actor.id,
+            given_names="Menor", family_names="Prueba",
+            sex="female", postal_code="52001", mobile_phone="600000000",
+            health_card_issued_on=date(2026, 1, 10),
+        )
+        assert minor.sex == "female"
+        assert minor.postal_code == "52001"
+        assert minor.mobile_phone == "600000000"
+        assert minor.health_card_issued_on == date(2026, 1, 10)
+
+        day = update_diary_day_details(
+            session, actor_account_id=actor.id, diary_date=date(2026, 11, 23),
+            morning_staff="Educador A", afternoon_staff="Educadora B",
+            night_staff="Educador C", morning_activities="Actividad mañana",
+            afternoon_activities="Actividad tarde", night_activities="Actividad noche",
+        )
+        assert isinstance(day, DiaryDay)
+        assert day.morning_staff == "Educador A"
+        assert day.afternoon_staff == "Educadora B"
+        assert day.night_staff == "Educador C"
+        assert day.morning_activities == "Actividad mañana"
+        assert day.afternoon_activities == "Actividad tarde"
+        assert day.night_activities == "Actividad noche"
+        assert session.scalar(select(AccessAudit).where(
+            AccessAudit.event == "diary_day_details_updated"
+        )) is not None
