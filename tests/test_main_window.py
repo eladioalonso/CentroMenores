@@ -170,7 +170,7 @@ def test_resident_workspace_includes_documents_tab_and_opener():
         assert dialog.documents_table.columnCount() == 5
         health_button = next(
             button for button in dialog.findChildren(QPushButton)
-            if button.text() == "Ficha sanitaria y medicación"
+            if button.text() == "Gestionar medicación, administraciones y vacunas"
         )
         assert health_button.isEnabled()
         dialog.open_documents()
