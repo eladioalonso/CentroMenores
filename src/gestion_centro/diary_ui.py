@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QHeaderView, QMessageBox, QListWidget, QListWidgetItem,
     QDialogButtonBox, QLabel, QGroupBox, QInputDialog,
 )
-from sqlalchemy import select, or_
+from sqlalchemy import select
 
 from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import DiaryDay, DiaryEntry, DiaryEntryStayLink, Stay
@@ -22,7 +22,6 @@ from gestion_centro.domain.documents_service import list_active_stays, list_docu
 class DiaryDialog(QDialog):
     SHIFTS = {"Mañana": "morning", "Tarde": "afternoon", "Noche": "night", "Sin especificar": "unspecified"}
     CATEGORIES = {
-        "Actividades realizadas": "activity",
         "Comportamientos positivos": "positive",
         "Comportamientos negativos": "negative",
         "Observaciones": "observation",
