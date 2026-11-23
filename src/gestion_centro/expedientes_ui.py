@@ -218,6 +218,7 @@ class MinorWorkspaceDialog(QDialog):
         action_items = [
             ("Modificar información del menor", self.edit_personal),
             ("Historial de modificaciones", self.show_personal_history),
+            ("Seguimiento educativo", self.open_education),
             ("Cerrar ficha", self.accept),
         ]
         for index, (label, callback) in enumerate(action_items):
