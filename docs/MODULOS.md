@@ -1,81 +1,68 @@
 # Organización funcional de la aplicación
 
-La aplicación se organiza en **cuatro módulos de trabajo**, tal como se aprobó en las decisiones consolidadas. La pantalla de Inicio es únicamente un panel de entrada y Administración es un área técnica reservada al administrador; ninguno constituye un quinto módulo funcional.
+La aplicación tendrá **dos apartados principales de trabajo**. La pantalla de Inicio puede mantenerse como entrada rápida y el área de Administración será exclusivamente técnica para el administrador; no son módulos de trabajo.
 
-Las herramientas que antes podían aparecer como apartados independientes —documentación, seguimiento educativo, escolaridad, salidas, visitas, autorizaciones, agenda y calendario— quedan integradas en el expediente principal o en el parte diario según su finalidad.
+## 1. Información del menor
 
-## 1. Expediente principal del menor
+Una ficha única por menor, con tres pestañas sencillas:
 
-Es la ficha individual de referencia y el punto de consulta de la trayectoria personal y educativa.
+### 1.1 Datos generales
+- Nombre.
+- Apellidos.
+- Sexo.
+- Fecha de nacimiento.
+- Lugar de nacimiento.
+- País de nacimiento.
+- Nacionalidad.
+- Dirección actual.
+- Código postal.
+- NIF/NIE.
+- Email.
+- Número de teléfono móvil.
 
-Incluye:
+La edad se calculará automáticamente a partir de la fecha de nacimiento, sin pedir que se introduzca manualmente.
 
-- Identificación: nombre y apellidos, lugar y país de nacimiento, nacionalidad, fecha de nacimiento y edad calculada, NIF/NIE, pasaporte, domicilio y correo.
-- Historial de ingresos, reingresos y bajas, manteniendo cada estancia como un periodo independiente.
-- Seguimiento educativo, objetivos, evolución, PEI y escolaridad.
-- Documentación personal y administrativa vinculada al menor o a una estancia.
-- Salidas y retornos, responsables, destinos y situación de cada movimiento.
-- Autorizaciones, consentimientos, visitas y restricciones de contacto.
-- Historial de acontecimientos del menor, con acceso a los hechos del parte diario relacionados.
+### 1.2 Información sanitaria
+- CIP.
+- Fecha de emisión de la tarjeta sanitaria.
+- Fecha de caducidad.
+- Centro de salud asignado.
+- Facultativo asignado.
+- Enfermería asignada.
+- Enfermedades y tratamientos.
 
-Los datos identificativos se mantienen en este expediente. La información clínica y los identificadores sanitarios se gestionan en el expediente sanitario, evitando que existan dos fichas clínicas independientes.
+La información sanitaria estará dentro de la ficha del menor, no en un módulo independiente. Se mantendrá el historial de cambios y, cuando proceda, el detalle de medicación, administraciones y vacunación asociado a ese menor. Los datos sanitarios no se duplicarán en el parte diario: allí solo se reflejarán las actuaciones o incidencias que deban constar cronológicamente.
 
-## 2. Expediente sanitario del menor
+### 1.3 Documentos escaneados
+- Adjuntar y consultar documentos escaneados desde la propia ficha.
+- Cada documento conservará su relación con el menor y su historial.
 
-Es el registro sanitario permanente vinculado directamente al expediente principal, no a una única estancia. Debe permitir consultar la trayectoria sanitaria aunque el menor haya causado baja y posteriormente haya reingresado.
+## 2. Parte diario / Calendario
 
-Incluye:
+Un único registro por fecha, organizado por turnos:
 
-- Perfil sanitario: CIP, centro de salud, facultativo, enfermería, vigencia de tarjeta sanitaria, antecedentes, alergias, condiciones relevantes e instrucciones de emergencia.
-- Historial de consultas, incidencias sanitarias, urgencias y actuaciones registradas por el centro.
-- Medicación y tratamientos prescritos, con pauta, duración, horarios, administraciones y seguimiento.
-- Vacunación individual: administraciones documentadas, identificación de vacuna y dosis, fecha, centro/profesional, lote y justificante cuando consten.
-- Revisiones de calendario y seguimiento de dosis, diferenciando calendario infantil, acelerado, adulto, grupos de riesgo, campañas e inmunización pasiva.
-- Versiones y trazabilidad de las modificaciones.
+- Fecha.
+- Personal de mañana.
+- Personal de tarde.
+- Personal de noche.
+- Altas de menores.
+- Bajas de menores.
+- Actividades de mañana.
+- Actividades de tarde.
+- Actividades de noche.
+- Conductas positivas.
+- Conductas negativas.
+- Observaciones.
 
-Los catálogos vacunales son referencias documentales versionadas. No diagnostican, prescriben ni sustituyen la valoración del profesional sanitario. La falta de un registro de administración no se interpretará por sí sola como confirmación de una dosis pendiente.
+Las anotaciones conservarán fecha, turno, autoría y rectificaciones. Los registros cerrados podrán corregirse mediante una nueva versión, conservando el original y el motivo.
 
-Todos los educadores activos pueden consultar y actualizar los datos ordinarios del expediente sanitario, dejando auditoría de los accesos y cambios conforme a las reglas del centro.
+El calendario se consultará desde este mismo apartado, sin constituir otro módulo independiente.
 
-## 3. Parte diario
+## Reglas comunes
 
-Es la fuente cronológica única de los acontecimientos y de la actividad cotidiana del centro.
-
-Incluye:
-
-- Fecha y organización por turnos (mañana, tarde y noche), con identificación de los educadores.
-- Altas, reingresos, bajas y salidas que deban reflejarse en el registro diario.
-- Actividades, tareas y asuntos relevantes para la continuidad entre turnos.
-- Observaciones generales y hechos relacionados con uno o varios menores.
-- Actuaciones y acontecimientos sanitarios que deban constar en la cronología, sin sustituir el expediente sanitario.
-- Conductas positivas y negativas.
-- Rectificaciones vinculadas a la anotación original.
-
-Las incidencias no se duplican en un segundo registro factual independiente: se documentan en el parte diario y desde allí se seleccionan los hechos que deban formar parte de un informe. Una rectificación conserva el texto anterior, autoría, fecha y motivo cuando corresponda.
-
-## 4. Informes de incidencias
-
-Permite elaborar documentos a partir de una o varias anotaciones ya existentes en el parte diario.
-
-Flujo de trabajo:
-
-1. Buscar anotaciones por periodo y, cuando proceda, por menor.
-2. Seleccionar los hechos que se incorporarán al informe.
-3. Preparar una relación cronológica con fecha, menores vinculados, categoría, contenido y autoría original.
-4. Revisar y completar título, destinatario y redacción.
-5. Guardar un borrador compartido para continuarlo desde otra sesión de educador.
-6. Emitir una versión oficial y exportarla a Word.
-7. Si se detecta un error en una versión emitida, generar una rectificación versionada sin sobrescribir el documento anterior.
-
-Cada versión conserva el texto, autor, fecha y vínculos con las anotaciones del parte diario que la sustentan. El mismo hecho puede incorporarse a más de un informe. El informe no reemplaza ni modifica la anotación original.
-
-## Reglas comunes de funcionamiento
-
-- Cualquier educador activo puede consultar, crear y modificar información de los cuatro módulos, independientemente de quién creó el registro.
-- Las modificaciones relevantes quedan auditadas y, cuando corresponda, versionadas o vinculadas como rectificación.
-- Los registros originales y las versiones emitidas oficialmente no se sobrescriben.
-- La información se introduce una sola vez y se reutiliza mediante vínculos entre expedientes, parte diario e informes.
-- Las herramientas de administración técnica —cuentas, configuración, copias, restauración y diagnóstico— permanecen fuera de los cuatro módulos.
-- La pantalla de Inicio resume la actividad y facilita el acceso; no crea una fuente de datos paralela.
-
-Para reglas detalladas de permisos, cierres, conservación y flujos, prevalecen [Decisiones consolidadas del diseño](DECISIONES_CONSOLIDADAS.md), [Usuarios y permisos](USUARIOS_Y_PERMISOS.md) y [Flujos de trabajo](FLUJOS_DE_TRABAJO.md).
+- La ficha del menor será el punto único de consulta de sus datos generales, sanitarios y documentos.
+- Los educadores activos podrán consultar y actualizar la información ordinaria, con trazabilidad de los cambios.
+- La información se introducirá una sola vez y se reutilizará mediante vínculos.
+- Las herramientas técnicas de usuarios, copias, restauración y diagnóstico permanecerán separadas y reservadas al administrador.
+- Las funciones anteriores que ya no formen parte de estos dos apartados no deben aparecer como módulos ni botones de uso diario. Los datos históricos existentes se conservarán durante la simplificación; no se eliminarán automáticamente.
+- La aplicación seguirá en validación y no se utilizará con datos reales hasta completar las pruebas y la aprobación institucional.
