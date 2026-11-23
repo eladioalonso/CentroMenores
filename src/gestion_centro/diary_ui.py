@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, QDateEdit, QDateTimeEdit,
     QComboBox, QLineEdit, QTextEdit, QPushButton, QTableWidget, QTableWidgetItem,
     QHeaderView, QMessageBox, QListWidget, QListWidgetItem,
-    QDialogButtonBox, QLabel, QGroupBox,
+    QDialogButtonBox, QLabel, QGroupBox, QInputDialog,
 )
 from sqlalchemy import select, or_
 
@@ -126,6 +126,18 @@ class DiaryDialog(QDialog):
         self.refresh()
 
     def save_day_details(self):
+        reason = None
+        with session_scope(self.factory) as session:
+            existing_day = session.scalar(select(DiaryDay).where(
+                DiaryDay.diary_date == self.day.date().toPython()
+            ))
+            is_closed = bool(existing_day and existing_day.closed_at)
+        if is_closed:
+            reason, accepted = QInputDialog.getText(
+                self, "Rectificar parte cerrado", "Motivo de la modificación:"
+            )
+            if not accepted or not reason.strip():
+                return
         try:
             with session_scope(self.factory) as session:
                 update_diary_day_details(
@@ -137,6 +149,7 @@ class DiaryDialog(QDialog):
                     morning_activities=self.morning_activities.toPlainText(),
                     afternoon_activities=self.afternoon_activities.toPlainText(),
                     night_activities=self.night_activities.toPlainText(),
+                    reason=reason,
                 )
             QMessageBox.information(self, "Parte diario", "Se han guardado los turnos y las actividades del día.")
         except (ValueError, PermissionError) as exc:
