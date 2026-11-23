@@ -45,11 +45,10 @@ En desarrollo, la carpeta de datos se puede indicar con `CENTRO_DATOS_DIR`; por 
 
 ## Funciones de la versión de desarrollo
 
-- Navegación principal organizada en los cuatro módulos funcionales aprobados.
-- Expediente principal con identidad única, estancias, seguimiento educativo, escolaridad, documentos, autorizaciones, visitas y salidas.
-- Expediente sanitario permanente por menor, con medicación, administraciones, vacunas, revisiones y versiones trazables.
-- Parte diario cronológico compartido, con anotaciones relacionadas con uno o varios menores y rectificaciones versionadas.
-- Informes de incidencias con selección explícita de hechos del parte, borradores compartidos, emisión, rectificación e historial de versiones.
+- Nueva organización simplificada en dos apartados de trabajo: Información del menor y Parte diario / Calendario.
+- Información del menor en una ficha única con datos generales, información sanitaria y documentos escaneados.
+- Parte diario organizado por fecha y turnos, con personal, altas, bajas, actividades, conductas y observaciones.
+- Historial, autoría y rectificaciones versionadas conservados.
 - Edición ordinaria compartida: cualquier educador activo puede modificar registros creados por otro educador; se conserva la autoría histórica.
 - Copias ZIP verificables y restauración con copia previa, validación de integridad y reconciliación de auditoría.
 - Ayuda integrada y modo de demostración aislado.
