@@ -153,7 +153,7 @@ def update_diary_day_details(
     session: Session, *, actor_account_id: str, diary_date: date,
     morning_staff: str = "", afternoon_staff: str = "", night_staff: str = "",
     morning_activities: str = "", afternoon_activities: str = "",
-    night_activities: str = "",
+    night_activities: str = "", reason: str | None = None,
 ) -> DiaryDay:
     """Guarda personal y actividades por turno en el encabezado diario."""
     actor = _active_author(session, actor_account_id)
@@ -172,10 +172,15 @@ def update_diary_day_details(
     }
     changed = [key for key, value in values.items() if getattr(day, key) != value]
     if changed:
+        if day.closed_at and not (reason or "").strip():
+            raise ValueError("Para corregir los datos de un parte cerrado debes indicar el motivo.")
+        old_values = {key: getattr(day, key) for key in changed}
         for key in changed:
             setattr(day, key, values[key])
         _audit(session, actor, "diary_day_details_updated",
-               f"Fecha: {diary_date.isoformat()}; campos: {', '.join(changed)}")
+               f"Fecha: {diary_date.isoformat()}; motivo: {(reason or '').strip()}; "
+               f"valores anteriores: {old_values}; valores nuevos: "
+               f"{{{', '.join(f'{key!r}: {values[key]!r}' for key in changed)}}}")
     return day
 
 
