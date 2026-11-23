@@ -59,6 +59,15 @@ def create_minor(
     )
     session.add(minor)
     session.flush()
+    if any((cip, health_center, physician, nurse, health_card_expires_on, clinical_history)):
+        from gestion_centro.domain.health_service import save_health_profile
+        save_health_profile(
+            session, actor_account_id=actor.id, minor_id=minor.id,
+            allergies=None, relevant_conditions=None, emergency_instructions=None,
+            cip=cip, health_center=health_center, physician=physician, nurse=nurse,
+            health_card_expires_on=health_card_expires_on,
+            clinical_history=clinical_history,
+        )
     _audit(session, actor, "minor_created", f"Expediente: {minor.id}")
     return minor
 
@@ -142,6 +151,20 @@ def update_minor_personal_data(
     for name, value in values.items():
         setattr(minor, name, value)
     minor.updated_at = datetime.now(timezone.utc)
+    if set(changed) & HEALTH_PERSONAL_FIELDS:
+        from gestion_centro.domain.health_service import save_health_profile
+        from gestion_centro.domain.health import HealthProfile
+        profile = session.scalar(select(HealthProfile).where(HealthProfile.minor_id == minor.id))
+        save_health_profile(
+            session, actor_account_id=actor.id, minor_id=minor.id,
+            allergies=profile.allergies if profile else None,
+            relevant_conditions=profile.relevant_conditions if profile else None,
+            emergency_instructions=profile.emergency_instructions if profile else None,
+            cip=minor.cip, health_center=minor.health_center,
+            physician=minor.physician, nurse=minor.nurse,
+            health_card_expires_on=minor.health_card_expires_on,
+            clinical_history=minor.clinical_history,
+        )
     _audit(session, actor, "minor_personal_data_updated",
         f"Expediente: {minor.id}; versión: {version.id}; campos modificados: {', '.join(changed)}")
     return minor
