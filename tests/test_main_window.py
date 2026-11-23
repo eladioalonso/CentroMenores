@@ -166,8 +166,15 @@ def test_resident_workspace_includes_documents_tab_and_opener():
     )
     try:
         labels = [dialog.tabs.tabText(i) for i in range(dialog.tabs.count())]
-        assert "3. Documentos escaneados" in labels
+        assert "3. Ingresos y estancias" in labels
+        assert "4. Acontecimientos" in labels
+        assert "5. Documentos escaneados" in labels
         assert dialog.documents_table.columnCount() == 5
+        assert dialog.stays.columnCount() == 5
+        assert dialog.events.columnCount() == 5
+        action_labels = {button.text() for button in dialog.findChildren(QPushButton)}
+        assert {"Nuevo ingreso / reingreso", "Modificar estancia", "Cerrar estancia",
+                "Añadir acontecimiento", "Rectificar acontecimiento", "Historial de versiones"} <= action_labels
         health_button = next(
             button for button in dialog.findChildren(QPushButton)
             if button.text() == "Gestionar medicación, administraciones y vacunas"
