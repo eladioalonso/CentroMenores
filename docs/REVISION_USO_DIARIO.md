@@ -50,9 +50,9 @@ Los calendarios vacunales son referencias documentales; no prescriben ni determi
 Es la fuente cronológica única de los hechos y de la actividad cotidiana del centro.
 
 Debe facilitar:
-- Consulta por fecha, turno, categoría y menor.
-- Identificación de educadores de mañana, tarde y noche.
-- Registro de altas, bajas, actividades, observaciones y comportamientos.
+- Consulta por fecha, categoría y menor.
+- Registro de actividades realizadas en el día, comportamientos positivos, comportamientos negativos y observaciones.
+- Las altas y bajas se reflejan desde el historial de estancias del expediente; no se duplican como categorías manuales del parte.
 - Anotaciones generales o relacionadas con varios menores.
 - Rectificaciones vinculadas a la anotación original.
 - Acceso a agenda y calendario como vistas de planificación relacionadas, sin crear una segunda fuente de datos.
