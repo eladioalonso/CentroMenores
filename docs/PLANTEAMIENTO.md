@@ -12,7 +12,7 @@ La aplicación tendrá exactamente cuatro módulos de trabajo:
 
 1. **Expediente principal del menor:** identidad, datos personales, estancias e ingresos/reingresos, seguimiento educativo, escolaridad, documentos, autorizaciones, visitas, restricciones, salidas y retornos.
 2. **Expediente sanitario del menor:** ficha sanitaria, antecedentes, consultas y urgencias, tratamientos, medicación, administraciones, vacunación, revisiones y documentación sanitaria. Está vinculado a la ficha única del menor.
-3. **Parte diario:** cronología compartida por fecha y turnos, educadores, altas/bajas, actividades, observaciones, conductas positivas y negativas y hechos relevantes.
+3. **Parte diario:** cronología compartida por fecha y cuatro apartados: actividades realizadas en el día, comportamientos positivos, comportamientos negativos y observaciones. Cada anotación conserva fecha/hora, autoría y vínculos con menores cuando corresponda; las altas y bajas se gestionan desde el historial de estancias.
 4. **Informes de incidencias:** selección de anotaciones del parte diario, elaboración de borradores, revisión, emisión, rectificación e historial de versiones.
 
 Inicio es un panel de entrada y resumen, no un módulo adicional. Administración es un área técnica reservada al administrador, no un módulo de trabajo para educadores.
