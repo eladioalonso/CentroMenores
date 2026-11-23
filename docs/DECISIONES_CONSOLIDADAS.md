@@ -128,35 +128,25 @@ Todos los educadores podrán activar el procedimiento excepcional (*break glass*
 - Diagnóstico automático y completo manual por el administrador: base de datos, relaciones, carpetas, permisos, adjuntos, copias, espacio y estado general.
 - Los informes técnicos no contendrán datos identificativos, sanitarios ni contenido de menores. Si se necesitara soporte con datos reales, deberá autorizarse y minimizarse separadamente.
 
-## 9. Módulos funcionales definitivos
+## 9. Organización funcional simplificada
 
-La aplicación tendrá exactamente cuatro módulos de trabajo:
+La aplicación tendrá **dos apartados principales de trabajo**:
 
-1. **Expediente principal del menor.** Ficha identificativa, estancias e ingresos/reingresos, seguimiento educativo, escolaridad, documentación personal y administrativa, familiares y restricciones, visitas, salidas y autorizaciones.
-2. **Expediente sanitario del menor.** Ficha sanitaria, antecedentes, consultas y urgencias, tratamientos, medicación, administraciones, vacunas, dosis, revisiones y documentación sanitaria. Se vincula al expediente principal y no duplica la identidad del menor.
-3. **Parte diario.** Registro cronológico único por fecha y turnos, con educadores, altas/bajas, actividades, observaciones, comportamientos e incidencias. Es la fuente de los hechos que se utilizarán en los informes.
-4. **Informes de incidencias.** Selección de hechos ya registrados en el parte diario, elaboración cronológica, revisión, emisión y rectificación versionada. Cada hecho seleccionado mantiene su vínculo con el registro original.
+1. **Información del menor.** Una ficha única con tres secciones: datos generales (nombre, apellidos, sexo, fecha y lugar de nacimiento, país de nacimiento, nacionalidad, dirección actual, código postal, NIF/NIE, email y teléfono móvil); información sanitaria (CIP, fecha de emisión y caducidad de tarjeta, centro de salud, facultativo, enfermería, enfermedades y tratamientos); y documentos escaneados.
+2. **Parte diario / Calendario.** Registro único por fecha con personal de mañana, tarde y noche; altas y bajas de menores; actividades separadas por mañana, tarde y noche; conductas positivas y negativas; y observaciones. El calendario queda integrado en este apartado.
 
-El inicio/panel general puede existir como pantalla de entrada, pero no es un módulo funcional adicional. Usuarios, permisos, auditoría, copias, restauración, mantenimiento y configuración son herramientas técnicas reservadas al administrador y no módulos de trabajo para educadores.
+El inicio/panel general puede mantenerse como pantalla de entrada, pero no es un módulo funcional adicional. Administración, usuarios, permisos, copias, restauración, mantenimiento y configuración son herramientas técnicas reservadas al administrador.
 
-### Reglas transversales
-- La información se registra una sola vez en su módulo de origen. Los demás módulos la consultan o enlazan, sin crear duplicados innecesarios.
-- El expediente principal y el sanitario comparten la identidad única del menor; los datos sanitarios se mantienen en el expediente sanitario.
-- El parte diario es la fuente cronológica de hechos. Un informe selecciona y referencia anotaciones existentes; no obliga a registrar de nuevo el mismo acontecimiento como una segunda incidencia independiente.
-- Un informe puede agrupar hechos de varios días y menores; un mismo hecho puede formar parte de más de un informe.
-- Los borradores de informe se pueden editar. Las versiones emitidas oficialmente se conservan y cualquier rectificación genera una nueva versión vinculada, sin alterar la entregada.
-- Diferenciar fecha/hora del hecho y fecha/hora de registro.
-- Las operaciones relevantes conservan autoría, fecha/hora, historial y trazabilidad.
+La información sanitaria deja de mostrarse como módulo independiente y se integra en la ficha del menor. Se conservarán los datos sanitarios existentes, el historial de versiones, y el detalle clínico o de medicación que ya esté registrado, sin duplicarlo en el parte diario.
 
-### Edición compartida por educadores
-- Todos los educadores activos pueden consultar, crear y modificar cualquier información de los cuatro módulos, independientemente de quién creó el registro.
-- No existen restricciones de edición por autor, turno, antigüedad del registro o cierre del parte diario.
-- El cierre del parte impide añadir nuevas anotaciones ordinarias a esa fecha, pero no impide modificar anotaciones existentes.
-- La edición crea una nueva versión vinculada al original. Nunca se sobrescribe silenciosamente la información anterior.
-- Cada versión identifica al educador que realizó el cambio, fecha/hora, registro afectado y motivo de modificación cuando corresponda.
-- Los informes ya emitidos no se alteran retroactivamente: se crea una versión rectificada y se conserva la versión emitida.
-- El administrador no será intermediario obligatorio para las modificaciones ordinarias. Sus permisos adicionales se limitan a administración técnica, cuentas, configuración, copias y restauración.
-- La identidad del autor original se conserva como dato histórico aunque otro educador realice una modificación.
+Las funciones anteriores que no aparecen en esta estructura dejarán de ocupar la navegación o las pantallas de uso cotidiano. Los registros históricos se conservarán durante la simplificación y no se eliminarán automáticamente.
+
+Reglas comunes:
+- La ficha del menor será el punto único de consulta de sus datos generales, sanitarios y documentos.
+- El parte diario será la fuente cronológica de actividad, hechos y continuidad entre turnos.
+- Todos los educadores activos podrán consultar y actualizar la información ordinaria, con autoría, auditoría e historial de rectificaciones.
+- Los registros cerrados podrán corregirse mediante una nueva versión, conservando el original y el motivo.
+- La información se introducirá una sola vez y se reutilizará mediante vínculos, evitando duplicidades.
 
 ## 10. Ayuda y formación
 
