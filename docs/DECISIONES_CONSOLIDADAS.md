@@ -133,7 +133,7 @@ Todos los educadores podrán activar el procedimiento excepcional (*break glass*
 La aplicación tendrá **dos apartados principales de trabajo**:
 
 1. **Información del menor.** Una ficha única con tres secciones: datos generales (nombre, apellidos, sexo, fecha y lugar de nacimiento, país de nacimiento, nacionalidad, dirección actual, código postal, NIF/NIE, email y teléfono móvil); información sanitaria (CIP, fecha de emisión y caducidad de tarjeta, centro de salud, facultativo, enfermería, enfermedades y tratamientos); y documentos escaneados.
-2. **Parte diario / Calendario.** Registro único por fecha con personal de mañana, tarde y noche; altas y bajas de menores; actividades separadas por mañana, tarde y noche; conductas positivas y negativas; y observaciones. El calendario queda integrado en este apartado.
+2. **Parte diario / Calendario.** Registro cronológico único por fecha, organizado en cuatro apartados: actividades realizadas en el día, comportamientos positivos, comportamientos negativos y observaciones. Cada anotación conserva fecha/hora, autoría y, cuando corresponda, vínculos con uno o varios menores. No se solicita personal ni se separan actividades por turnos en el formulario diario. Las altas y bajas se consultan desde el historial de estancias del expediente. El calendario queda integrado en este apartado.
 
 El inicio/panel general puede mantenerse como pantalla de entrada, pero no es un módulo funcional adicional. Administración, usuarios, permisos, copias, restauración, mantenimiento y configuración son herramientas técnicas reservadas al administrador.
 
