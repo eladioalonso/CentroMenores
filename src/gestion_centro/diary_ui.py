@@ -44,9 +44,7 @@ class DiaryDialog(QDialog):
         self.day.setDate(QDate.currentDate())
         date_form = QFormLayout()
         date_form.addRow("Fecha", self.day)
-        layout.addLayout(date_for        # La actividad diaria se registra como una anotación única en el apartado
-        # correspondiente, evitando duplicarla en tres campos por turnos.
-)
+        layout.addLayout(date_form)
 
         form = QFormLayout()
         self.day.setCalendarPopup(True)
