@@ -166,7 +166,7 @@ def test_resident_workspace_includes_documents_tab_and_opener():
     )
     try:
         labels = [dialog.tabs.tabText(i) for i in range(dialog.tabs.count())]
-        assert "Documentación" in labels
+        assert "3. Documentos escaneados" in labels
         assert dialog.documents_table.columnCount() == 5
         health_button = next(
             button for button in dialog.findChildren(QPushButton)
