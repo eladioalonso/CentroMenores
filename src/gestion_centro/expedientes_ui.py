@@ -157,7 +157,10 @@ class MinorWorkspaceDialog(QDialog):
         layout.addWidget(self.tabs)
         self.personal = QWidget()
         self.personal_form = QFormLayout(self.personal)
-        self.tabs.addTab(self.personal, 'Datos personales')
+        self.tabs.addTab(self.personal, "1. Datos generales")
+        self.sanitary = QWidget()
+        self.sanitary_form = QFormLayout(self.sanitary)
+        self.tabs.addTab(self.sanitary, "2. Información sanitaria")
         self.stays = QTableWidget(0, 5)
         self.stays.setHorizontalHeaderLabels(['ID', 'Ingreso', 'Salida', 'Estado', 'Motivo'])
         self.stays.setColumnHidden(0, True)
@@ -219,22 +222,27 @@ class MinorWorkspaceDialog(QDialog):
             self.setWindowTitle('Expediente · ' + (minor.nif_nie or minor.passport_number or 'Sin NIF/NIE') + ' · ' + minor.given_names + ' ' + minor.family_names)
             while self.personal_form.rowCount():
                 self.personal_form.removeRow(0)
-            fields = [
-                ('Nombre', minor.given_names), ('Apellidos', minor.family_names),
-                ('Sexo', {'female': 'Femenino', 'male': 'Masculino', 'other': 'Otro'}.get(minor.sex, '—')),
-                ('Fecha de nacimiento', str(minor.birth_date or '—')),
-                ('Edad', str(minor.age) if minor.age is not None else '—'),
-                ('Lugar de nacimiento', minor.locality), ('País de nacimiento', minor.birth_country),
-                ('Nacionalidad', minor.nationality), ('Dirección actual', minor.address),
-                ('Código postal', minor.postal_code), ('NIF/NIE', minor.nif_nie),
-                ('Email', minor.email), ('Teléfono móvil', minor.mobile_phone),
-                ('CIP', minor.cip), ('Fecha de emisión tarjeta', str(minor.health_card_issued_on or '—')),
-                ('Fecha de caducidad tarjeta', str(minor.health_card_expires_on or '—')),
-                ('Centro de salud', minor.health_center), ('Facultativo', minor.physician),
-                ('Enfermería', minor.nurse), ('Enfermedades y tratamientos', minor.clinical_history),
+            general_fields = [
+                ("Nombre", minor.given_names), ("Apellidos", minor.family_names),
+                ("Sexo", {"female": "Femenino", "male": "Masculino", "other": "Otro"}.get(minor.sex, "—")),
+                ("Fecha de nacimiento", str(minor.birth_date or "—")),
+                ("Edad", str(minor.age) if minor.age is not None else "—"),
+                ("Lugar de nacimiento", minor.locality), ("País de nacimiento", minor.birth_country),
+                ("Nacionalidad", minor.nationality), ("Dirección actual", minor.address),
+                ("Código postal", minor.postal_code), ("NIF/NIE", minor.nif_nie),
+                ("Email", minor.email), ("Teléfono móvil", minor.mobile_phone),
             ]
-            for label, value in fields:
-                self.personal_form.addRow(label, QLabel(value or '—'))
+            sanitary_fields = [
+                ("CIP", minor.cip), ("Fecha de emisión", str(minor.health_card_issued_on or "—")),
+                ("Fecha de caducidad", str(minor.health_card_expires_on or "—")),
+                ("Centro de salud asignado", minor.health_center), ("Facultativo asignado", minor.physician),
+                ("Enfermería asignada", minor.nurse), ("Enfermedades y tratamientos", minor.clinical_history),
+            ]
+            for form_widget, fields in ((self.personal_form, general_fields), (self.sanitary_form, sanitary_fields)):
+                while form_widget.rowCount():
+                    form_widget.removeRow(0)
+                for label, value in fields:
+                    form_widget.addRow(label, QLabel(value or "—"))
             stays = sorted(minor.stays, key=lambda item: item.sequence_number, reverse=True)
             documents = []
             for stay in stays:
