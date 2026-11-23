@@ -161,9 +161,8 @@ class MinorWorkspaceDialog(QDialog):
         self.sanitary = QWidget()
         self.sanitary_form = QFormLayout(self.sanitary)
         self.tabs.addTab(self.sanitary, "2. Información sanitaria")
-        health_management = QPushButton("Gestionar medicación, administraciones y vacunas")
-        health_management.clicked.connect(self.open_health)
-        self.sanitary_form.addRow(health_management)
+        self.health_management = QPushButton("Gestionar medicación, administraciones y vacunas")
+        self.health_management.clicked.connect(self.open_health)
         self.stays = QTableWidget(0, 5)
         self.stays.setHorizontalHeaderLabels(['ID', 'Ingreso', 'Salida', 'Estado', 'Motivo'])
         self.stays.setColumnHidden(0, True)
@@ -236,6 +235,7 @@ class MinorWorkspaceDialog(QDialog):
                     form_widget.removeRow(0)
                 for label, value in fields:
                     form_widget.addRow(label, QLabel(value or "—"))
+            self.sanitary_form.addRow(self.health_management)
             stays = sorted(minor.stays, key=lambda item: item.sequence_number, reverse=True)
             documents = []
             for stay in stays:
