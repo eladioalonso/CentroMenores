@@ -542,13 +542,13 @@ class EducationDialog(StaySelectorDialog):
 
 
 class HealthDialog(StaySelectorDialog):
-    def __init__(self, factory, actor_id, stay_id=None):
+    def __init__(self, factory, actor_id, stay_id=None, minor_id=None):
         super().__init__(factory, "Ficha sanitaria y medicación", stay_id=None)
         self.actor_id = actor_id
         # La ficha sanitaria se selecciona por expediente permanente, no por ingreso.
-        preferred_minor_id = None
+        preferred_minor_id = minor_id
         with session_scope(factory) as session:
-            if stay_id:
+            if preferred_minor_id is None and stay_id:
                 selected_stay = session.get(Stay, stay_id)
                 preferred_minor_id = selected_stay.minor_id if selected_stay else None
             minors = session.scalars(select(Minor).order_by(Minor.active.desc(), Minor.family_names, Minor.given_names)).all()
