@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from gestion_centro.auth.models import AccessAudit
 from gestion_centro.auth.service import Role, create_professional_account
 from gestion_centro.domain.models import Minor, MinorPersonalDataVersion
+from gestion_centro.domain.health import HealthProfile
 from gestion_centro.domain.service import create_minor, update_minor_personal_data
 from gestion_centro.persistence.base import Base
 
@@ -40,6 +41,11 @@ def test_personal_data_update_is_saved_and_audited():
         assert saved.nurse == 'Enfermera ficticia'
         assert saved.health_card_expires_on == date(2027, 5, 1)
         assert saved.clinical_history == 'Historial ficticio'
+        profile = session.scalar(select(HealthProfile).where(HealthProfile.minor_id == minor.id))
+        assert profile is not None
+        assert profile.cip == 'CIP-123'
+        assert profile.health_center == 'Centro ficticio'
+        assert profile.clinical_history == 'Historial ficticio'
         version = session.scalar(select(MinorPersonalDataVersion).where(
             MinorPersonalDataVersion.minor_id == minor.id))
         assert version is not None
