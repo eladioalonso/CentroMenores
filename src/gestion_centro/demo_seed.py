@@ -15,11 +15,18 @@ DEMO_PASSWORD = "012345678910"
 
 # Identidades deliberadamente neutras: no representan a personas reales.
 DEMO_MINORS = [
-    (f"Menor Demo {i:02d}", f"Expediente de Prueba {i:02d}",
-     ("España", "Marruecos", "Argelia")[i % 3],
-     ("Melilla", "Nador", "Málaga", "Tetuán")[i % 4],
-     date(2008 + i % 7, 1 + i % 12, 1 + i % 27))
-    for i in range(1, 31)
+    ("X0000001A", "Alex", "Ríos Medina", "España", "Melilla", date(2010, 4, 12)),
+    ("X0000002B", "Samira", "Benali", "Marruecos", "Nador", date(2009, 9, 3)),
+    ("X0000003C", "Daniel", "Santos Vega", "España", "Málaga", date(2012, 1, 27)),
+    ("X0000004D", "Yasmin", "El Amrani", "Marruecos", "Tetuán", date(2008, 6, 18)),
+    ("X0000005E", "Nora", "García León", "España", "Granada", date(2011, 11, 9)),
+    *[
+        (f"XDEMO{i:04d}A", f"Menor Demo {i:02d}", f"Expediente de Prueba {i:02d}",
+         ("España", "Marruecos", "Argelia")[i % 3],
+         ("Melilla", "Nador", "Málaga", "Tetuán")[i % 4],
+         date(2008 + i % 7, 1 + i % 12, 1 + i % 27))
+        for i in range(6, 31)
+    ],
 ]
 
 
@@ -43,8 +50,7 @@ def seed_demo_data(factory) -> None:
             )
         actor_id = account.id
         stays = []
-        for index, (given, family, country, locality, born) in enumerate(DEMO_MINORS, 1):
-            nif_nie = f"XDEMO{index:04d}A"
+        for index, (nif_nie, given, family, country, locality, born) in enumerate(DEMO_MINORS, 1):
             minor = session.scalar(select(Minor).where(Minor.nif_nie == nif_nie))
             if minor is None:
                 minor = create_minor(
