@@ -39,22 +39,14 @@ La información sanitaria estará dentro de la ficha del menor, no en un módulo
 
 ## 2. Parte diario / Calendario
 
-Un único registro por fecha, organizado por turnos:
+Un único registro cronológico por fecha, organizado en cuatro apartados:
 
-- Fecha.
-- Personal de mañana.
-- Personal de tarde.
-- Personal de noche.
-- Altas de menores.
-- Bajas de menores.
-- Actividades de mañana.
-- Actividades de tarde.
-- Actividades de noche.
-- Conductas positivas.
-- Conductas negativas.
+- Actividades realizadas en el día.
+- Comportamientos positivos.
+- Comportamientos negativos.
 - Observaciones.
 
-Las anotaciones conservarán fecha, turno, autoría y rectificaciones. Los registros cerrados podrán corregirse mediante una nueva versión, conservando el original y el motivo.
+Cada anotación conserva fecha/hora del hecho, momento de registro, autoría y, cuando corresponda, vínculos con uno o varios menores. No se solicita personal ni se separan actividades por turnos en el formulario. Las altas y bajas se gestionan desde el historial de estancias del expediente. Las anotaciones de días cerrados pueden rectificarse mediante una nueva versión, conservando el original, la nueva autoría y el motivo.
 
 El calendario se consultará desde este mismo apartado, sin constituir otro módulo independiente.
 
