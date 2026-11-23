@@ -14,10 +14,9 @@ from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import DiaryDay, DiaryEntry, DiaryEntryStayLink, Stay
 from gestion_centro.domain.service import (
     record_diary_entry, close_diary_day, revise_diary_entry,
-    has_health_access, list_diary_records, update_diary_day_details,
+    list_diary_records, update_diary_day_details,
 )
 from gestion_centro.domain.documents_service import list_active_stays, list_document_stays
-from gestion_centro.domain.health_service import read_health_profile, list_medication_plans
 
 
 class DiaryDialog(QDialog):
@@ -33,12 +32,10 @@ class DiaryDialog(QDialog):
     def __init__(self, factory, actor_id):
         super().__init__()
         self.factory, self.actor_id = factory, actor_id
-        with session_scope(factory) as session:
-            self.health_access = has_health_access(session, actor_account_id=actor_id)
         self.setWindowTitle("Diario e incidencias")
         self.resize(980, 640)
         layout = QVBoxLayout(self)
-        intro = QLabel("Completa los apartados del día. Las enfermedades y los tratamientos se consultan automáticamente desde las fichas sanitarias. Las anotaciones quedan vinculadas a su autor.")
+        intro = QLabel("Registra el personal, las actividades y los hechos relevantes de cada turno. Las anotaciones quedan vinculadas a su autor.")
         intro.setWordWrap(True)
         intro.setObjectName("formIntro")
         layout.addWidget(intro)
@@ -48,6 +45,9 @@ class DiaryDialog(QDialog):
         self.day = QDateEdit()
         self.day.setCalendarPopup(True)
         self.day.setDate(QDate.currentDate())
+        date_form = QFormLayout()
+        date_form.addRow("Fecha", self.day)
+        layout.addLayout(date_form)
         staffing_box = QGroupBox("Personal por turnos")
         staffing_form = QFormLayout(staffing_box)
         self.morning_staff = QLineEdit()
@@ -79,15 +79,13 @@ class DiaryDialog(QDialog):
         for label, key in self.SHIFTS.items(): self.shift.addItem(label, key)
         self.category = QComboBox()
         for label, key in self.CATEGORIES.items():
-            if key != "health" or self.health_access:
-                self.category.addItem(label, key)
+            self.category.addItem(label, key)
         self.content = QTextEdit()
         self.content.setMinimumHeight(130)
         self.content.setPlaceholderText("Describe los hechos con claridad. El texto se ajustará automáticamente al ancho del cuadro.")
         self.participant_hint = QLineEdit("Sin menores vinculados")
         self.participant_hint.setReadOnly(True)
         self.selected_stay_ids = []
-        form.addRow("Fecha del parte", self.day)
         form.addRow("Turno", self.shift)
         form.addRow("Apartado", self.category)
         form.addRow("Contenido", self.content)
@@ -96,12 +94,6 @@ class DiaryDialog(QDialog):
         form.addRow("Personas vinculadas", self.participant_hint)
         form.addRow("", select_stays)
         layout.addLayout(form)
-        layout.addWidget(QLabel("Enfermedades y tratamientos · consulta de expedientes presentes en la fecha seleccionada"))
-        self.health_summary = QTextEdit()
-        self.health_summary.setReadOnly(True)
-        self.health_summary.setMaximumHeight(145)
-        self.health_summary.setPlaceholderText("La información sanitaria se consulta desde los expedientes y no se vuelve a escribir en el parte.")
-        layout.addWidget(self.health_summary)
         actions = QHBoxLayout()
         self.add_button = QPushButton("Guardar apartado")
         self.add_button.clicked.connect(self.add_entry)
@@ -387,41 +379,12 @@ class DiaryDialog(QDialog):
             rows.sort(key=lambda x: x[0])
             is_closed = bool(day and day.closed_at)
             day_details = day
-            health_rows = []
-            health_stays = session.scalars(
-                select(Stay).where(
-                    Stay.started_on <= selected,
-                    or_(Stay.ended_on.is_(None), Stay.ended_on >= selected),
-                ).order_by(Stay.started_on, Stay.id)
-            ).all()
-            for stay in health_stays:
-                minor = stay.minor
-                profile = read_health_profile(session, actor_account_id=self.actor_id, minor_id=minor.id)
-                plans = list_medication_plans(session, actor_account_id=self.actor_id, minor_id=minor.id)
-                details = []
-                if profile and profile.relevant_conditions:
-                    details.append(f"Enfermedades/condiciones: {profile.relevant_conditions}")
-                if profile and profile.allergies:
-                    details.append(f"Alergias: {profile.allergies}")
-                active_plans = [plan for plan in plans if plan.active
-                    and plan.starts_on <= selected
-                    and (plan.ends_on is None or plan.ends_on >= selected)]
-                details.extend(
-                    f"Tratamiento: {plan.medication_name} · {plan.prescribed_dose} · {plan.schedule_text}"
-                    for plan in active_plans
-                )
-                if details:
-                    health_rows.append(f"{minor.given_names} {minor.family_names}\n" + "\n".join(details))
-            health_text = "\n\n".join(health_rows) if health_rows else (
-                "No hay enfermedades o tratamientos activos registrados para los menores que se encuentran actualmente en el centro."
-            )
         self.morning_staff.setText((day_details.morning_staff or "") if day_details else "")
         self.afternoon_staff.setText((day_details.afternoon_staff or "") if day_details else "")
         self.night_staff.setText((day_details.night_staff or "") if day_details else "")
         self.morning_activities.setPlainText((day_details.morning_activities or "") if day_details else "")
         self.afternoon_activities.setPlainText((day_details.afternoon_activities or "") if day_details else "")
         self.night_activities.setPlainText((day_details.night_activities or "") if day_details else "")
-        self.health_summary.setPlainText(health_text)
         self.table.setRowCount(len(rows))
         for i, values in enumerate(rows):
             display = [values[0].astimezone().strftime("%d/%m %H:%M"), *values[1:4]]
