@@ -93,21 +93,14 @@ Los calendarios son referencias documentales. La ausencia de un registro no demu
 ### Registro cronológico
 
 1. El educador abre Parte diario.
-2. Selecciona la fecha y el turno correspondiente: mañana, tarde o noche.
-3. Consulta la cronología del día y los educadores registrados en cada turno.
-4. Añade una anotación general o vinculada a uno o varios menores.
-5. Selecciona la categoría adecuada e introduce el contenido.
-6. Distingue la fecha/hora en que ocurrió el hecho de la fecha/hora en que se registró, cuando no coincidan.
+2. Selecciona la fecha.
+3. Consulta la cronología de anotaciones de ese día.
+4. Selecciona uno de los cuatro apartados: actividades realizadas en el día, comportamientos positivos, comportamientos negativos u observaciones.
+5. Introduce el contenido y, cuando proceda, vincula uno o varios menores. Los hechos generales pueden quedar sin vincular.
+6. Indica la fecha/hora en que ocurrió el hecho; la aplicación registra por separado el momento de registro y la autoría.
 7. Guarda la anotación. La aplicación conserva autoría, relaciones y marcas de tiempo.
 
-El parte incluye, según la organización aprobada por el centro:
-- Turnos y educadores.
-- Altas, reingresos, bajas y salidas relevantes.
-- Actividades y tareas.
-- Observaciones generales.
-- Actuaciones y hechos que deban constar en la cronología.
-- Conductas positivas y negativas.
-- Hechos relevantes relacionados con uno o varios menores.
+Las altas, reingresos y bajas se consultan y gestionan desde el historial de estancias del expediente, evitando duplicarlas como categorías manuales del parte diario. La cronología no solicita un parte de personal ni divide las actividades por turnos.
 
 ### Consulta y rectificación
 
