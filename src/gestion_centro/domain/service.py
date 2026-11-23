@@ -18,6 +18,8 @@ HEALTH_PERSONAL_FIELDS = {
 def create_minor(
     session: Session, *, actor_account_id: str, given_names: str, family_names: str,
     birth_country: str | None = None, locality: str | None = None,
+    sex: str | None = None, postal_code: str | None = None, mobile_phone: str | None = None,
+    health_card_issued_on: date | None = None,
     nationality: str | None = None, birth_date: date | None = None,
     nif_nie: str | None = None, passport_number: str | None = None,
     cip: str | None = None, address: str | None = None,
@@ -39,12 +41,16 @@ def create_minor(
         raise ValueError("El correo electrónico no tiene un formato válido")
     minor = Minor(
         given_names=given_names.strip(), family_names=family_names.strip(),
+        sex=(sex or "").strip() or None,
         birth_country=(birth_country or "").strip() or None,
         locality=(locality or "").strip() or None,
         nationality=(nationality or "").strip() or None, birth_date=birth_date,
         nif_nie=clean_nif_nie,
         passport_number=(passport_number or "").strip() or None,
         cip=(cip or "").strip() or None, address=(address or "").strip() or None,
+        postal_code=(postal_code or "").strip() or None,
+        mobile_phone=(mobile_phone or "").strip() or None,
+        health_card_issued_on=health_card_issued_on,
         health_center=(health_center or "").strip() or None,
         physician=(physician or "").strip() or None, nurse=(nurse or "").strip() or None,
         health_card_expires_on=health_card_expires_on,
@@ -62,6 +68,8 @@ def update_minor_personal_data(
     session: Session, *, actor_account_id: str, minor_id: str,
     given_names: str, family_names: str, birth_country: str | None = None,
     locality: str | None = None, nationality: str | None = None,
+    sex: str | None = None, postal_code: str | None = None, mobile_phone: str | None = None,
+    health_card_issued_on: date | None | object = _UNSET,
     birth_date: date | None = None, nif_nie: str | None = None,
     passport_number: str | None = None, address: str | None = None,
     email: str | None = None, cip: str | None | object = _UNSET,
@@ -88,6 +96,7 @@ def update_minor_personal_data(
     values = {
         "given_names": given_names.strip(),
         "family_names": family_names.strip(),
+        "sex": (sex or "").strip() or None,
         "birth_country": (birth_country or "").strip() or None,
         "locality": (locality or "").strip() or None,
         "nationality": (nationality or "").strip() or None,
@@ -95,6 +104,8 @@ def update_minor_personal_data(
         "nif_nie": clean_nif_nie,
         "passport_number": (passport_number or "").strip() or None,
         "address": (address or "").strip() or None,
+        "postal_code": (postal_code or "").strip() or None,
+        "mobile_phone": (mobile_phone or "").strip() or None,
         "email": clean_email,
     }
     optional_health_values = {
@@ -103,6 +114,7 @@ def update_minor_personal_data(
         "physician": (physician or "").strip() or None if physician is not _UNSET else _UNSET,
         "nurse": (nurse or "").strip() or None if nurse is not _UNSET else _UNSET,
         "health_card_expires_on": health_card_expires_on,
+        "health_card_issued_on": health_card_issued_on,
         "clinical_history": (clinical_history or "").strip() or None if clinical_history is not _UNSET else _UNSET,
     }
     for name, value in optional_health_values.items():
