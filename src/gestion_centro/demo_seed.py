@@ -1,4 +1,4 @@
-"""Datos y cuenta ficticios precargados exclusivamente en el modo demo."""
+""""Carga idempotente de datos ficticios para probar la aplicación con --demo."""
 
 from datetime import date, datetime, timedelta, timezone
 
@@ -6,116 +6,102 @@ from sqlalchemy import select
 
 from gestion_centro.auth.models import UserAccount
 from gestion_centro.auth.service import Role, create_professional_account
-from gestion_centro.domain.models import DiaryDay, DiaryEntry, Incident, Minor
-from gestion_centro.domain.service import (
-    create_minor, open_stay, record_diary_entry, record_incident,
-)
+from gestion_centro.domain.models import DiaryDay, DiaryEntry, Minor
+from gestion_centro.domain.service import create_minor, open_stay, record_diary_entry
 from gestion_centro.persistence.database import session_scope
-
 
 DEMO_USERNAME = "educador"
 DEMO_PASSWORD = "012345678910"
 
+# Identidades deliberadamente neutras: no representan a personas reales.
+DEMO_MINORS = [
+    (f"Menor Demo {i:02d}", f"Expediente de Prueba {i:02d}",
+     ("España", "Marruecos", "Argelia")[i % 3],
+     ("Melilla", "Nador", "Málaga", "Tetuán")[i % 4],
+     date(2008 + i % 7, 1 + i % 12, 1 + i % 27))
+    for i in range(1, 31)
+]
+
 
 def seed_demo_data(factory) -> None:
-    """Crea una cuenta EDUCADOR y registros de ejemplo de forma idempotente."""
+    """Crea una cuenta EDUCADOR, 30 expedientes y ejemplos diarios.
+
+    Se puede ejecutar repetidamente: no duplica los expedientes ni las
+    anotaciones precargadas y no elimina datos existentes.
+    """
+    today = date.today()
+    now = datetime.now(timezone.utc)
     with session_scope(factory) as session:
         account = session.scalar(
             select(UserAccount).where(UserAccount.username == DEMO_USERNAME)
         )
         if account is None:
             account = create_professional_account(
-                session,
-                display_name="educador",
-                username="EDUCADOR",
-                password=DEMO_PASSWORD,
+                session, display_name="Educador de demostración",
+                username="EDUCADOR", password=DEMO_PASSWORD,
                 role=Role.EDUCATOR,
             )
         actor_id = account.id
-
-        examples = [
-            ("DEMO-001", "X0000001A", "Alex", "Ríos Medina", date(2010, 4, 12), "España", "Melilla"),
-            ("DEMO-002", "X0000002B", "Samira", "Benali", date(2009, 9, 3), "Marruecos", "Nador"),
-            ("DEMO-003", "X0000003C", "Daniel", "Santos Vega", date(2012, 1, 27), "España", "Málaga"),
-            ("DEMO-004", "X0000004D", "Yasmin", "El Amrani", date(2008, 6, 18), "Marruecos", "Tetuán"),
-            ("DEMO-005", "X0000005E", "Nora", "García León", date(2011, 11, 9), "España", "Granada"),
-        ]
-        stays = {}
-        for code, nif_nie, given, family, born, country, locality in examples:
+        stays = []
+        for index, (given, family, country, locality, born) in enumerate(DEMO_MINORS, 1):
+            nif_nie = f"XDEMO{index:04d}A"
             minor = session.scalar(select(Minor).where(Minor.nif_nie == nif_nie))
             if minor is None:
-                minor = session.scalar(select(Minor).where(
-                    Minor.given_names == given, Minor.family_names == family,
-                    Minor.birth_date == born,
-                ))
-                if minor is not None:
-                    minor.nif_nie = nif_nie
-            if minor is None:
                 minor = create_minor(
-                    session, actor_account_id=actor_id,
-                    nif_nie=nif_nie, given_names=given, family_names=family,
-                    birth_country=country, locality=locality, nationality=country,
-                    birth_date=born,
+                    session, actor_account_id=actor_id, nif_nie=nif_nie,
+                    given_names=given, family_names=family,
+                    sex="No especificado", birth_country=country,
+                    locality=locality, nationality=country, birth_date=born,
+                    address="Dirección ficticia de demostración",
+                    postal_code="52000",
+                    cip=f"DEMO-CIP-{index:04d}",
+                    health_card_issued_on=today - timedelta(days=180),
+                    health_card_expires_on=today + timedelta(days=365),
+                    health_center="Centro de Salud Demo Melilla",
+                    physician="Profesional Demo", nurse="Enfermería Demo",
+                    clinical_history="Información sanitaria ficticia para pruebas.",
                 )
-            active_stay = next((s for s in minor.stays if s.status == "active"), None)
-            if active_stay is None:
-                active_stay = open_stay(
+            stay = next((s for s in minor.stays if s.status == "active"), None)
+            if stay is None:
+                stay = open_stay(
                     session, actor_account_id=actor_id, minor_id=minor.id,
-                    started_on=date.today() - timedelta(days=20 + len(stays) * 3),
+                    started_on=today - timedelta(days=10 + index),
                 )
-            stays[code] = active_stay
+            stays.append(stay)
 
-        now = datetime.now(timezone.utc)
-        diary_examples = [
-            (0, "morning", "activity", "Actividad de ejemplo: apoyo escolar y organización del espacio común.", "DEMO-001"),
-            (1, "afternoon", "positive", "Conducta positiva de ejemplo: colaboración en la actividad grupal.", "DEMO-002"),
-            (1, "night", "observation", "Observación ficticia: se realiza el relevo de turno sin incidencias pendientes.", "DEMO-003"),
-            (2, "morning", "negative", "Conducta negativa de ejemplo: desacuerdo durante una actividad; se acompaña la resolución dialogada.", "DEMO-004"),
-            (2, "afternoon", "general", "Registro general de ejemplo: participación en tareas cotidianas del centro.", "DEMO-005"),
+        examples = [
+            ("activity", "Apoyo escolar y lectura compartida."),
+            ("positive", "Colabora en la organización del espacio común."),
+            ("negative", "Desacuerdo durante un juego; se acompaña la resolución dialogada."),
+            ("observation", "Se observa buen descanso y puntualidad en la rutina."),
+            ("activity", "Taller creativo y actividad deportiva."),
+            ("positive", "Ayuda a otro menor durante una actividad grupal."),
+            ("observation", "Se registra una cita educativa ficticia para seguimiento."),
+            ("negative", "Dificultad puntual para respetar turnos; se trabaja la escucha."),
+            ("activity", "Realiza las tareas escolares previstas con apoyo."),
+            ("positive", "Mantiene actitud participativa durante la actividad."),
+            ("observation", "Se deja constancia de entrega de material personal."),
+            ("activity", "Actividad educativa y puesta en común posterior."),
+            ("negative", "No sigue inicialmente una indicación; acepta la intervención."),
+            ("positive", "Respeta los acuerdos de convivencia durante la tarde."),
+            ("observation", "Se revisa agenda semanal y próximas actividades."),
+            ("activity", "Actividad de habilidades domésticas."),
+            ("positive", "Completa de forma autónoma la rutina acordada."),
+            ("observation", "Se anota una comunicación ficticia con el centro educativo."),
+            ("negative", "Discusión verbal leve; se realiza mediación educativa."),
+            ("activity", "Actividad de biblioteca y lectura individual."),
         ]
-        for days_ago, shift, category, content, code in diary_examples:
-            if days_ago > 1:
-                continue
-            diary_date = date.today() - timedelta(days=days_ago)
+        for offset, (category, content) in enumerate(examples, 1):
+            diary_date = today - timedelta(days=offset)
             day = session.scalar(select(DiaryDay).where(DiaryDay.diary_date == diary_date))
-            duplicate = session.scalar(
-                select(DiaryEntry.id).where(
-                    DiaryEntry.diary_day_id == day.id,
-                    DiaryEntry.content == content,
-                )
-            ) if day else None
+            duplicate = session.scalar(select(DiaryEntry.id).where(
+                DiaryEntry.diary_day_id == day.id, DiaryEntry.content == content,
+            )) if day else None
             if duplicate:
                 continue
-            happened = now - timedelta(days=days_ago, hours=2)
             record_diary_entry(
                 session, actor_account_id=actor_id, diary_date=diary_date,
-                shift=shift, category=category, content=content,
-                happened_at=happened, stay_ids=[stays[code].id], now=now,
-            )
-
-        incident_examples = [
-            (1, "Desacuerdo durante actividad", "Situación ficticia de convivencia. Se facilita el diálogo y se registra el seguimiento educativo.", "conflict", "low", "DEMO-002"),
-            (0, "Daño accidental en material", "Daño ficticio y leve en material de uso común. Se deja constancia para su revisión.", "damage", "low", "DEMO-003"),
-            (0, "Incidencia de seguridad de ejemplo", "Situación ficticia revisada por el equipo; queda pendiente completar el seguimiento.", "safety", "medium", "DEMO-004"),
-        ]
-        for days_ago, title, description, kind, severity, code in incident_examples:
-            if days_ago > 1:
-                continue
-            diary_date = date.today() - timedelta(days=days_ago)
-            # Evita duplicados si se vuelve a iniciar la demo.
-            day = session.scalar(select(DiaryDay).where(DiaryDay.diary_date == diary_date))
-            duplicate = session.scalar(
-                select(Incident.id).where(
-                    Incident.diary_day_id == day.id,
-                    Incident.title == title,
-                )
-            ) if day else None
-            if duplicate:
-                continue
-            record_incident(
-                session, actor_account_id=actor_id, diary_date=diary_date,
-                title=title, description=description, incident_type=kind,
-                severity=severity, happened_at=now - timedelta(days=days_ago, hours=1),
-                participants=[(stays[code].id, "involved", "Participación ficticia de ejemplo")],
-                now=now,
+                shift="unspecified", category=category, content=content,
+                happened_at=now - timedelta(days=offset, hours=2),
+                stay_ids=[stays[(offset - 1) % len(stays)].id], now=now,
             )
