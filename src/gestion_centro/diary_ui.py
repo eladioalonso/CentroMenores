@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, QDateEdit, QDateTimeEdit,
     QComboBox, QLineEdit, QTextEdit, QPushButton, QTableWidget, QTableWidgetItem,
     QHeaderView, QMessageBox, QListWidget, QListWidgetItem,
-    QDialogButtonBox, QLabel,
+    QDialogButtonBox, QLabel, QGroupBox,
 )
 from sqlalchemy import select, or_
 
@@ -14,7 +14,7 @@ from gestion_centro.persistence.database import session_scope
 from gestion_centro.domain.models import DiaryDay, DiaryEntry, DiaryEntryStayLink, Stay
 from gestion_centro.domain.service import (
     record_diary_entry, close_diary_day, revise_diary_entry,
-    has_health_access, list_diary_records,
+    has_health_access, list_diary_records, update_diary_day_details,
 )
 from gestion_centro.domain.documents_service import list_active_stays, list_document_stays
 from gestion_centro.domain.health_service import read_health_profile, list_medication_plans
@@ -43,8 +43,34 @@ class DiaryDialog(QDialog):
         self.day_state = QLabel()
         self.day_state.setObjectName("recordState")
         layout.addWidget(self.day_state)
-        form = QFormLayout()
         self.day = QDateEdit()
+        self.day.setCalendarPopup(True)
+        self.day.setDate(QDate.currentDate())
+        staffing_box = QGroupBox("Personal por turnos")
+        staffing_form = QFormLayout(staffing_box)
+        self.morning_staff = QLineEdit()
+        self.afternoon_staff = QLineEdit()
+        self.night_staff = QLineEdit()
+        staffing_form.addRow("Personal de mañana", self.morning_staff)
+        staffing_form.addRow("Personal de tarde", self.afternoon_staff)
+        staffing_form.addRow("Personal de noche", self.night_staff)
+        layout.addWidget(staffing_box)
+        activities_box = QGroupBox("Actividades realizadas por turnos")
+        activities_form = QFormLayout(activities_box)
+        self.morning_activities = QTextEdit()
+        self.afternoon_activities = QTextEdit()
+        self.night_activities = QTextEdit()
+        for field in (self.morning_activities, self.afternoon_activities, self.night_activities):
+            field.setMaximumHeight(72)
+        activities_form.addRow("Mañana", self.morning_activities)
+        activities_form.addRow("Tarde", self.afternoon_activities)
+        activities_form.addRow("Noche", self.night_activities)
+        save_day = QPushButton("Guardar personal y actividades del día")
+        save_day.clicked.connect(self.save_day_details)
+        activities_form.addRow(save_day)
+        layout.addWidget(activities_box)
+
+        form = QFormLayout()
         self.day.setCalendarPopup(True)
         self.day.setDate(QDate.currentDate())
         self.shift = QComboBox()
@@ -98,6 +124,23 @@ class DiaryDialog(QDialog):
         self.table.itemSelectionChanged.connect(self._update_selection_actions)
         self.day.dateChanged.connect(self.refresh)
         self.refresh()
+
+    def save_day_details(self):
+        try:
+            with session_scope(self.factory) as session:
+                update_diary_day_details(
+                    session, actor_account_id=self.actor_id,
+                    diary_date=self.day.date().toPython(),
+                    morning_staff=self.morning_staff.text(),
+                    afternoon_staff=self.afternoon_staff.text(),
+                    night_staff=self.night_staff.text(),
+                    morning_activities=self.morning_activities.toPlainText(),
+                    afternoon_activities=self.afternoon_activities.toPlainText(),
+                    night_activities=self.night_activities.toPlainText(),
+                )
+            QMessageBox.information(self, "Parte diario", "Se han guardado los turnos y las actividades del día.")
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo guardar", str(exc))
 
     def choose_stays(self, include_closed=False):
         dialog = QDialog(self)
@@ -326,6 +369,7 @@ class DiaryDialog(QDialog):
                 {"kind": "entry", "id": x.id}) for x in entries]
             rows.sort(key=lambda x: x[0])
             is_closed = bool(day and day.closed_at)
+            day_details = day
             health_rows = []
             health_stays = session.scalars(
                 select(Stay).where(
@@ -354,6 +398,12 @@ class DiaryDialog(QDialog):
             health_text = "\n\n".join(health_rows) if health_rows else (
                 "No hay enfermedades o tratamientos activos registrados para los menores que se encuentran actualmente en el centro."
             )
+        self.morning_staff.setText((day_details.morning_staff or "") if day_details else "")
+        self.afternoon_staff.setText((day_details.afternoon_staff or "") if day_details else "")
+        self.night_staff.setText((day_details.night_staff or "") if day_details else "")
+        self.morning_activities.setPlainText((day_details.morning_activities or "") if day_details else "")
+        self.afternoon_activities.setPlainText((day_details.afternoon_activities or "") if day_details else "")
+        self.night_activities.setPlainText((day_details.night_activities or "") if day_details else "")
         self.health_summary.setPlainText(health_text)
         self.table.setRowCount(len(rows))
         for i, values in enumerate(rows):
