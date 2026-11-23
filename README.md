@@ -55,7 +55,7 @@ En desarrollo, la carpeta de datos se puede indicar con `CENTRO_DATOS_DIR`; por 
 
 Modo de demostración: ejecutar `GestionCentro.exe --demo`. En desarrollo puede ejecutarse `python -m gestion_centro --demo`. Usa una carpeta independiente (`demo_data` junto al EXE portable o `.centro_demo` en desarrollo) y no abre la carpeta de datos normales.
 
-La demostración precarga expedientes, estancias y anotaciones ficticias. Incluye una cuenta de prueba `EDUCADOR` (contraseña inicial de demostración: `012345678910`), sin permisos de administración. Cambia la contraseña de prueba si el flujo lo permite y no reutilices esa clave en ningún otro servicio. Los educadores activos pueden consultar y registrar información sanitaria; el campo histórico `health_access` ya no bloquea ese acceso. La carga es idempotente y no duplica ejemplos al volver a abrir la demo. No copies datos reales a esa carpeta.
+La demostración precarga 30 expedientes ficticios con estancias activas, información general y ficha sanitaria de prueba, además de 20 anotaciones vinculadas a menores y distribuidas entre los cuatro apartados del parte diario. Incluye una cuenta de prueba `EDUCADOR` (contraseña inicial de demostración: `012345678910`), sin permisos de administración. Cambia la contraseña de prueba si el flujo lo permite y no reutilices esa clave en ningún otro servicio. Los educadores activos pueden consultar y registrar información sanitaria; el campo histórico `health_access` ya no bloquea ese acceso. La carga es idempotente y no duplica ejemplos al volver a abrir la demo. No copies datos reales a esa carpeta.
 
 El acceso móvil por Wi-Fi no está habilitado. No abrir puertos ni exponer el equipo a redes externas para intentar activarlo.
 
