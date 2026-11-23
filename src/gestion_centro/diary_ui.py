@@ -6,21 +6,20 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, QDateEdit, QDateTimeEdit,
     QComboBox, QLineEdit, QTextEdit, QPushButton, QTableWidget, QTableWidgetItem,
     QHeaderView, QMessageBox, QListWidget, QListWidgetItem,
-    QDialogButtonBox, QLabel, QGroupBox, QInputDialog,
+    QDialogButtonBox, QLabel, QInputDialog,
 )
 from sqlalchemy import select
 
 from gestion_centro.persistence.database import session_scope
-from gestion_centro.domain.models import DiaryDay, DiaryEntry, DiaryEntryStayLink, Stay
+from gestion_centro.domain.models import DiaryEntry, DiaryEntryStayLink, Stay
 from gestion_centro.domain.service import (
     record_diary_entry, close_diary_day, revise_diary_entry,
-    list_diary_records, update_diary_day_details,
+    list_diary_records,
 )
 from gestion_centro.domain.documents_service import list_active_stays, list_document_stays
 
 
 class DiaryDialog(QDialog):
-    SHIFTS = {"Mañana": "morning", "Tarde": "afternoon", "Noche": "night", "Sin especificar": "unspecified"}
     CATEGORIES = {
         "Actividades realizadas en el día": "activity",
         "Comportamientos positivos": "positive",
@@ -92,36 +91,6 @@ class DiaryDialog(QDialog):
         self.table.itemSelectionChanged.connect(self._update_selection_actions)
         self.day.dateChanged.connect(self.refresh)
         self.refresh()
-
-    def save_day_details(self):
-        reason = None
-        with session_scope(self.factory) as session:
-            existing_day = session.scalar(select(DiaryDay).where(
-                DiaryDay.diary_date == self.day.date().toPython()
-            ))
-            is_closed = bool(existing_day and existing_day.closed_at)
-        if is_closed:
-            reason, accepted = QInputDialog.getText(
-                self, "Rectificar parte cerrado", "Motivo de la modificación:"
-            )
-            if not accepted or not reason.strip():
-                return
-        try:
-            with session_scope(self.factory) as session:
-                update_diary_day_details(
-                    session, actor_account_id=self.actor_id,
-                    diary_date=self.day.date().toPython(),
-                    morning_staff=self.morning_staff.text(),
-                    afternoon_staff=self.afternoon_staff.text(),
-                    night_staff=self.night_staff.text(),
-                    morning_activities=self.morning_activities.toPlainText(),
-                    afternoon_activities=self.afternoon_activities.toPlainText(),
-                    night_activities=self.night_activities.toPlainText(),
-                    reason=reason,
-                )
-            QMessageBox.information(self, "Parte diario", "Se han guardado los turnos y las actividades del día.")
-        except (ValueError, PermissionError) as exc:
-            QMessageBox.warning(self, "No se pudo guardar", str(exc))
 
     def choose_stays(self, include_closed=False):
         dialog = QDialog(self)
