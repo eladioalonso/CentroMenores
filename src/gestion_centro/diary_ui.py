@@ -22,11 +22,10 @@ from gestion_centro.domain.documents_service import list_active_stays, list_docu
 class DiaryDialog(QDialog):
     SHIFTS = {"Mañana": "morning", "Tarde": "afternoon", "Noche": "night", "Sin especificar": "unspecified"}
     CATEGORIES = {
+        "Actividades realizadas en el día": "activity",
         "Comportamientos positivos": "positive",
         "Comportamientos negativos": "negative",
         "Observaciones": "observation",
-        "Altas de usuarios": "admission",
-        "Bajas de usuarios": "discharge",
     }
     def __init__(self, factory, actor_id):
         super().__init__()
@@ -34,7 +33,7 @@ class DiaryDialog(QDialog):
         self.setWindowTitle("Diario e incidencias")
         self.resize(980, 640)
         layout = QVBoxLayout(self)
-        intro = QLabel("Registra el personal, las actividades y los hechos relevantes de cada turno. Las anotaciones quedan vinculadas a su autor.")
+        intro = QLabel("Registra las actividades del día, los comportamientos positivos o negativos y las observaciones relevantes. Las anotaciones quedan vinculadas a su autor.")
         intro.setWordWrap(True)
         intro.setObjectName("formIntro")
         layout.addWidget(intro)
@@ -46,30 +45,9 @@ class DiaryDialog(QDialog):
         self.day.setDate(QDate.currentDate())
         date_form = QFormLayout()
         date_form.addRow("Fecha", self.day)
-        layout.addLayout(date_form)
-        staffing_box = QGroupBox("Personal por turnos")
-        staffing_form = QFormLayout(staffing_box)
-        self.morning_staff = QLineEdit()
-        self.afternoon_staff = QLineEdit()
-        self.night_staff = QLineEdit()
-        staffing_form.addRow("Personal de mañana", self.morning_staff)
-        staffing_form.addRow("Personal de tarde", self.afternoon_staff)
-        staffing_form.addRow("Personal de noche", self.night_staff)
-        layout.addWidget(staffing_box)
-        activities_box = QGroupBox("Actividades realizadas por turnos")
-        activities_form = QFormLayout(activities_box)
-        self.morning_activities = QTextEdit()
-        self.afternoon_activities = QTextEdit()
-        self.night_activities = QTextEdit()
-        for field in (self.morning_activities, self.afternoon_activities, self.night_activities):
-            field.setMaximumHeight(72)
-        activities_form.addRow("Mañana", self.morning_activities)
-        activities_form.addRow("Tarde", self.afternoon_activities)
-        activities_form.addRow("Noche", self.night_activities)
-        save_day = QPushButton("Guardar personal y actividades del día")
-        save_day.clicked.connect(self.save_day_details)
-        activities_form.addRow(save_day)
-        layout.addWidget(activities_box)
+        layout.addLayout(date_for        # La actividad diaria se registra como una anotación única en el apartado
+        # correspondiente, evitando duplicarla en tres campos por turnos.
+)
 
         form = QFormLayout()
         self.day.setCalendarPopup(True)
@@ -378,12 +356,7 @@ class DiaryDialog(QDialog):
             rows.sort(key=lambda x: x[0])
             is_closed = bool(day and day.closed_at)
             day_details = day
-        self.morning_staff.setText((day_details.morning_staff or "") if day_details else "")
-        self.afternoon_staff.setText((day_details.afternoon_staff or "") if day_details else "")
-        self.night_staff.setText((day_details.night_staff or "") if day_details else "")
-        self.morning_activities.setPlainText((day_details.morning_activities or "") if day_details else "")
-        self.afternoon_activities.setPlainText((day_details.afternoon_activities or "") if day_details else "")
-        self.night_activities.setPlainText((day_details.night_activities or "") if day_details else "")
+        # Las anotaciones se muestran en una única cronología diaria.
         self.table.setRowCount(len(rows))
         for i, values in enumerate(rows):
             display = [values[0].astimezone().strftime("%d/%m %H:%M"), *values[1:4]]
