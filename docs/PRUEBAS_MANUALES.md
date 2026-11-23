@@ -45,7 +45,10 @@ Marca cada punto como correcto, incorrecto o no probado. Anota los errores y los
 - [ ] Comprobar CIP, fecha de emisión y caducidad de tarjeta, centro de salud, facultativo, enfermería y enfermedades/tratamientos.
 - [ ] Comprobar que la información sanitaria queda vinculada al perfil clínico del menor y que se conserva el historial de cambios.
 - [ ] Modificar datos generales y sanitarios y comprobar la trazabilidad.
-- [ ] Abrir la sección de medicación, administraciones y vacunas desde la pestaña sanitaria.
+- [ ] Consultar y gestionar ingresos/reingresos desde la pestaña de estancias; modificar y cerrar una estancia ficticia.
+- [ ] Añadir un acontecimiento y comprobar que queda vinculado al menor.
+- [ ] Rectificar un acontecimiento y consultar su historial de versiones.
+- [ ] Abrir la sección de medicación, administraciones y vacunas desde la pestaña sanitaria y comprobar que el menor ya aparece seleccionado, incluso si no tiene estancia activa.
 - [ ] Registrar una pauta ficticia y sus horarios.
 - [ ] Registrar y rectificar una administración de prueba, comprobando que conserva versiones.
 - [ ] Consultar calendarios vacunales documentales y registrar una vacuna ficticia.
