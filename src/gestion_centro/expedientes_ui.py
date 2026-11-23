@@ -84,14 +84,7 @@ class NewMinorDialog(QDialog):
             sanitary_form.addRow(label, widget)
         tabs.addTab(sanitary, "2. Información sanitaria")
 
-        documents = QWidget()
-        documents_layout = QVBoxLayout(documents)
-        note = QLabel("Los documentos escaneados se añadirán y consultarán desde la pestaña Documentos de la ficha, una vez creado el expediente.")
-        note.setWordWrap(True)
-        documents_layout.addWidget(note)
-        documents_layout.addStretch(1)
-        tabs.addTab(documents, "3. Documentos")
-
+        # La documentación se incorpora desde el expediente una vez creado.
         buttons = QHBoxLayout()
         save = QPushButton("Crear expediente")
         cancel = QPushButton("Cancelar")
