@@ -57,16 +57,15 @@ Los calendarios vacunales son referencias documentales. No uses datos clínicos 
 ### 2. Parte diario / Calendario
 
 - [ ] Seleccionar una fecha.
-- [ ] Introducir el personal de mañana, tarde y noche.
-- [ ] Introducir actividades independientes para mañana, tarde y noche.
-- [ ] Guardar y cambiar de fecha; volver a la fecha original y comprobar que los datos se conservan.
-- [ ] Registrar altas y bajas ficticias.
-- [ ] Registrar conductas positivas, conductas negativas y observaciones.
-- [ ] Vincular anotaciones a uno o varios menores cuando corresponda.
-- [ ] Comprobar que se muestran fecha, turno, autoría y contenido.
+- [ ] Seleccionar una fecha y comprobar que se muestran las anotaciones de ese día.
+- [ ] Registrar actividades realizadas en el día.
+- [ ] Registrar comportamientos positivos y negativos en categorías separadas.
+- [ ] Registrar observaciones generales.
+- [ ] Vincular anotaciones a uno o varios menores cuando corresponda; dejar sin vincular los hechos generales.
+- [ ] Comprobar que cada anotación muestra fecha/hora, categoría, autoría y contenido.
+- [ ] Cambiar de fecha y volver a la original para comprobar que los registros se conservan.
 - [ ] Cerrar el parte y comprobar que no admite nuevas anotaciones ordinarias.
-- [ ] Rectificar una anotación con otra cuenta de educador y comprobar que se conserva el original y el motivo.
-- [ ] Modificar personal o actividades de un parte cerrado y comprobar que solicita motivo y registra los valores anteriores y nuevos.
+- [ ] Rectificar una anotación con otra cuenta de educador y comprobar que se conserva el original, la nueva autoría y el motivo.
 - [ ] Consultar el calendario desde el mismo apartado.
 
 ### Copias, restauración y mantenimiento
