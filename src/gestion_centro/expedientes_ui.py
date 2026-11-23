@@ -165,6 +165,37 @@ class MinorWorkspaceDialog(QDialog):
         self.events.setColumnHidden(0, True)
         self.events.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.events.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
+        stays_tab = QWidget()
+        stays_layout = QVBoxLayout(stays_tab)
+        stays_actions = QHBoxLayout()
+        for label, callback in [
+            ("Nuevo ingreso / reingreso", self.new_stay),
+            ("Modificar estancia", self.edit_stay),
+            ("Cerrar estancia", self.close_stay),
+        ]:
+            button = QPushButton(label)
+            button.clicked.connect(callback)
+            stays_actions.addWidget(button)
+        stays_layout.addLayout(stays_actions)
+        stays_layout.addWidget(self.stays)
+        self.tabs.addTab(stays_tab, "3. Ingresos y estancias")
+
+        events_tab = QWidget()
+        events_layout = QVBoxLayout(events_tab)
+        events_actions = QHBoxLayout()
+        for label, callback in [
+            ("Añadir acontecimiento", self.add_event),
+            ("Rectificar acontecimiento", self.edit_event),
+            ("Historial de versiones", self.show_event_history),
+        ]:
+            button = QPushButton(label)
+            button.clicked.connect(callback)
+            events_actions.addWidget(button)
+        events_layout.addLayout(events_actions)
+        events_layout.addWidget(self.events)
+        self.tabs.addTab(events_tab, "4. Acontecimientos")
+
         documents_tab = QWidget()
         documents_layout = QVBoxLayout(documents_tab)
         documents_info = QLabel('Los documentos se conservan vinculados a cada ingreso o reingreso. Puedes consultar el historial documental de todas las estancias desde aquí.')
@@ -180,7 +211,7 @@ class MinorWorkspaceDialog(QDialog):
         documents_button.clicked.connect(self.open_documents)
         documents_layout.addWidget(documents_button)
         documents_layout.addStretch(1)
-        self.tabs.addTab(documents_tab, '3. Documentos escaneados')
+        self.tabs.addTab(documents_tab, '5. Documentos escaneados')
         actions = QGridLayout()
         actions.setHorizontalSpacing(8)
         actions.setVerticalSpacing(6)
