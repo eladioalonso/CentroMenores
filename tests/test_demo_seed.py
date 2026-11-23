@@ -21,13 +21,13 @@ def test_demo_seed_creates_educator_and_fictional_records_idempotently():
                 select(UserAccount).where(UserAccount.username == "educador")
             )
             assert account is not None
-            assert account.professional.display_name == "educador"
+            assert account.professional.display_name == "Educador de demostración"
             assert account.role == "educator"
             assert account.health_access is False
-            assert session.scalar(select(func.count()).select_from(Minor)) == 5
-            assert session.scalar(select(func.count()).select_from(Stay)) == 5
-            assert session.scalar(select(func.count()).select_from(DiaryEntry)) == 3
-            assert session.scalar(select(func.count()).select_from(Incident)) == 3
+            assert session.scalar(select(func.count()).select_from(Minor)) == 30
+            assert session.scalar(select(func.count()).select_from(Stay)) == 30
+            assert session.scalar(select(func.count()).select_from(DiaryEntry)) == 20
+            assert session.scalar(select(func.count()).select_from(Incident)) == 0
             result = authenticate(
                 session, username="EDUCADOR", password=DEMO_PASSWORD
             )
