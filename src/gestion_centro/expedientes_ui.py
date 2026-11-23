@@ -559,6 +559,9 @@ class MinorWorkspaceDialog(QDialog):
             minor = session.get(Minor, self.minor_id)
             if minor is None:
                 return
+            health_profile = read_health_profile(
+                session, actor_account_id=self.actor_id, minor_id=minor.id
+            )
             dialog = QDialog(self)
             dialog.setWindowTitle("Modificar información del menor")
             dialog.resize(760, 760)
@@ -608,19 +611,21 @@ class MinorWorkspaceDialog(QDialog):
             sanitary_form = QFormLayout(sanitary_tab)
             health_controls = {}
             for key, label, value in [
-                ("cip", "CIP", minor.cip), ("health_center", "Centro de salud asignado", minor.health_center),
-                ("physician", "Facultativo asignado", minor.physician), ("nurse", "Enfermería asignada", minor.nurse),
+                ("cip", "CIP", health_profile.cip if health_profile else None),
+                ("health_center", "Centro de salud asignado", health_profile.health_center if health_profile else None),
+                ("physician", "Facultativo asignado", health_profile.physician if health_profile else None),
+                ("nurse", "Enfermería asignada", health_profile.nurse if health_profile else None),
             ]:
                 field = QLineEdit(value or "")
                 health_controls[key] = field
                 sanitary_form.addRow(label, field)
             issued = NewMinorDialog._date_field()
             expires = NewMinorDialog._date_field()
-            for widget, value in ((issued, minor.health_card_issued_on), (expires, minor.health_card_expires_on)):
+            for widget, value in ((issued, minor.health_card_issued_on), (expires, health_profile.health_card_expires_on if health_profile else None)):
                 if value:
                     widget.setDate(QDate(value.year, value.month, value.day))
             clinical = QTextEdit()
-            clinical.setPlainText(minor.clinical_history or "")
+            clinical.setPlainText(health_profile.clinical_history or "" if health_profile else "")
             clinical.setMinimumHeight(100)
             sanitary_form.addRow("Fecha de emisión", issued)
             sanitary_form.addRow("Fecha de caducidad", expires)
