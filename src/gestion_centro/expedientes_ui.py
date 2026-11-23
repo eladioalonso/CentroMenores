@@ -144,7 +144,7 @@ class NewMinorDialog(QDialog):
             "nurse": self.nurse.text(),
             "clinical_history": self.clinical_history.toPlainText(),
         }
-}
+
 
 class MinorWorkspaceDialog(QDialog):
     def __init__(self, factory, actor_id, minor_id, parent=None, documents_opener=None):
