@@ -1,4 +1,4 @@
-""""Carga idempotente de datos ficticios para probar la aplicación con --demo."""
+"""Carga idempotente de datos ficticios para probar la aplicación con --demo."""
 
 from datetime import date, datetime, timedelta, timezone
 
