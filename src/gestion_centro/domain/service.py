@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from gestion_centro.auth.models import AccessAudit, UserAccount
-from gestion_centro.domain.models import Event, EventStayLink, Minor, MinorPersonalDataVersion, Stay
+from gestion_centro.domain.models import DiaryDay, Event, EventStayLink, Minor, MinorPersonalDataVersion, Stay
 
 _UNSET = object()
 HEALTH_PERSONAL_FIELDS = {
@@ -146,6 +146,37 @@ def update_minor_personal_data(
         f"Expediente: {minor.id}; versión: {version.id}; campos modificados: {', '.join(changed)}")
     return minor
 
+
+
+
+def update_diary_day_details(
+    session: Session, *, actor_account_id: str, diary_date: date,
+    morning_staff: str = "", afternoon_staff: str = "", night_staff: str = "",
+    morning_activities: str = "", afternoon_activities: str = "",
+    night_activities: str = "",
+) -> DiaryDay:
+    """Guarda personal y actividades por turno en el encabezado diario."""
+    actor = _active_author(session, actor_account_id)
+    day = session.scalar(select(DiaryDay).where(DiaryDay.diary_date == diary_date))
+    if day is None:
+        day = DiaryDay(diary_date=diary_date)
+        session.add(day)
+        session.flush()
+    values = {
+        "morning_staff": morning_staff.strip() or None,
+        "afternoon_staff": afternoon_staff.strip() or None,
+        "night_staff": night_staff.strip() or None,
+        "morning_activities": morning_activities.strip() or None,
+        "afternoon_activities": afternoon_activities.strip() or None,
+        "night_activities": night_activities.strip() or None,
+    }
+    changed = [key for key, value in values.items() if getattr(day, key) != value]
+    if changed:
+        for key in changed:
+            setattr(day, key, values[key])
+        _audit(session, actor, "diary_day_details_updated",
+               f"Fecha: {diary_date.isoformat()}; campos: {', '.join(changed)}")
+    return day
 
 
 def has_health_access(session: Session, *, actor_account_id: str) -> bool:
