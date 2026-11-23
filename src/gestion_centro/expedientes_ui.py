@@ -181,8 +181,8 @@ class MinorWorkspaceDialog(QDialog):
         stays_layout.addWidget(self.stays)
         self.tabs.addTab(stays_tab, "3. Ingresos y estancias")
 
-        events_tab = QWidget()
-        events_layout = QVBoxLayout(events_tab)
+        self.events_tab = QWidget()
+        events_layout = QVBoxLayout(self.events_tab)
         events_actions = QHBoxLayout()
         for label, callback in [
             ("Añadir acontecimiento", self.add_event),
@@ -194,7 +194,7 @@ class MinorWorkspaceDialog(QDialog):
             events_actions.addWidget(button)
         events_layout.addLayout(events_actions)
         events_layout.addWidget(self.events)
-        self.tabs.addTab(events_tab, "4. Acontecimientos")
+        self.tabs.addTab(self.events_tab, "4. Acontecimientos")
 
         documents_tab = QWidget()
         documents_layout = QVBoxLayout(documents_tab)
@@ -508,7 +508,7 @@ class MinorWorkspaceDialog(QDialog):
             with session_scope(self.factory) as session:
                 record_event(session, author_account_id=self.actor_id, title=title, description=description, happened_at=datetime.now(timezone.utc), stay_ids=[stay_id])
             self.refresh()
-            self.tabs.setCurrentWidget(self.events)
+            self.tabs.setCurrentWidget(self.events_tab)
         except (ValueError, PermissionError) as exc:
             QMessageBox.warning(self, 'No se pudo registrar', str(exc))
 
