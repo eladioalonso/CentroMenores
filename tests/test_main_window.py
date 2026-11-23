@@ -174,7 +174,8 @@ def test_resident_workspace_includes_documents_tab_and_opener():
         assert dialog.events.columnCount() == 5
         action_labels = {button.text() for button in dialog.findChildren(QPushButton)}
         assert {"Nuevo ingreso / reingreso", "Modificar estancia", "Cerrar estancia",
-                "Añadir acontecimiento", "Rectificar acontecimiento", "Historial de versiones"} <= action_labels
+                "Añadir acontecimiento", "Rectificar acontecimiento", "Historial de versiones",
+                "Seguimiento educativo"} <= action_labels
         health_button = next(
             button for button in dialog.findChildren(QPushButton)
             if button.text() == "Gestionar medicación, administraciones y vacunas"
