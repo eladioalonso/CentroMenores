@@ -985,7 +985,7 @@ class MainWindow(QMainWindow):
             change_password_button.clicked.connect(change_password)
             top_actions.addWidget(change_password_button)
         help_button = QPushButton("Ayuda y preguntas frecuentes")
-        help_button.clicked.connect(lambda: HelpDialog(self).exec())
+        help_button.clicked.connect(lambda: open_workspace_tab("Ayuda", lambda: HelpDialog(self), "help"))
         logout_button = QPushButton("Cerrar sesión")
         logout_button.clicked.connect(self.request_logout)
         top_actions.addWidget(help_button)
@@ -1008,8 +1008,42 @@ class MainWindow(QMainWindow):
         sidebar_layout.addWidget(sidebar_title)
 
         tabs = QTabWidget()
-        tabs.tabBar().hide()
         tabs.setDocumentMode(True)
+        tabs.setTabsClosable(True)
+        tabs.setMovable(True)
+        tabs.setUsesScrollButtons(True)
+        workspace_tabs = {}
+
+        def open_workspace_tab(label: str, factory_fn, key: str | None = None) -> None:
+            """Abre módulos dentro del área central, sin ventanas emergentes."""
+            tab_key = key or label
+            existing = workspace_tabs.get(tab_key)
+            if existing is not None and tabs.indexOf(existing) >= 0:
+                tabs.setCurrentWidget(existing)
+                return
+            widget = factory_fn()
+            if isinstance(widget, QDialog):
+                widget.setParent(tabs)
+                widget.setWindowFlags(Qt.WindowType.Widget)
+                widget.setModal(False)
+            widget.setProperty("workspaceDynamic", True)
+            index = tabs.addTab(widget, label)
+            workspace_tabs[tab_key] = widget
+            widget.setProperty("workspaceKey", tab_key)
+            tabs.setCurrentIndex(index)
+            widget.show()
+
+        def close_workspace_tab(index: int) -> None:
+            widget = tabs.widget(index)
+            if widget is None or not widget.property("workspaceDynamic"):
+                return
+            key = widget.property("workspaceKey")
+            if key:
+                workspace_tabs.pop(key, None)
+            tabs.removeTab(index)
+            widget.deleteLater()
+
+        tabs.tabCloseRequested.connect(close_workspace_tab)
         workspace.addWidget(sidebar)
         workspace.addWidget(tabs, 1)
 
@@ -1088,19 +1122,19 @@ class MainWindow(QMainWindow):
 
             dashboard_card(0, 0, "present", "Menores presentes",
                 "Estancias activas que no figuran en una salida en curso.",
-                lambda: ExpedientesDialog(factory, account_id).exec())
+                lambda: open_workspace_tab("Expedientes", lambda: ExpedientesDialog(factory, account_id), "expedientes"))
             dashboard_card(0, 1, "outside", "Menores fuera del centro",
                 "Menores vinculados a salidas que todavía no constan como finalizadas.",
-                lambda: OutingsDialog(factory, account_id).exec())
+                lambda: open_workspace_tab("Salidas", lambda: OutingsDialog(factory, account_id), "salidas"))
             dashboard_card(1, 0, "returns", "Retornos atrasados",
                 "Salidas en curso cuya hora prevista de regreso ya ha pasado.",
                 lambda: OutingsDialog(factory, account_id).exec())
             dashboard_card(1, 1, "incidents", "Incidencias abiertas",
                 "Incidencias formales pendientes de cierre.",
-                lambda: DiaryDialog(factory, account_id).exec())
+                lambda: open_workspace_tab("Parte diario", lambda: DiaryDialog(factory, account_id), "diario"))
             dashboard_card(2, 0, "tasks", "Tareas vencidas",
                 "Tareas pendientes o en curso cuya fecha ya ha pasado.",
-                lambda: AgendaDialog(factory, account_id).exec())
+                lambda: open_workspace_tab("Agenda", lambda: AgendaDialog(factory, account_id), "agenda"))
             dashboard_card(2, 1, "agenda", "Agenda próxima",
                 "Elementos pendientes o en curso con fecha futura.",
                 lambda: AgendaDialog(factory, account_id).exec())
@@ -1127,7 +1161,7 @@ class MainWindow(QMainWindow):
                         "La cuenta debe estar activa para consultar la ficha sanitaria.",
                     )
                     return
-            HealthDialog(factory, account_id).exec()
+            open_workspace_tab("Ficha sanitaria", lambda: HealthDialog(factory, account_id), "sanitaria")
 
         def add_actions(tab: QWidget, actions: list[tuple[str, str, object]], columns: int = 2) -> None:
             layout = QVBoxLayout(tab)
@@ -1164,7 +1198,7 @@ class MainWindow(QMainWindow):
             daily_layout = QVBoxLayout(daily)
             daily_actions = QHBoxLayout()
             calendar_button = QPushButton("Calendario de actividades y citas")
-            calendar_button.clicked.connect(lambda: CalendarDialog(factory, account_id).exec())
+            calendar_button.clicked.connect(lambda: open_workspace_tab("Calendario", lambda: CalendarDialog(factory, account_id), "calendario"))
             daily_actions.addWidget(calendar_button)
             daily_actions.addStretch(1)
             daily_layout.addLayout(daily_actions)
@@ -1180,7 +1214,7 @@ class MainWindow(QMainWindow):
             minor_info_page = QWidget()
             tabs.addTab(minor_info_page, "Información del menor")
             add_actions(minor_info_page, [
-                ("Abrir ficha de un menor", "Consulta y actualiza los datos generales, sanitarios y documentos escaneados desde una única ficha.", lambda: ExpedientesDialog(factory, account_id, documents_opener=lambda minor_id: DocumentsDialog(factory, account_id, paths, minor_id=minor_id).exec()).exec()),
+                ("Abrir ficha de un menor", "Consulta y actualiza los datos generales, sanitarios y documentos escaneados desde una única ficha.", lambda: open_workspace_tab("Expedientes", lambda: ExpedientesDialog(factory, account_id, documents_opener=lambda minor_id: open_workspace_tab(f"Documentos · {minor_id[:8]}", lambda: DocumentsDialog(factory, account_id, paths, minor_id=minor_id), f"documentos:{minor_id}")), "expedientes")),
             ])
         else:
             for label in ("Parte diario / Calendario", "Información del menor"):
@@ -1196,10 +1230,10 @@ class MainWindow(QMainWindow):
             administration = QWidget()
             tabs.addTab(administration, "Administración")
             add_actions(administration, [
-                ("Administrar cuentas", "Crea y administra cuentas, perfiles y estados de acceso.", lambda: AccountManagementDialog(factory, account_id).exec()),
-                ("Copias de seguridad", "Crea, verifica y restaura copias de la base de datos.", lambda: BackupDialog(paths, factory, account_id).exec()),
-                ("Mantenimiento y diagnóstico", "Consulta el estado técnico y las herramientas de diagnóstico.", lambda: MaintenanceDialog(paths, factory, account_id).exec()),
-                ("Estadísticas y memoria", "Genera consultas agregadas e informes de actividad.", lambda: ReportsDialog(factory, account_id).exec()),
+                ("Administrar cuentas", "Crea y administra cuentas, perfiles y estados de acceso.", lambda: open_workspace_tab("Cuentas", lambda: AccountManagementDialog(factory, account_id), "cuentas")),
+                ("Copias de seguridad", "Crea, verifica y restaura copias de la base de datos.", lambda: open_workspace_tab("Copias de seguridad", lambda: BackupDialog(paths, factory, account_id), "copias")),
+                ("Mantenimiento y diagnóstico", "Consulta el estado técnico y las herramientas de diagnóstico.", lambda: open_workspace_tab("Mantenimiento", lambda: MaintenanceDialog(paths, factory, account_id), "mantenimiento")),
+                ("Estadísticas y memoria", "Genera consultas agregadas e informes de actividad.", lambda: open_workspace_tab("Estadísticas", lambda: ReportsDialog(factory, account_id), "estadisticas")),
             ])
 
         # La navegación queda a la izquierda y el área central conserva el espacio
