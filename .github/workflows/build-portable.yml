@@ -12,8 +12,8 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -35,7 +35,7 @@ jobs:
           if (!(Test-Path "dist/GestionCentro/GestionCentro.exe")) { throw "Executable missing" }
           if (!(Test-Path "dist/GestionCentro/_internal/alembic.ini")) { throw "Alembic config missing" }
           if (!(Test-Path "dist/GestionCentro/_internal/migrations/versions/0001_auth_core.py")) { throw "Migration missing" }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: GestionCentro-Windows-portable
           path: dist/GestionCentro/
