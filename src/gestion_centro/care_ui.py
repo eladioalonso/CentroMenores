@@ -1062,8 +1062,15 @@ class HealthDialog(StaySelectorDialog):
                         active=active.isChecked(),
                     )
                 else:
+                    active_stay = session.scalar(select(Stay).where(
+                        Stay.minor_id == self.stay.currentData(), Stay.status == "active"
+                    ))
+                    if active_stay is None:
+                        raise ValueError(
+                            "Para registrar una pauta de medicación, el residente debe tener un ingreso activo."
+                        )
                     add_medication_plan(
-                        session, actor_account_id=self.actor_id, minor_id=self.stay.currentData(),
+                        session, actor_account_id=self.actor_id, stay_id=active_stay.id,
                         medication_name=medication.text().strip(), prescribed_dose=dose.text().strip(),
                         schedule_text=instructions.toPlainText().strip(),
                         prescriber_reference=reference.text().strip(),
