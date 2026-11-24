@@ -188,6 +188,14 @@ def test_vaccine_administration_preserves_traceability_and_validates_health_docu
  assert record.source_document_id==doc.id
 
 
+def test_vaccine_record_rejects_overlong_dose_reference(health_case):
+ s,actor,stay=health_case
+ with pytest.raises(ValueError,match="referencia de dosis"):
+  add_vaccine_record(s,actor_account_id=actor,minor_id=s.get(Stay,stay).minor_id,
+   vaccine_name="Vacuna ficticia",administered_on=date(2026,1,2),
+   dose_reference="X"*81)
+
+
 def test_vaccine_record_rejects_future_administration_date(health_case):
  s,actor,stay=health_case
  from datetime import timedelta
