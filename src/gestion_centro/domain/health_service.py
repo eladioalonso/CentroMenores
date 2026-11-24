@@ -448,6 +448,8 @@ def add_vaccine_record(session: Session, *, actor_account_id: str, vaccine_name:
     if not vaccine_name.strip(): raise ValueError("La vacuna es obligatoria")
     if administered_on > date.today():
         raise ValueError("La fecha de administración no puede ser futura")
+    if dose_reference and len(dose_reference) > 80:
+        raise ValueError("La referencia de dosis supera la longitud permitida")
     if calendar_item_id:
         item = session.get(VaccineCalendarItem, calendar_item_id)
         if item is None or item.entry_kind != "dose":
