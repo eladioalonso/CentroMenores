@@ -1128,7 +1128,7 @@ class MainWindow(QMainWindow):
                 lambda: open_workspace_tab("Salidas", lambda: OutingsDialog(factory, account_id), "salidas"))
             dashboard_card(1, 0, "returns", "Retornos atrasados",
                 "Salidas en curso cuya hora prevista de regreso ya ha pasado.",
-                lambda: OutingsDialog(factory, account_id).exec())
+                lambda: open_workspace_tab("Salidas", lambda: OutingsDialog(factory, account_id), "salidas"))
             dashboard_card(1, 1, "incidents", "Incidencias abiertas",
                 "Incidencias formales pendientes de cierre.",
                 lambda: open_workspace_tab("Parte diario", lambda: DiaryDialog(factory, account_id), "diario"))
@@ -1137,7 +1137,7 @@ class MainWindow(QMainWindow):
                 lambda: open_workspace_tab("Agenda", lambda: AgendaDialog(factory, account_id), "agenda"))
             dashboard_card(2, 1, "agenda", "Agenda próxima",
                 "Elementos pendientes o en curso con fecha futura.",
-                lambda: AgendaDialog(factory, account_id).exec())
+                lambda: open_workspace_tab("Agenda", lambda: AgendaDialog(factory, account_id), "agenda"))
             refresh_button = QPushButton("Actualizar contadores")
             refresh_button.clicked.connect(refresh_dashboard)
             dashboard_layout.addWidget(refresh_button)
