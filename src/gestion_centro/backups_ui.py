@@ -18,6 +18,17 @@ class BackupDialog(QDialog):
         self.resize(760, 480)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Las copias incluyen la base de datos, documentos e imágenes."))
+        security_notice = QLabel(
+            "IMPORTANTE: los archivos ZIP no están cifrados. Pueden contener datos personales "
+            "y sanitarios. Guárdalos únicamente en soportes cifrados y con acceso restringido. "
+            "La verificación comprueba la integridad, no cifra ni protege el contenido."
+        )
+        security_notice.setWordWrap(True)
+        security_notice.setStyleSheet(
+            "background: #FFF4E5; color: #754B16; border: 1px solid #E8C98F; "
+            "border-radius: 6px; padding: 9px;"
+        )
+        layout.addWidget(security_notice)
         actions = QHBoxLayout()
         create = QPushButton("Crear copia manual")
         create.clicked.connect(self.create_manual)
